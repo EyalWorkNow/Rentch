@@ -32,6 +32,7 @@ import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -49,8 +50,6 @@ class SearchChatScreen extends StatefulWidget {
   @override
   State<SearchChatScreen> createState() => _SearchChatScreenState();
 }
-
-const _botName = 'אתי';
 
 class _ChatMsg {
   _ChatMsg({
@@ -124,16 +123,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   final Set<String> _interviewAsked = {};
   bool _interviewIntroShown = false;
 
-  static const _starterChips = [
-    '3 חדרים בתל אביב עד 7000, עם מרפסת',
-    'ליד הרכבת, משופצת, לזוג עם כלב',
-    'דירה בחיפה עם חניה ומעלית',
-  ];
+  List<String> _starterChips(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.searchChatScreen7ea53091,
+      l10n.searchChatScreenC2031464,
+      l10n.searchChatScreen13a0e834,
+    ];
+  }
+
+  bool _greetingAdded = false;
 
   @override
   void initState() {
     super.initState();
-    _messages.add(_greetingMsg());
     _loadConsent();
     _seedFromPersona();
     // Start pulling the FULL catalogue now (idempotent, ~10 extra pages) while
@@ -141,6 +144,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // the first 150 loaded rows and miss listings on page 2+.
     unawaited(context.read<DatingProvider>().ensureFullCatalogLoaded());
     SpeedMode.immediate.addListener(_onSpeedModeChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The greeting needs AppLocalizations, which isn't safely available in
+    // initState() — didChangeDependencies is the correct place to read it once.
+    if (!_greetingAdded) {
+      _greetingAdded = true;
+      _messages.add(_greetingMsg(context));
+    }
   }
 
   /// Personalise for a returning user: pre-fill what we already know with high
@@ -162,24 +176,30 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
-  _ChatMsg _greetingMsg() => _ChatMsg(
-        role: 'assistant',
-        text:
-            'היי! אני $_botName 👋 כיף להכיר.\nאני כאן כדי לעזור לך למצוא בית שבאמת '
-            'מתאים לך — בלי לחץ ובקצב שלך. ספר לי קצת עליך ועל מה שאתה מחפש, '
-            'במילים שלך, ואני אדאג לשאר. 🙂',
-        chips: _starterChips,
-      );
+  String _botName(BuildContext context) =>
+      AppLocalizations.of(context)!.searchChatScreen8e4d1523;
+
+  _ChatMsg _greetingMsg(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return _ChatMsg(
+      role: 'assistant',
+      text: l10n.searchChatScreen4d424290(_botName(context)) +
+          l10n.searchChatScreenE14f1c0d +
+          l10n.searchChatScreen997d1274,
+      chips: _starterChips(context),
+    );
+  }
 
   // "חיפושים אחרונים" — a compact sheet of the user's recent queries. Tapping
   // one starts a fresh conversation seeded with that query so it re-runs.
   Future<void> _showSearchHistory() async {
+    final l10n = AppLocalizations.of(context)!;
     final items = await _history.load();
     if (!mounted) return;
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('אין עדיין חיפושים קודמים'),
-        duration: Duration(milliseconds: 1800),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.searchChatScreenCcd6fad4),
+        duration: const Duration(milliseconds: 1800),
       ));
       return;
     }
@@ -202,8 +222,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                   children: [
                     const Icon(IconsaxPlusLinear.clock, size: 20),
                     const SizedBox(width: 8),
-                    const Text('חיפושים אחרונים',
-                        style: TextStyle(
+                    Text(l10n.searchChatScreenE13c91de,
+                        style: const TextStyle(
                             fontSize: 17, fontWeight: FontWeight.w800)),
                     const Spacer(),
                     TextButton(
@@ -211,7 +231,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                         await _history.clear();
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
-                      child: Text('נקה',
+                      child: Text(l10n.searchChatScreenE8b3a3d5,
                           style: TextStyle(color: AppColors.textSecondary)),
                     ),
                   ],
@@ -261,7 +281,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _voicePendingLocationText = null;
       _lastReply = '';
       _lastShowedResults = false;
-      _messages.add(_greetingMsg());
+      _messages.add(_greetingMsg(context));
     });
     _scrollToEnd();
   }
@@ -275,6 +295,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // the persona seed still personalises ranking silently, it just isn't shown as
     // "הסינונים שלך" before the user has done anything.
     if (_query.isEmpty || !_searched) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     final items = <Widget>[];
     if (_query.neighborhood != null) {
       items.add(_removableChip(IconsaxPlusLinear.location, _query.neighborhood!,
@@ -290,19 +311,19 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
     if (_query.minRooms != null || _query.maxRooms != null) {
       items.add(_removableChip(IconsaxPlusLinear.category,
-          '${_roomsChipLabel()} חד׳', () => _drop(rooms: true)));
+          l10n.searchChatScreen9f2426ad(_roomsChipLabel()), () => _drop(rooms: true)));
     }
     if (_query.minPrice != null || _query.maxPrice != null) {
       items.add(_removableChip(
-          IconsaxPlusLinear.wallet_money, _priceChipLabel(), () => _drop(price: true)));
+          IconsaxPlusLinear.wallet_money, _priceChipLabel(context), () => _drop(price: true)));
     }
     if (_query.nearTrain) {
       items.add(_removableChip(
-          IconsaxPlusLinear.bus, 'ליד הרכבת', () => _drop(train: true)));
+          IconsaxPlusLinear.bus, l10n.searchChatScreen255d7425, () => _drop(train: true)));
     }
     if (_query.cheapPreference) {
       items.add(_removableChip(
-          IconsaxPlusLinear.tag, 'הכי משתלם', () => _drop(cheap: true)));
+          IconsaxPlusLinear.tag, l10n.searchChatScreen679a8520, () => _drop(cheap: true)));
     }
     for (final a in _query.amenities) {
       // Strip the emoji prefix the tag carries — the chip now uses an iconsax icon.
@@ -319,7 +340,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          Text('הסינון שלך:',
+          Text(l10n.searchChatScreen3fd04a29,
               style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
@@ -360,14 +381,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final lo = _query.minRooms, hi = _query.maxRooms;
     if (lo != null && hi != null) return lo == hi ? f(lo) : '${f(lo)}-${f(hi)}';
     if (lo != null) return '${f(lo)}+';
-    return 'עד ${f(hi!)}';
+    return AppLocalizations.of(context)!.searchChatScreen4d756cba(f(hi!));
   }
 
-  String _priceChipLabel() {
+  String _priceChipLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final lo = _query.minPrice, hi = _query.maxPrice;
     if (lo != null && hi != null) return '₪${_money(lo)}–${_money(hi)}';
-    if (hi != null) return 'עד ₪${_money(hi)}';
-    return 'מ-₪${_money(lo!)}';
+    if (hi != null) return l10n.searchChatScreenB3cd0d47(_money(hi));
+    return l10n.searchChatScreen043b90f3(_money(lo!));
   }
 
   void _drop(
@@ -424,10 +446,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   Future<void> _rerunSearch() async {
     if (!_searched) return;
+    final l10n = AppLocalizations.of(context)!;
     if (_query.isEmpty) {
       setState(() => _messages.add(_ChatMsg(
           role: 'assistant',
-          text: 'ניקיתי את הסינון 🙂 ספר לי מה לחפש עכשיו.')));
+          text: l10n.searchChatScreenF85b1711)));
       _scrollToEnd();
       return;
     }
@@ -443,8 +466,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _messages.add(_ChatMsg(
         role: 'assistant',
         text: results.isEmpty
-            ? 'אחרי העדכון לא נשארו התאמות. אפשר להוסיף משהו אחר?'
-            : 'עדכנתי לפי השינוי 👇',
+            ? l10n.searchChatScreen2611b32a
+            : l10n.searchChatScreenA55284d7,
         scored: results,
         chips: results.isEmpty ? const [] : _refinePromptChips(),
       ));
@@ -458,6 +481,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   static const int _kCollapsedResults = 5;
 
   Widget _resultList(_ChatMsg m) {
+    final l10n = AppLocalizations.of(context)!;
     final total = m.scored.length;
     final show =
         m.expanded ? total : (total > _kCollapsedResults ? _kCollapsedResults : total);
@@ -511,14 +535,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2)),
                       const SizedBox(width: 8),
-                      Text('מחפש עוד דירות…',
+                      Text(l10n.searchChatScreen6f6b921d,
                           style: TextStyle(
                               color: AppColors.primaryDark,
                               fontWeight: FontWeight.w700,
                               fontSize: 13)),
                     ])
                   : Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(_showMoreLabel(m),
+                      Text(_showMoreLabel(m, l10n),
                           style: TextStyle(
                               color: AppColors.primaryDark,
                               fontWeight: FontWeight.w700,
@@ -533,12 +557,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     ]);
   }
 
-  String _showMoreLabel(_ChatMsg m) {
+  String _showMoreLabel(_ChatMsg m, AppLocalizations l10n) {
     // Before expanding, offer the hidden pool count; after, it's a widen fetch.
     if (!m.expanded && m.scored.length > _kCollapsedResults) {
-      return 'הצג עוד ${m.scored.length - _kCollapsedResults} דירות';
+      return l10n.searchChatScreen4636c484(m.scored.length - _kCollapsedResults);
     }
-    return 'הצג עוד דירות';
+    return l10n.searchChatScreenCc493224;
   }
 
   Future<void> _showMore(_ChatMsg m) async {
@@ -721,6 +745,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // into the chat, and returns a short spoken summary + the results for אתי.
   Future<({List<ScoredProperty> results, String summary})> _handleRealtimeSearch(
       Map<String, dynamic> args) async {
+    final l10n = AppLocalizations.of(context)!;
     final provider = context.read<DatingProvider>();
     // Amenities: accept both the legacy `amenities` and the new `features` (feat_*)
     // the tool now emits.
@@ -798,7 +823,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         if (results.isNotEmpty) {
           _messages.add(_ChatMsg(
               role: 'assistant',
-              text: 'הנה כמה דירות שמתאימות למה שסיפרת 👇',
+              text: l10n.searchChatScreen7ce13a9c,
               scored: results,
               chips: _refinePromptChips()));
         }
@@ -806,13 +831,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _scrollToEnd();
     }
     final summary = results.isEmpty
-        ? 'לא מצאתי דירה מדויקת, אפשר להרחיב אזור או תקציב?'
-        : 'מצאתי ${results.length} דירות שמתאימות, הן מופיעות עכשיו על המסך';
+        ? l10n.searchChatScreenA6e71e55
+        : l10n.searchChatScreen61081906(results.length);
     return (results: results, summary: summary);
   }
 
   // Understood-criteria chips for the voice screen (mirrors the chat criteria bar).
-  List<String> _voiceCriteria() {
+  List<String> _voiceCriteria(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final q = _query;
     final out = <String>[];
     if (q.city != null && q.city!.trim().isNotEmpty) out.add(q.city!.trim());
@@ -822,17 +848,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (q.minRooms != null) {
       final r = q.minRooms!;
       final label = r == r.roundToDouble() ? r.toInt().toString() : r.toString();
-      out.add('$label חדרים');
+      out.add(l10n.searchChatScreenC0c2a8be(label));
     }
     if (q.maxPrice != null) {
       final p = q.maxPrice!.toString().replaceAllMapped(
           RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
-      out.add('עד $p ₪');
+      out.add(l10n.searchChatScreen35e94525(p));
     }
     for (final a in q.amenities) {
       out.add(SmartSearch.amenityTag(a));
     }
-    if (q.nearTrain) out.add('🚉 ליד הרכבת');
+    if (q.nearTrain) out.add(l10n.searchChatScreen840a3a9f);
     return out;
   }
 
@@ -848,6 +874,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // אתי's reply text (for the visualizer to read aloud) + whether listing cards
   // were rendered (so the visualizer can close and reveal them inline).
   Future<VoiceTurn> _processVoiceUtterance(String transcript) async {
+    final l10n = AppLocalizations.of(context)!;
     final t = transcript.trim();
     final wantsNow = _wantsResultsNow(t);
 
@@ -862,8 +889,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         final r = _voicePending.isNotEmpty ? _voicePending : _latestScored;
         return VoiceTurn(
           reply: r.isEmpty
-              ? 'רגע, בוא נחדד עוד קצת ואמצא לך את המתאימות'
-              : 'מעולה! הנה מה שמצאתי בשבילך 👇',
+              ? l10n.searchChatScreen5a4b1739
+              : l10n.searchChatScreenBc3b9351,
           showResults: r.isNotEmpty,
           results: r,
         );
@@ -875,8 +902,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // (don't grab GPS silently). The held utterance runs once the user taps it.
     if (_locationRelative.hasMatch(t) && _query.city == null) {
       _voicePendingLocationText = transcript;
-      return const VoiceTurn(
-        reply: 'כדי לחפש לך דירות באזור שלך אני צריכה לדעת איפה את/ה 📍 אפשר לשתף מיקום?',
+      return VoiceTurn(
+        reply: l10n.searchChatScreen95335c81,
         needLocation: true,
       );
     }
@@ -902,9 +929,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         !_voiceConsented) {
       _voiceAwaitingConsent = true;
       _voicePending = _latestScored; // hold them so "כן" reveals exactly these
-      return const VoiceTurn(
-        reply: 'מצאתי כמה אפשרויות שמתאימות למה שתיארת. '
-            'רוצה שאראה לך אותן עכשיו, או שנוסיף עוד משהו? 🙂',
+      return VoiceTurn(
+        reply: l10n.searchChatScreen1daddad9 + l10n.searchChatScreen39e1f421,
       );
     }
 
@@ -912,7 +938,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (wantsNow) _voiceConsented = true;
     return VoiceTurn(
       reply: _lastReply.isEmpty
-          ? 'ספר לי עוד קצת על מה שאתה מחפש'
+          ? l10n.searchChatScreen1f0defdc
           : _lastReply,
       showResults: _lastShowedResults,
       results: _lastShowedResults ? _latestScored : const <ScoredProperty>[],
@@ -922,14 +948,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // The user tapped the animated "share my location" button in the voice screen →
   // capture GPS, fold in the city, and run the utterance we held.
   Future<VoiceTurn> _shareLocationVoice() async {
-    final held = _voicePendingLocationText ?? 'דירה';
+    final l10n = AppLocalizations.of(context)!;
+    final held = _voicePendingLocationText ?? l10n.searchChatScreen7dae215b;
     _voicePendingLocationText = null;
     final city = await _captureGps();
     if (city == null || city.isEmpty) {
       return VoiceTurn(
         reply: _locationDeniedForever
-            ? 'צריך לאשר גישה למיקום בהגדרות 📍 — או פשוט תגיד/י לי באיזו עיר לחפש'
-            : 'לא הצלחתי לזהות מיקום כרגע 🙈 באיזו עיר לחפש?',
+            ? l10n.searchChatScreen320230a9
+            : l10n.searchChatScreenE9aa1c0c,
       );
     }
     if (mounted) _query = _merge(_query, SearchQuery(city: city));
@@ -992,6 +1019,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // (the OS permission prompt is the approval), set the city, and search. This is
   // the only place that reads location, and only after an explicit user tap.
   Future<void> _shareLocationNow() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _messages.removeWhere((m) => m.locationRequest);
       _busy = true;
@@ -1002,7 +1030,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       setState(() {
         _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'לא הצלחתי לזהות מיקום כרגע 🙈 אפשר פשוט להגיד לי באיזו עיר לחפש?'));
+            text: l10n.searchChatScreen3135f25b));
         _busy = false;
       });
       _scrollToEnd();
@@ -1011,7 +1039,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _query = _merge(_query, SearchQuery(city: city));
     setState(() => _messages.add(_ChatMsg(
         role: 'assistant',
-        text: '📍 מצאתי אותך — את/ה ב$city. מחפשת שם עכשיו את מה שהכי מתאים 👇')));
+        text: l10n.searchChatScreenF1e58bcd(city))));
     final provider = context.read<DatingProvider>();
     var results = _rankByLifestyle(
             _applyLifestyleFilter(await _cohortRanked(provider, limit: 40)))
@@ -1024,12 +1052,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       if (results.isEmpty) {
         _messages.add(_ChatMsg(
             role: 'assistant',
-            text:
-                'לא צפו כרגע התאמות מדויקות באזור שלך — נרחיב תקציב או אזור?'));
+            text: l10n.searchChatScreenD94e281c));
       } else {
         _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'הנה מה שהכי מתאים לך באזור שלך 👇',
+            text: l10n.searchChatScreenD42b5de4,
             scored: results,
             chips: _refinePromptChips()));
       }
@@ -1134,18 +1161,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   /// A friendly on-device acknowledgement so fast mode never leaves אתי silent
   /// when there's nothing to search or clarify yet.
   String _localAck() {
+    final l10n = AppLocalizations.of(context)!;
     if (_query.isEmpty) {
-      return 'ספר/י לי מה מחפשים — עיר, תקציב, כמה חדרים, ומה חשוב לך 🙂';
+      return l10n.searchChatScreen6f5e36b8;
     }
-    return 'קיבלתי 👍 עוד משהו שחשוב לך, או שאראה לך דירות עכשיו?';
+    return l10n.searchChatScreen3130f977;
   }
 
   String _instantReply(bool shouldSearch, List<ScoredProperty> results,
-      bool anyExact) {
+      bool anyExact, BuildContext context) {
     if (!shouldSearch || results.isEmpty) return '';
+    final l10n = AppLocalizations.of(context)!;
     return anyExact
-        ? 'הנה מה שמצאתי בשבילך 👇'
-        : 'הנה הכי קרובות למה שחיפשת 👇';
+        ? l10n.searchChatScreenE9c8b415
+        : l10n.searchChatScreen4027c8f4;
   }
 
   /// Background personalisation: after the instant on-device results are on
@@ -1199,6 +1228,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
 
+    final l10n = AppLocalizations.of(context)!;
     final provider = context.read<DatingProvider>();
 
     setState(() {
@@ -1255,7 +1285,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       setState(() {
         _messages.add(_ChatMsg(
           role: 'assistant',
-          text: 'כדי למצוא לך דירות באזור שלך, אני רק צריכה לזהות איפה את/ה 📍\nלשתף את המיקום?',
+          text: l10n.searchChatScreen55799661,
           locationRequest: true,
         ));
         _busy = false;
@@ -1290,12 +1320,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         // Ask the next question (with its "why") instead of searching yet.
         final intro = _interviewIntroShown
             ? ''
-            : 'כמה שאלות קצרות כדי לדייק בשבילך 🙂\n\n';
+            : l10n.searchChatScreen9ccf780f;
         _interviewIntroShown = true;
         _interviewAsked.add(nextQ.key);
         // From the 2nd question on, add a skip chip so the user is never stuck.
         final chips = asked >= 1
-            ? [...nextQ.chips, 'תראי לי דירות עכשיו']
+            ? [...nextQ.chips, l10n.searchChatScreen37cee5fa]
             : nextQ.chips;
         if (!mounted) return;
         setState(() {
@@ -1330,7 +1360,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       anyExact = results.any((r) => r.exact);
     }
     // Instant canned reply now; the warm GPT reply is upgraded in the background.
-    final sr = (_instantReply(shouldSearch, results, anyExact), const <String>[]);
+    final sr = (_instantReply(shouldSearch, results, anyExact, context), const <String>[]);
 
     // ANTI-HALLUCINATION: when the EXACT request has no match, do NOT silently
     // drop filters and show mismatched flats. First look for the SAME filters
@@ -1341,9 +1371,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       final nearby = _nearbySameFilters(_query, provider, km: 10);
       if (nearby.isNotEmpty) {
         results = nearby;
-        final city = _query.city?.trim() ?? 'שם';
-        widenNote = 'לא מצאתי דירות שעונות בדיוק לבקשה ב$city עם הסינונים האלה — '
-            'אבל אלה עד 10 ק"מ מ$city, עם אותם סינונים בדיוק (לא רחוק!)';
+        final city = _query.city?.trim() ?? l10n.searchChatScreen8b1aa6b1;
+        widenNote = l10n.searchChatScreen8c180264(city) +
+            l10n.searchChatScreenCeed4a22(city);
       }
     }
 
@@ -1368,8 +1398,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         final reality = BudgetRealityCheck.assess(_query);
         if (reality.needsGuidance) {
           final chips = <String>[
-            if (reality.expected != null) 'עד ${reality.expected} ₪',
-            if (reality.nearbyCity != null) 'אזור ${reality.nearbyCity}',
+            if (reality.expected != null) l10n.searchChatScreenF7b15001(reality.expected!.toString()),
+            if (reality.nearbyCity != null) l10n.searchChatScreenDc2e4dcf(reality.nearbyCity!),
           ];
           _messages.add(_ChatMsg(
               role: 'assistant', text: reality.message, chips: chips));
@@ -1377,16 +1407,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         if (results.isEmpty) {
           // Honest — nothing matched, not even within 10km with the same filters.
           // Offer concrete ways to relax (tapping a chip re-runs the search).
-          final city = _query.city?.trim() ?? 'האזור הזה';
+          final city = _query.city?.trim() ?? l10n.searchChatScreen616a9ead;
           final chips = <String>[];
-          if (_query.city != null) chips.add('אזור ${_query.city}');
+          if (_query.city != null) chips.add(l10n.searchChatScreenA62ac675(_query.city!));
           if (_query.maxPrice != null) {
-            chips.add('עד ${(_query.maxPrice! * 1.2).round()} ₪');
+            chips.add(l10n.searchChatScreenE8ad7744(
+                (_query.maxPrice! * 1.2).round().toString()));
           }
           _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'לא מצאתי דירות שעונות לבקשה ב$city עם הסינונים האלה 😕\n'
-                'אפשר להרחיב את האזור, להעלות תקציב או להוריד סינונים כדי למצוא אופציות מתאימות.',
+            text: l10n.searchChatScreen02622166(city) +
+                l10n.searchChatScreen25b42314,
             chips: chips,
           ));
         } else {
@@ -1410,18 +1441,18 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           // built fallback, then gets upgraded to the LLM's warm version below.
           howChoseMsg = _ChatMsg(
             role: 'assistant',
-            text: _howIChoseFallback(results),
+            text: _howIChoseFallback(results, context),
           );
           _messages.add(howChoseMsg!);
           final exactCount = results.where((r) => r.exact).length;
           resultsMsg = _ChatMsg(
             role: 'assistant',
             text: !anyExact
-                ? 'אלה הכי קרובות למה שחיפשת 👇'
+                ? l10n.searchChatScreen3a89ba73
                 : exactCount == results.length
-                    ? 'מצאתי $exactCount דירות שמתאימות לך 🎯'
-                    : 'מצאתי $exactCount שמתאימות בול, והוספתי עוד קרובות '
-                        'כדי שיהיה ממה לבחור 👇',
+                    ? l10n.searchChatScreen94ee5876(exactCount.toString())
+                    : l10n.searchChatScreenA5a08a80(exactCount.toString()) +
+                        l10n.searchChatScreen19e1fa38,
             scored: results,
             chips: _refinePromptChips(),
           );
@@ -1541,14 +1572,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // Engine-only fallback "how I chose these", built from the top scorecards when
   // the LLM is unavailable — still cites real data so the header stays honest.
-  String _howIChoseFallback(List<ScoredProperty> results) {
+  String _howIChoseFallback(List<ScoredProperty> results, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final cards = results
         .map((r) => r.scorecard)
         .whereType<Scorecard>()
         .toList();
     if (cards.isEmpty) {
-      return 'דירגתי כל דירה לפי ציון רב-ממדי — תמורה למחיר, מיקום, '
-          'קרבה לתחבורה ובטיחות — והצפתי את ההתאמות הטובות ביותר.';
+      return l10n.searchChatScreen642c3ded + l10n.searchChatScreenB35c8d26;
     }
     // Which dimensions weighed most across the top picks?
     final weight = <String, double>{};
@@ -1565,24 +1596,24 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         .map((e) => labels[e.key] ?? e.key)
         .toList();
     final best = cards.first;
-    final sb = StringBuffer('כך בחרתי: שקללתי בעיקר ');
-    sb.write(topDims.isEmpty ? 'תמורה למחיר ומיקום' : _joinHe(topDims));
-    sb.write(' על בסיס נתוני אמת. ');
+    final sb = StringBuffer(l10n.searchChatScreen316236bf);
+    sb.write(topDims.isEmpty ? l10n.searchChatScreen5c0f04c1 : _joinHe(topDims, l10n));
+    sb.write(l10n.searchChatScreenEcd67fb1);
     if (best.personaReasons.isNotEmpty) {
-      sb.write('התאמתי גם להעדפות שלך — ${best.personaReasons.first}. ');
+      sb.write(l10n.searchChatScreenB3622b1e(best.personaReasons.first));
     }
-    sb.write('בראש הרשימה ${best.fitPct}% התאמה');
+    sb.write(l10n.searchChatScreen2b144437(best.fitPct.toString()));
     if (best.tier.isNotEmpty) sb.write(' (${best.tier})');
-    sb.write('. הקש "למה זו?" על כל דירה לפירוט המלא.');
+    sb.write(l10n.searchChatScreenE9fe38e7);
     return sb.toString();
   }
 
   // Hebrew-friendly list join: "א, ב ו-ג".
-  String _joinHe(List<String> items) {
+  String _joinHe(List<String> items, AppLocalizations l10n) {
     if (items.isEmpty) return '';
     if (items.length == 1) return items.first;
     final head = items.sublist(0, items.length - 1).join(', ');
-    return '$head ו${items.last}';
+    return l10n.searchChatScreenE7d0c3b9(head, items.last);
   }
 
   // Warm conversational reply from server נועה (Gemini, tenant_search mode);
@@ -1611,6 +1642,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Warm, persona-aware reply built with NO LLM call. Returns null when the input
   // is non-Hebrew or too vague — those go to GPT (correct language / real nuance).
   String? _localReply() {
+    final l10n = AppLocalizations.of(context)!;
     final lastUser = _messages.lastWhere((m) => m.role == 'user',
         orElse: () => _ChatMsg(role: 'user'));
     final text = lastUser.text;
@@ -1627,25 +1659,33 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final parts = <String>[];
     if (q.minRooms != null) {
       final r = q.minRooms!;
-      parts.add('${r == r.roundToDouble() ? r.toInt() : r} חדרים');
+      parts.add(l10n.searchChatScreen121302b1(
+          r == r.roundToDouble() ? r.toInt().toString() : r.toString()));
     }
-    if (q.city != null && q.city!.trim().isNotEmpty) parts.add('ב${q.city!.trim()}');
+    if (q.city != null && q.city!.trim().isNotEmpty) {
+      parts.add(l10n.searchChatScreenD2776ad7(q.city!.trim()));
+    }
     if (q.maxPrice != null) {
       final p = q.maxPrice!.toString().replaceAllMapped(
           RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
-      parts.add('עד $p ₪');
+      parts.add(l10n.searchChatScreen35e94525(p));
     }
     final summary = parts.join(' ');
 
-    const openers = ['הבנתי 😊', 'מעולה, קלטתי', 'אחלה, הבנתי', 'סבבה, הבנתי'];
+    final openers = [
+      l10n.searchChatScreen74c3e44d,
+      l10n.searchChatScreen034ce5a9,
+      l10n.searchChatScreen09cbbf65,
+      l10n.searchChatScreen8135ce70,
+    ];
     final opener = openers[(_openerIdx++) % openers.length];
 
     // Enough to search (city + budget or rooms) → reflect + go straight to results.
     final enough = q.city != null && (q.maxPrice != null || q.minRooms != null);
     if (enough || _searched || _userTurns >= 2) {
       return summary.isEmpty
-          ? '$opener. בודקת מה הכי מתאים לך 👇'
-          : '$opener — $summary. בודקת מה הכי מתאים לך 👇';
+          ? l10n.searchChatScreen62cb3d3d(opener)
+          : l10n.searchChatScreen22a8276a(opener, summary);
     }
     // Otherwise ask ONE persona-appropriate follow-up (still no LLM).
     final follow = _cohortFollowup();
@@ -1655,24 +1695,25 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // A warm follow-up question tuned to the detected persona — a fixed, reused
   // library (no tokens).
   String _cohortFollowup() {
+    final l10n = AppLocalizations.of(context)!;
     final s = SmartSearch.cohortSignals(_conversationText);
     if (s['household'] == 'family' || _persona['baby'] == 'true') {
-      return 'מה הכי חשוב לכם — קרבה לגנים ובתי ספר, ממ״ד, או שקט?';
+      return l10n.searchChatScreen344ff8c5;
     }
     if (s['lifeStage'] == 'student' || s['household'] == 'student') {
-      return 'מעדיפ/ה דירת שותפים או משהו לבד? וכמה קריטית הקרבה לאוניברסיטה?';
+      return l10n.searchChatScreen25af8375;
     }
     if (s['isInvestor'] == 'true') {
-      return 'זו השקעה לשכירות או לקנייה? ומה הכי חשוב לך בתשואה?';
+      return l10n.searchChatScreen4729c6ea;
     }
     if (s['lifeStage'] == 'senior' || s['accessibilityNeed'] == 'true') {
-      return 'חשוב מעלית וקומה נמוכה? וקרבה לשירותי בריאות?';
+      return l10n.searchChatScreenDe6c778e;
     }
-    if (s['wfh'] == 'true') return 'צריך חדר עבודה נפרד ושקט? ואינטרנט מהיר?';
+    if (s['wfh'] == 'true') return l10n.searchChatScreen1a7921f2;
     if (_persona['religiosity'] != null || s['isReligious'] == 'true') {
-      return 'חשוב לכם קרבה לבית כנסת ולמוסדות שמתאימים לכם?';
+      return l10n.searchChatScreen6f0e9087;
     }
-    return 'מה עוד חשוב לך — אווירת שכונה, קומה, או משהו ספציפי בדירה?';
+    return l10n.searchChatScreenB7874897;
   }
 
   // ── Personalization interview ──────────────────────────────────────────────
@@ -1683,6 +1724,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   /// most-decisive first (area → budget → household → the #1 priority) and
   /// capped at 3 questions in [_send].
   ({String key, String q, String why, List<String> chips})? _nextInterviewQuestion() {
+    final l10n = AppLocalizations.of(context)!;
     final s = SmartSearch.cohortSignals(_conversationText);
     final household = _persona['household'] ?? s['household'];
     bool has(String k) => _interviewAsked.contains(k);
@@ -1696,78 +1738,105 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // already knows from the free text, so a rich opener may ask fewer.
     // 1) WHERE
     if (_query.city == null && _query.neighborhood == null) {
-      add('area', 'באיזה אזור לחפש?',
-          'המיקום קובע כמעט הכל.',
-          ['תל אביב', 'ירושלים', 'חיפה', 'מרכז/השרון', 'באר שבע']);
+      add('area', l10n.searchChatScreenD3cb993d,
+          l10n.searchChatScreen61710995,
+          [
+            l10n.searchChatScreen2c1f2bbd,
+            l10n.searchChatScreen8e0dfe1e,
+            l10n.searchChatScreenCa1cc213,
+            l10n.searchChatScreenF3acedbf,
+            l10n.searchChatScreen35529032,
+          ]);
     }
     // 2) HOW MUCH
     if (_query.maxPrice == null) {
-      add('budget', 'תקציב חודשי מקסימלי?',
-          'שאראה רק דירות אפשריות.',
-          ['עד 4,000', '4,000-6,000', '6,000-9,000', 'מעל 9,000']);
+      add('budget', l10n.searchChatScreen8c19300f,
+          l10n.searchChatScreenDd0caf20,
+          [l10n.searchChatScreen1dc1a458, '4,000-6,000', '6,000-9,000', l10n.searchChatScreenBbdaa418]);
     }
     // 3) WHO (only while unknown)
     if (household == null) {
-      add('household', 'מי גר בדירה?',
-          'קובע כמה חדרים וצרכים בשכונה.',
-          ['לבד', 'זוג', 'משפחה עם ילדים', 'שותפים']);
+      add('household', l10n.searchChatScreen5e0214d0,
+          l10n.searchChatScreen27e52fe1,
+          [
+            l10n.searchChatScreenCaef6ad4,
+            l10n.searchChatScreen4df994d0,
+            l10n.searchChatScreen52204c3c,
+            l10n.searchChatScreenB5c68bd1,
+          ]);
     }
     // The single most important factor — the always-relevant closer.
-    add('priority', 'הכי חשוב לך בדירה?',
-        'זה מה שידחוף את ההצעות הנכונות למעלה.',
-        ['מיקום מרכזי', 'שקט', 'תמורה למחיר', 'דירה מרווחת', 'קרוב לעבודה']);
+    add('priority', l10n.searchChatScreenEe542324,
+        l10n.searchChatScreenB86b9b16,
+        [
+          l10n.searchChatScreenAb3f526d,
+          l10n.searchChatScreen40d07087,
+          l10n.searchChatScreen4e515b14,
+          l10n.searchChatScreen68579629,
+          l10n.searchChatScreenCd73f9c6,
+        ]);
 
     return out.isEmpty ? null : out.first;
   }
 
   int _warmIdx = 0;
   String _warmFallback() {
-    const lines = [
-      'כיף, נשמע שיש לך כיוון 🙌 ספר לי עוד קצת — אזור, תקציב, כמה חדרים?',
-      'הבנתי אותך. מה הכי חשוב לך בדירה או בשכונה?',
-      'אהבתי. רוצה שאראה לך כבר כמה אפשרויות, או שנחדד עוד קצת?',
+    final l10n = AppLocalizations.of(context)!;
+    final lines = [
+      l10n.searchChatScreenC5847f1d,
+      l10n.searchChatScreenE6d0829f,
+      l10n.searchChatScreenC752e50e,
     ];
     return lines[(_warmIdx++) % lines.length];
   }
 
   // Concrete refinement suggestions — shown only AFTER the user opts to refine.
   List<String> _refineChips() {
+    final l10n = AppLocalizations.of(context)!;
     final chips = <String>[];
     if (_query.maxPrice != null) {
-      chips.add('עד ₪${(_query.maxPrice! * 0.85).round()}');
+      chips.add(l10n.searchChatScreen258a50bf(
+          (_query.maxPrice! * 0.85).round().toString()));
     }
-    if (_query.minRooms != null) chips.add('${(_query.minRooms! + 1).toInt()} חדרים');
-    if (!_query.amenities.contains('feat_parking')) chips.add('עם חניה');
-    if (!_query.nearTrain) chips.add('קרוב לרכבת');
-    if (!_query.amenities.contains('feat_elevator')) chips.add('עם מעלית');
+    if (_query.minRooms != null) {
+      chips.add(l10n.searchChatScreenF83283b7(
+          (_query.minRooms! + 1).toInt().toString()));
+    }
+    if (!_query.amenities.contains('feat_parking')) chips.add(l10n.searchChatScreen63cd0477);
+    if (!_query.nearTrain) chips.add(l10n.searchChatScreenEe07d486);
+    if (!_query.amenities.contains('feat_elevator')) chips.add(l10n.searchChatScreen706598a7);
     return chips.take(4).toList();
   }
 
   // Gentle refine prompt shown WITH the results (instead of dumping the options)
   // so אתי isn't naggy — she just offers to refine, and only asks the next
   // question if the user says yes.
-  static const _kRefineYes = '✨ כן, בוא נדייק';
-  static const _kRefineNo = 'זה מצוין, תודה';
-  List<String> _refinePromptChips() =>
-      _refineChips().isEmpty ? const [] : const [_kRefineYes, _kRefineNo];
+  String _kRefineYes(BuildContext context) =>
+      AppLocalizations.of(context)!.searchChatScreenE6452825;
+  String _kRefineNo(BuildContext context) =>
+      AppLocalizations.of(context)!.searchChatScreen113aa61a;
+  List<String> _refinePromptChips() => _refineChips().isEmpty
+      ? const []
+      : [_kRefineYes(context), _kRefineNo(context)];
 
   // Routes a quick-reply chip: the refine prompt is handled locally (no LLM),
   // everything else goes through the normal turn.
   void _onChipTap(String c) {
     if (_busy) return;
-    if (c == _kRefineYes) {
+    final l10n = AppLocalizations.of(context)!;
+    if (c == _kRefineYes(context)) {
       setState(() => _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'מעולה 😊 מה נדייק כדי לצמצם למה שהכי מתאים לך?',
+            text: l10n.searchChatScreen391e982f,
             chips: _refineChips(),
           )));
       _scrollToEnd();
       return;
     }
-    if (c == _kRefineNo) {
+    if (c == _kRefineNo(context)) {
       setState(() => _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'מקסים! 🙏 אם תרצה לחדד עוד משהו בהמשך — אני כאן.',
+            text: l10n.searchChatScreenD51433d2,
           )));
       _scrollToEnd();
       return;
@@ -1841,7 +1910,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (ifs.isEmpty || !mounted) return;
     setState(() => _messages.add(_ChatMsg(
           role: 'assistant',
-          text: 'רוצה עוד אפשרויות מתאימות? נסה לשנות אחד מאלה 👇',
+          text: AppLocalizations.of(context)!.searchChatScreen8b097eb6,
           whatIfs: ifs,
         )));
     _scrollToEnd();
@@ -1988,6 +2057,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // a flat 50km away or way over budget as if it fit.
   List<ScoredProperty> _verifyResults(List<ScoredProperty> results) {
     if (results.isEmpty) return results;
+    final l10n = AppLocalizations.of(context)!;
 
     final city = _query.city?.trim();
     final loc = (city != null && city.isNotEmpty)
@@ -2021,8 +2091,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         continue;
       }
       final notes = <String>[
-        if (geoFar) 'כ-${km.round()} ק״מ מ$city',
-        if (over) 'מעט מעל התקציב',
+        if (geoFar) l10n.searchChatScreenC911128e(km.round().toString(), city ?? ''),
+        if (over) l10n.searchChatScreen2820c4fe,
       ];
       nearby.add(ScoredProperty(r.property, r.score, r.tags, r.trainKm, false,
           r.scorecard, notes.join(' · ')));
@@ -2077,7 +2147,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Progressive relaxation for when nothing matches: widen budget, then drop soft
   // amenities + room floor, then (last resort) drop the city. So אתי always has
   // something close to show instead of dead-ending.
-  List<({SearchQuery q, String note})> _wideningLadder(SearchQuery q) {
+  List<({SearchQuery q, String note})> _wideningLadder(
+      SearchQuery q, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final budget = q.maxPrice;
     final up = (double f) => budget == null ? null : (budget * f).round();
     return [
@@ -2087,15 +2159,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             neighborhood: q.neighborhood,
             minRooms: q.minRooms,
             maxPrice: up(1.25)),
-        note: 'הרחבתי קצת את התקציב'
+        note: l10n.searchChatScreen55112a73
       ),
       (
         q: SearchQuery(city: q.city, maxPrice: up(1.6)),
-        note: 'הרחבתי תקציב וויתרתי על חלק מהדרישות'
+        note: l10n.searchChatScreen917c8977
       ),
       (
         q: SearchQuery(maxPrice: up(1.6)),
-        note: 'לא נמצא בדיוק בעיר הזו — הנה הכי קרוב באזורים אחרים'
+        note: l10n.searchChatScreen0b5b99ea
       ),
     ];
   }
@@ -2160,6 +2232,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   }
 
   String? _lifestyleNote() {
+    final l10n = AppLocalizations.of(context)!;
     final relName = _persona['religiosity'];
     final rel = relName == null
         ? null
@@ -2167,40 +2240,45 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             orElse: () => Religiosity.traditional);
     final parts = <String>[];
     if (rel != null) {
-      const label = {
-        'secular': 'חילוני',
-        'traditional': 'מסורתי',
-        'religious': 'דתי',
-        'haredi': 'חרדי',
+      final label = {
+        'secular': l10n.searchChatScreenB6601495,
+        'traditional': l10n.searchChatScreen50cb5eda,
+        'religious': l10n.searchChatScreen21c1f153,
+        'haredi': l10n.searchChatScreenFed27efc,
       };
-      parts.add('נתתי עדיפות לאזורים שמתאימים לאורח חיים ${label[rel.name]}');
+      parts.add(l10n.searchChatScreenA4b6a21f(label[rel.name] ?? ''));
     }
     if (_needsElevator) {
-      parts.add('ודילגתי על קומות גבוהות בלי מעלית 🛗');
+      parts.add(l10n.searchChatScreen85c47725);
     }
     if (parts.isEmpty) return null;
-    return 'שמתי לב לכמה דברים: ${parts.join(', ')}.';
+    return l10n.searchChatScreen567bc622(parts.join(', '));
   }
 
   // The single most useful missing detail, as a question + quick-reply chips.
   (String, List<String>)? _clarifyingPrompt() {
+    final l10n = AppLocalizations.of(context)!;
     if (_query.city == null) {
-      return ('באיזה אזור או עיר לחפש?', const [
-        'תל אביב',
-        'ירושלים',
-        'חיפה',
-        'מרכז',
+      return (l10n.searchChatScreenE3396557, [
+        l10n.searchChatScreen2c1f2bbd,
+        l10n.searchChatScreen8e0dfe1e,
+        l10n.searchChatScreenCa1cc213,
+        l10n.searchChatScreen3afe34bd,
       ]);
     }
     if (_query.maxPrice == null) {
-      return ('מה התקציב החודשי שלך?', const [
-        'עד ₪5,000',
-        'עד ₪7,000',
-        'עד ₪9,000',
+      return (l10n.searchChatScreen73d294f3, [
+        l10n.searchChatScreen808024f5,
+        l10n.searchChatScreenBe87f690,
+        l10n.searchChatScreenAe2323e0,
       ]);
     }
     if (_query.minRooms == null && _query.maxRooms == null) {
-      return ('כמה חדרים אתם צריכים?', const ['2 חדרים', '3 חדרים', '4 חדרים']);
+      return (l10n.searchChatScreen88a8e951, [
+        l10n.searchChatScreen1f57228c,
+        l10n.searchChatScreen535bb0c7,
+        l10n.searchChatScreen0c3da33f,
+      ]);
     }
     return null;
   }
@@ -2251,27 +2329,27 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
     _consentAsked = true;
     _pendingPersona = persona;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _messages.add(_ChatMsg(
         role: 'assistant',
         isConsent: true,
-        text:
-            'רוצה שאזכור את ההעדפות שלך כדי לדייק לך עוד יותר בפעם הבאה? '
-            'הכל מאובטח, ותמיד אפשר לבטל. 💙',
+        text: l10n.searchChatScreen32cd7c3b + l10n.searchChatScreenD5b92b5a,
       ));
     });
     _scrollToEnd();
   }
 
   Future<void> _resolveConsent(bool granted) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _consent = granted;
       _messages.removeWhere((m) => m.isConsent);
       _messages.add(_ChatMsg(
         role: 'assistant',
         text: granted
-            ? 'מעולה, תודה! מבטיחה לשמור על זה 🙌'
-            : 'אין בעיה בכלל, נמשיך ככה. 🙂',
+            ? l10n.searchChatScreenB2d293af
+            : l10n.searchChatScreenB00e7ac4,
       ));
     });
     try {
@@ -2305,6 +2383,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -2339,7 +2418,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_botName,
+                  Text(_botName(context),
                       style: TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -2352,7 +2431,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                             color: AppColors.success, shape: BoxShape.circle)),
                     const SizedBox(width: 5),
                     Flexible(
-                      child: Text('תבדוק אותי אם אני באמת עוזרת חכמה',
+                      child: Text(l10n.searchChatScreenFaae8713,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -2365,13 +2444,13 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           ]),
           actions: [
             IconButton(
-              tooltip: 'חיפושים אחרונים',
+              tooltip: l10n.searchChatScreenE13c91de,
               icon: Icon(IconsaxPlusLinear.clock,
                   color: AppColors.textSecondary, size: 22),
               onPressed: _showSearchHistory,
             ),
             IconButton(
-              tooltip: 'שיחה חדשה',
+              tooltip: l10n.searchChatScreen82c40bcf,
               icon: Icon(IconsaxPlusLinear.refresh_2,
                   color: AppColors.textSecondary, size: 24),
               onPressed: _resetConversation,
@@ -2549,6 +2628,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // אתי's GPS request → the user approves here; only then does the app capture.
   Widget _locationButtons() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [
@@ -2562,7 +2642,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          label: const Text('שתף את המיקום שלי'),
+          label: Text(l10n.searchChatScreen39e281e5),
         ),
         const SizedBox(width: 10),
         OutlinedButton(
@@ -2572,7 +2652,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                     _messages.removeWhere((m) => m.locationRequest);
                     _messages.add(_ChatMsg(
                         role: 'assistant',
-                        text: 'אין בעיה — באיזו עיר או אזור לחפש?'));
+                        text: l10n.searchChatScreenFab66f7b));
                   }),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.textSecondary,
@@ -2580,13 +2660,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Text('אגיד עיר'),
+          child: Text(l10n.searchChatScreen542039da),
         ),
       ]),
     );
   }
 
   Widget _consentButtons() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [
@@ -2599,7 +2680,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Text('כן, בשמחה'),
+          child: Text(l10n.searchChatScreen10289345),
         ),
         const SizedBox(width: 10),
         OutlinedButton(
@@ -2610,7 +2691,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Text('לא עכשיו'),
+          child: Text(l10n.searchChatScreen98c8a5b8),
         ),
       ]),
     );
@@ -2663,11 +2744,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                     textInputAction: TextInputAction.newline,
                     textCapitalization: TextCapitalization.sentences,
                     style: const TextStyle(fontSize: 15),
-                    decoration: const InputDecoration(
-                      hintText: 'ספר לי במילים שלך...',
+                    decoration: InputDecoration(
+                      hintText: AppLocalizations.of(context)!.searchChatScreenD5d02271,
                       isCollapsed: true,
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
                       border: InputBorder.none,
                     ),
                   ),
@@ -2754,6 +2835,7 @@ class _AssistantPropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final p = scored.property;
     final width = MediaQuery.of(context).size.width * 0.82;
     final saved = context.watch<DatingProvider>().isSaved(p.id);
@@ -2843,8 +2925,8 @@ class _AssistantPropertyCard extends StatelessWidget {
                             Icon(IconsaxPlusBold.verify,
                                 size: 13, color: AppColors.success),
                             const SizedBox(width: 3),
-                            const Text('מאומת',
-                                style: TextStyle(
+                            Text(l10n.searchChatScreen7de9ac58,
+                                style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.navy)),
@@ -2952,11 +3034,11 @@ class _AssistantPropertyCard extends StatelessWidget {
                     child: Row(children: [
                       _InfoChip(
                           icon: IconsaxPlusLinear.home,
-                          label: '${p.roomsLabel} חדרים'),
+                          label: l10n.searchChatScreenF0f71ca3(p.roomsLabel)),
                       const SizedBox(width: 8),
                       _InfoChip(
                           icon: IconsaxPlusLinear.maximize_3,
-                          label: '${p.sizeM2} מ״ר'),
+                          label: l10n.searchChatScreen615d28b8(p.sizeM2.toString())),
                       // Geo "X מ׳ from …" tags moved into "למה זו" (above the data
                       // sources); only plain facts stay on this quick-facts row.
                       for (final t in scored.tags.where((t) => !isGeoTag(t))) ...[

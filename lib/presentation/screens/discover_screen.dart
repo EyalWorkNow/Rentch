@@ -12,6 +12,7 @@ import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/saved_search_repository.dart';
@@ -111,9 +112,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _nlBusy = false;
         _nlSummary = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        duration: Duration(milliseconds: 2600),
-        content: Text('לא הצלחתי להבין את החיפוש. נסו למשל: "3 חדרים בתל אביב עד 6000"'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 2600),
+        content: Text(AppLocalizations.of(context)!.discoverScreenE5a47f62),
       ));
       return;
     }
@@ -131,7 +132,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       final city = query.city?.trim() ?? '';
       _nlSummary = city.isEmpty
           ? query.describe()
-          : '${query.describe()}  ·  📍 $city והסביבה הקרובה';
+          : AppLocalizations.of(context)!
+              .discoverScreenC5c195f6(query.describe(), city);
     });
   }
 
@@ -385,11 +387,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       children: [
                         _GlassPillBadge(
                           icon: IconsaxPlusLinear.building,
-                          label: '${p.roomsLabel} חד׳',
+                          label: AppLocalizations.of(context)!
+                              .discoverScreenC6efa96a(p.roomsLabel),
                         ),
                         _GlassPillBadge(
                           icon: IconsaxPlusLinear.maximize_3,
-                          label: '${p.sizeM2} מ״ר',
+                          label: AppLocalizations.of(context)!
+                              .discoverScreen615d28b8(p.sizeM2),
                         ),
                       ],
                     ),
@@ -406,7 +410,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       children: [
                         // Real engagement badges from the listing's own market
                         // signals — each hidden at 0, so no fabricated numbers.
-                        ..._realSignalBadges(p),
+                        ..._realSignalBadges(context, p),
                         Text(
                           p.priceLabel,
                           style: const TextStyle(
@@ -589,7 +593,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                     bottom: 133,
                                     left: 24,
                                     child: Tooltip(
-                                      message: 'חזור לפריט הקודם',
+                                      message: AppLocalizations.of(context)!
+                                          .discoverScreenF1872f35,
                                       child: GestureDetector(
                                         onTap: () {
                                           HapticFeedback.lightImpact();
@@ -866,7 +871,8 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
         ? tenantProfile!.photoUrls.first
         : null;
 
-    final String tenantName = tenantProfile?.name ?? 'שוכר';
+    final String tenantName = tenantProfile?.name ??
+        AppLocalizations.of(context)!.discoverScreenC4b9553a;
 
     return Material(
       color: Colors.transparent,
@@ -998,7 +1004,10 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                                       angle: 0.13, // ~ +7.5 degrees
                                       child: _MatchPolaroidCard(
                                         media: propertyMedia,
-                                        title: p.address.isNotEmpty ? p.address : 'דירה להשכרה',
+                                        title: p.address.isNotEmpty
+                                            ? p.address
+                                            : AppLocalizations.of(context)!
+                                                .discoverScreen8a84741d,
                                         fallbackIcon: Icons.apartment_rounded,
                                       ),
                                     ),
@@ -1053,10 +1062,11 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                             padding: const EdgeInsets.symmetric(horizontal: 32),
                             child: Column(
                               children: [
-                                const Text(
-                                  'צעד אחד קטן לדירה החדשה שלך',
+                                Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen4b403e4b,
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 19,
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -1065,7 +1075,8 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'נמצאה התאמה מושלמת לדירה ב${p.address}',
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen1b24cc81(p.address),
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 14.5,
@@ -1113,19 +1124,20 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                                             ),
                                           ],
                                         ),
-                                        child: const Center(
+                                        child: Center(
                                           child: Row(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Icon(
+                                              const Icon(
                                                 IconsaxPlusBold.message,
                                                 color: Colors.white,
                                                 size: 20,
                                               ),
-                                              SizedBox(width: 10),
+                                              const SizedBox(width: 10),
                                               Text(
-                                                'כתיבת הודעה למשכיר',
-                                                style: TextStyle(
+                                                AppLocalizations.of(context)!
+                                                    .discoverScreenB2320205,
+                                                style: const TextStyle(
                                                   fontSize: 17,
                                                   fontWeight: FontWeight.w900,
                                                   color: Colors.white,
@@ -1143,9 +1155,10 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                                 // Keep Browsing Button
                                 TextButton(
                                   onPressed: () => Navigator.of(context).pop(),
-                                  child: const Text(
-                                    'המשך לדפדף',
-                                    style: TextStyle(
+                                  child: Text(
+                                    AppLocalizations.of(context)!
+                                        .discoverScreen4fb78a2e,
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF94A3B8),
@@ -1359,7 +1372,7 @@ class _MatchPropertyImage extends StatelessWidget {
 // Real engagement badges for a grid card, built from the listing's own market
 // signals. Each badge appears only when its value is > 0, and "חדש!" only when
 // the listing was created in the last 7 days — no fabricated numbers.
-List<Widget> _realSignalBadges(RentalProperty p) {
+List<Widget> _realSignalBadges(BuildContext context, RentalProperty p) {
   final s = p.marketSignals;
   final isNew = p.createdAt != null &&
       DateTime.now().difference(p.createdAt!).inDays < 7;
@@ -1372,8 +1385,8 @@ List<Widget> _realSignalBadges(RentalProperty p) {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: AppColors.red.withOpacity(0.4), width: 0.8),
         ),
-        child: const Text('חדש!',
-            style: TextStyle(
+        child: Text(AppLocalizations.of(context)!.discoverScreen8542ba18,
+            style: const TextStyle(
                 color: AppColors.dangerSoft,
                 fontWeight: FontWeight.w900,
                 fontSize: 9)),
@@ -1658,7 +1671,8 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
                 // (0xFFF1F5F8) — override to keep the pill fully white.
                 filled: true,
                 fillColor: Colors.white,
-                hintText: 'חפש דירה במילים שלך…',
+                hintText:
+                    AppLocalizations.of(context)!.discoverScreen59e95c52,
                 hintStyle: TextStyle(
                   fontSize: 15,
                   color: AppColors.textSecondary.withValues(alpha: 0.8),
@@ -1672,7 +1686,9 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
             ),
           ),
           IconButton(
-            tooltip: hasContent ? 'נקה' : 'סגור',
+            tooltip: hasContent
+                ? AppLocalizations.of(context)!.discoverScreenE8b3a3d5
+                : AppLocalizations.of(context)!.discoverScreen55247199,
             icon: const RentlyIcon(IconsaxPlusLinear.close_circle,
                 size: 18, color: AppColors.textSecondary),
             onPressed:
@@ -1701,7 +1717,7 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
   Widget _belowText() {
     if (widget.summary == null) {
       return Text(
-        'נסו: "3 חדרים בצפון ת״א עד 6000"',
+        AppLocalizations.of(context)!.discoverScreen31d3427c,
         style: TextStyle(
           fontSize: 12,
           color: AppColors.textSecondary.withValues(alpha: 0.9),
@@ -1840,7 +1856,7 @@ class _HeaderMenuButtonState extends State<_HeaderMenuButton>
             ],
           ),
           child: PopupMenuButton<int>(
-            tooltip: 'עוד',
+            tooltip: AppLocalizations.of(context)!.discoverScreenB429a0f3,
             padding: EdgeInsets.zero,
             position: PopupMenuPosition.under,
             icon: const Icon(Icons.more_vert, size: 20, color: AppColors.navy),
@@ -1852,20 +1868,22 @@ class _HeaderMenuButtonState extends State<_HeaderMenuButton>
                 value: 0,
                 child: _HeaderMenuRow(
                     icon: IconsaxPlusLinear.notification,
-                    label: 'התראות',
+                    label: AppLocalizations.of(context)!.discoverScreenA8e71c4c,
                     badge: _unread),
               ),
               PopupMenuItem(
                 value: 1,
                 child: _HeaderMenuRow(
                     icon: Icons.bookmark_border_rounded,
-                    label: 'חיפושים שמורים'),
+                    label:
+                        AppLocalizations.of(context)!.discoverScreen86023c2b),
               ),
               PopupMenuItem(
                 value: 2,
                 child: _HeaderMenuRow(
                     icon: Icons.favorite_border_rounded,
-                    label: 'הדירות ששמרתי'),
+                    label:
+                        AppLocalizations.of(context)!.discoverScreen2f416fd3),
               ),
             ],
           ),
@@ -1955,7 +1973,7 @@ class _SaveSearchButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'שמור חיפוש',
+      message: AppLocalizations.of(context)!.discoverScreen8f28a31a,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -1971,7 +1989,7 @@ class _SaveSearchButton extends StatelessWidget {
                   size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
               Text(
-                'שמור',
+                AppLocalizations.of(context)!.discoverScreenF50251bc,
                 style: TextStyle(
                   color: AppColors.primary,
                   fontSize: 14,
@@ -2125,9 +2143,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     final count = provider.filteredCountFor(scopedFilters);
     final averagePrice = provider.averagePriceFor(scopedFilters);
     final price = averagePrice <= 0
-        ? 'אין מחיר'
+        ? AppLocalizations.of(context)!.discoverScreenA43e6e7d
         : _compactPriceLabel(averagePrice.round());
-    return '$count דירות · $price';
+    return AppLocalizations.of(context)!.discoverScreen74b0b436(count, price);
   }
 
   String _filtersKey(SearchFilters filters) {
@@ -2225,7 +2243,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             textAlign: TextAlign.right,
             decoration: InputDecoration(
               suffixText: suffix.isEmpty ? null : suffix,
-              hintText: 'הכנס מספר',
+              hintText: AppLocalizations.of(context)!.discoverScreen6c3c338f,
             ),
             onSubmitted: (submitted) =>
                 Navigator.of(dialogContext).pop(submitted),
@@ -2233,11 +2251,13 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('ביטול'),
+              child:
+                  Text(AppLocalizations.of(context)!.discoverScreenA7c55a8d),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('שמור'),
+              child:
+                  Text(AppLocalizations.of(context)!.discoverScreenF50251bc),
             ),
           ],
         );
@@ -2286,14 +2306,16 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 keyboardType: keyboardType,
                 autofocus: true,
                 textAlign: TextAlign.right,
-                decoration: decoration('מינימום'),
+                decoration: decoration(
+                    AppLocalizations.of(context)!.discoverScreen7a683618),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: maxController,
                 keyboardType: keyboardType,
                 textAlign: TextAlign.right,
-                decoration: decoration('מקסימום'),
+                decoration: decoration(
+                    AppLocalizations.of(context)!.discoverScreen6dd38cc5),
                 onSubmitted: (_) => Navigator.of(dialogContext).pop(
                   (minController.text, maxController.text),
                 ),
@@ -2303,13 +2325,15 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('ביטול'),
+              child:
+                  Text(AppLocalizations.of(context)!.discoverScreenA7c55a8d),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(
                 (minController.text, maxController.text),
               ),
-              child: const Text('שמור'),
+              child:
+                  Text(AppLocalizations.of(context)!.discoverScreenF50251bc),
             ),
           ],
         );
@@ -2324,8 +2348,11 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   /// Prompts for a name, then calls the saved-search feature's public API.
   Future<void> _saveCurrentSearch(BuildContext context) async {
     final f = _draftFilters;
+    final l10n = AppLocalizations.of(context)!;
     final nameCtrl = TextEditingController(
-      text: f.city.trim().isNotEmpty ? 'דירות ב${f.city.trim()}' : 'החיפוש שלי',
+      text: f.city.trim().isNotEmpty
+          ? l10n.discoverScreenCe114a5b(f.city.trim())
+          : l10n.discoverScreenC7d46456,
     );
     final name = await showDialog<String>(
       context: context,
@@ -2335,16 +2362,17 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            'שמירת חיפוש',
-            style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
+          title: Text(
+            l10n.discoverScreenEd1b4e42,
+            style: const TextStyle(
+                color: AppColors.navy, fontWeight: FontWeight.w900),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'נשמור את הסינון הנוכחי ונודיע לך כשתעלה דירה חדשה שמתאימה.',
-                style: TextStyle(
+              Text(
+                l10n.discoverScreenE9b8eecc,
+                style: const TextStyle(
                     color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                 textAlign: TextAlign.right,
               ),
@@ -2353,18 +2381,19 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 controller: nameCtrl,
                 autofocus: true,
                 textAlign: TextAlign.right,
-                decoration: const InputDecoration(hintText: 'שם לחיפוש'),
+                decoration:
+                    InputDecoration(hintText: l10n.discoverScreen448f2c74),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('ביטול'),
+              child: Text(l10n.discoverScreenA7c55a8d),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogCtx).pop(nameCtrl.text),
-              child: const Text('שמור'),
+              child: Text(l10n.discoverScreenF50251bc),
             ),
           ],
         ),
@@ -2388,9 +2417,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       requiredTags: f.requiredFeatures.toList(),
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      duration: Duration(milliseconds: 2500),
-      content: Text('החיפוש נשמר. נודיע לך על דירות חדשות שמתאימות 🔔'),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 2500),
+      content: Text(AppLocalizations.of(context)!.discoverScreen58220e78),
     ));
   }
 
@@ -2458,10 +2487,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             .toList();
         final locationSuggestions = <_LocationSuggestion>[
           ...filteredCities.map(
-            (city) => _LocationSuggestion.city(city),
+            (city) => _LocationSuggestion.city(context, city),
           ),
           ...filteredAreas.map(
-            (searchArea) => _LocationSuggestion.area(searchArea),
+            (searchArea) => _LocationSuggestion.area(context, searchArea),
           ),
         ];
 
@@ -2515,9 +2544,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             ),
                           ),
                         ),
-                        const Text(
-                          'סינון ומיון',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context)!
+                              .discoverScreenA597b860,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                             color: AppColors.navy,
@@ -2537,14 +2567,16 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       children: [
                         // ── מטרה ──
                         _FilterSection(
-                          title: 'מטרה',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen8aa21a4c,
                           icon: IconsaxPlusLinear.category,
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
                             _TransactionCard(
-                              label: 'הכל',
+                              label: AppLocalizations.of(context)!
+                                  .discoverScreen5f8fb8a5,
                               price: _transactionMetric(
                                 provider,
                                 f,
@@ -2564,7 +2596,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             ),
                             const SizedBox(width: 8),
                             _TransactionCard(
-                              label: 'שכירות',
+                              label: AppLocalizations.of(context)!
+                                  .discoverScreen60d47dc4,
                               price: _transactionMetric(
                                 provider,
                                 f,
@@ -2584,7 +2617,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             ),
                             const SizedBox(width: 8),
                             _TransactionCard(
-                              label: 'קנייה',
+                              label: AppLocalizations.of(context)!
+                                  .discoverScreen40eb4dca,
                               price: _transactionMetric(
                                 provider,
                                 f,
@@ -2607,7 +2641,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── תקציב ──
                         _FilterSection(
-                          title: 'טווח מחירים',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreenC6c960c3,
                           icon: IconsaxPlusLinear.money,
                         ),
                         const SizedBox(height: 12),
@@ -2662,11 +2697,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         Row(
                           children: [
                             _PriceInputCard(
-                              label: 'מינימום',
+                              label: AppLocalizations.of(context)!
+                                  .discoverScreen7a683618,
                               value: _formatCurrency(f.minBudget.round()),
                               onTap: () => _editRangeValues(
                                 context: context,
-                                title: _priceFilterLabel(),
+                                title: _priceFilterLabel(context),
                                 initialMinValue: f.minBudget.toString(),
                                 initialMaxValue: f.maxBudget.toString(),
                                 suffix: '₪',
@@ -2709,13 +2745,15 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             ),
                             const SizedBox(width: 12),
                             _PriceInputCard(
-                              label: 'מקסימום',
+                              label: AppLocalizations.of(context)!
+                                  .discoverScreen6dd38cc5,
                               value: f.maxBudget >= 2000000000
-                                  ? 'ללא הגבלה'
+                                  ? AppLocalizations.of(context)!
+                                      .discoverScreen09ae3918
                                   : _formatCurrency(f.maxBudget.round()),
                               onTap: () => _editRangeValues(
                                 context: context,
-                                title: _priceFilterLabel(),
+                                title: _priceFilterLabel(context),
                                 initialMinValue: f.minBudget.toString(),
                                 initialMaxValue: f.maxBudget.toString(),
                                 suffix: '₪',
@@ -2762,16 +2800,18 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         SwitchListTile.adaptive(
                           value: f.includeUnknownPriceListings,
                           contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'לכלול דירות בלי מחיר',
-                            style: TextStyle(
+                          title: Text(
+                            AppLocalizations.of(context)!
+                                .discoverScreenFe578531,
+                            style: const TextStyle(
                               color: AppColors.navy,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          subtitle: const Text(
-                            'מחיר מתחת ל-600 ש"ח נחשב כלא ידוע',
-                            style: TextStyle(
+                          subtitle: Text(
+                            AppLocalizations.of(context)!
+                                .discoverScreen25ade83a,
+                            style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
                             ),
@@ -2784,7 +2824,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── חדרים ──
                         _FilterSection(
-                          title: 'חדרים',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreenB50b3974,
                           icon: IconsaxPlusLinear.home,
                         ),
                         const SizedBox(height: 12),
@@ -2825,7 +2866,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: AppColors.primary, width: 2),
                                   ),
-                                  hintText: 'מ-',
+                                  hintText: AppLocalizations.of(context)!
+                                      .discoverScreenC1779315,
                                   hintStyle: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary,
@@ -2890,7 +2932,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(color: AppColors.primary, width: 2),
                                   ),
-                                  hintText: 'עד',
+                                  hintText: AppLocalizations.of(context)!
+                                      .discoverScreen344c1d0e,
                                   hintStyle: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary,
@@ -2914,7 +2957,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── מיקום (עיר + אזור) ──
                         _FilterSection(
-                          title: 'מיקום',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen26d0e7de,
                           icon: IconsaxPlusLinear.location,
                           action: (f.city.isNotEmpty ||
                                   f.areaId != 'all_israel' ||
@@ -2935,7 +2979,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     padding: EdgeInsets.zero,
                                     foregroundColor: AppColors.primary,
                                   ),
-                                  child: const Text('הכל'),
+                                  child: Text(AppLocalizations.of(context)!
+                                      .discoverScreen5f8fb8a5),
                                 )
                               : null,
                         ),
@@ -2974,7 +3019,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'חפש עיר או אזור',
+                                    hintText: AppLocalizations.of(context)!
+                                        .discoverScreenE65e9ceb,
                                     hintStyle: TextStyle(
                                       fontSize: 14,
                                       color: AppColors.textSecondary
@@ -3033,13 +3079,20 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             child: Row(
                               children: [
                                 for (final city in [
-                                  'תל אביב',
-                                  'ירושלים',
-                                  'חיפה',
-                                  'גבעתיים',
-                                  'רמת גן',
-                                  'הרצליה',
-                                  'ראשון לציון',
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen2c1f2bbd,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen8e0dfe1e,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreenCa1cc213,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreenEa980134,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen2231ce66,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen982e0598,
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen96a73cd7,
                                 ]) ...[
                                   _FilterLocationPill(
                                     label: city,
@@ -3069,11 +3122,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 10),
                         if (locationQuery.isNotEmpty &&
                             locationSuggestions.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 6),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Text(
-                              'לא נמצאו ערים או אזורים מתאימים',
-                              style: TextStyle(
+                              AppLocalizations.of(context)!
+                                  .discoverScreen835a122a,
+                              style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -3140,7 +3194,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── מיון ──
                         _FilterSection(
-                            title: 'מיון', icon: IconsaxPlusLinear.sort),
+                            title: AppLocalizations.of(context)!
+                                .discoverScreen1df7e5cb,
+                            icon: IconsaxPlusLinear.sort),
                         const SizedBox(height: 10),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -3195,7 +3251,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          _sortLabel(option),
+                                          _sortLabel(context, option),
                                           style: TextStyle(
                                             color: selected
                                                 ? Colors.white
@@ -3215,7 +3271,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── גודל ──
                         _RangeSliderField(
-                          label: 'טווח גודל',
+                          label: AppLocalizations.of(context)!
+                              .discoverScreen0f95260b,
                           icon: IconsaxPlusLinear.maximize_4,
                           values: RangeValues(
                             f.minSizeM2.toDouble().clamp(0, 2000),
@@ -3224,16 +3281,18 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           min: 0,
                           max: 2000,
                           divisions: 200,
-                          displayValue:
-                              _sizeDisplayValue(f.minSizeM2, f.maxSizeM2),
+                          displayValue: _sizeDisplayValue(
+                              context, f.minSizeM2, f.maxSizeM2),
                           onValueTap: () => _editRangeValues(
                             context: context,
-                            title: 'טווח גודל',
+                            title: AppLocalizations.of(context)!
+                                .discoverScreen0f95260b,
                             initialMinValue: f.minSizeM2.toString(),
                             initialMaxValue: f.maxSizeM2 >= 1000000
                                 ? ''
                                 : f.maxSizeM2.toString(),
-                            suffix: 'מ"ר',
+                            suffix: AppLocalizations.of(context)!
+                                .discoverScreen608912c9,
                             keyboardType: TextInputType.number,
                             onSubmitted: (minRaw, maxRaw) {
                               final minParsed = int.tryParse(
@@ -3274,18 +3333,22 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── קומה ──
                         _SliderField(
-                          label: 'קומה מינימלית',
+                          label: AppLocalizations.of(context)!
+                              .discoverScreenC67e3688,
                           icon: IconsaxPlusLinear.building,
                           value: f.minFloor.toDouble(),
                           min: 0,
                           max: 30,
                           divisions: 30,
                           displayValue: f.minFloor == 0
-                              ? 'ללא הגבלה'
-                              : 'קומה ${f.minFloor}+',
+                              ? AppLocalizations.of(context)!
+                                  .discoverScreen09ae3918
+                              : AppLocalizations.of(context)!
+                                  .discoverScreenB42b537d(f.minFloor),
                           onValueTap: () => _editSliderValue(
                             context: context,
-                            title: 'קומה מינימלית',
+                            title: AppLocalizations.of(context)!
+                                .discoverScreenC67e3688,
                             initialValue:
                                 f.minFloor == 0 ? '' : '${f.minFloor}',
                             suffix: '',
@@ -3311,7 +3374,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── סוג נכס ──
                         _FilterSection(
-                          title: 'סוג נכס',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen7d93908e,
                           icon: IconsaxPlusLinear.building,
                         ),
                         const SizedBox(height: 12),
@@ -3345,7 +3409,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── מצב הנכס ──
                         _FilterSection(
-                          title: 'מצב הנכס',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen357b4923,
                           icon: IconsaxPlusLinear.shield_tick,
                           action: _PriorityLegend(),
                         ),
@@ -3374,7 +3439,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── מקור מודעה ──
                         _FilterSection(
-                          title: 'מקור מודעה',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen5aa1c77f,
                           icon: IconsaxPlusLinear.profile_2user,
                         ),
                         const SizedBox(height: 12),
@@ -3387,7 +3453,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               .map((source) {
                             final state = f.listingSourceState(source);
                             return _PriorityFilterChip(
-                              label: _listingSourceLabel(source),
+                              label: _listingSourceLabel(context, source),
                               state: state,
                               icon: _listingSourceIcon(source),
                               onTap: () => _handlePriorityTap(
@@ -3402,9 +3468,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           }).toList(),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'ללא בחירה: יוצגו גם פרטיות וגם מתיווך',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context)!
+                              .discoverScreenF7fab77d,
+                          style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
@@ -3413,7 +3480,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 24),
                         // ── מועד כניסה ──
                         _FilterSection(
-                          title: 'מועד כניסה',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen1399cd87,
                           icon: IconsaxPlusLinear.calendar_1,
                         ),
                         const SizedBox(height: 12),
@@ -3425,7 +3493,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               .map((option) {
                             final state = f.moveInState(option);
                             return _PriorityFilterChip(
-                              label: _moveInLabel(option),
+                              label: _moveInLabel(context, option),
                               state: state,
                               icon: IconsaxPlusLinear.calendar_1,
                               onTap: () => _handlePriorityTap(
@@ -3440,9 +3508,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           }).toList(),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'ללא בחירה: כל מועדי הכניסה רלוונטיים',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context)!
+                              .discoverScreen14a99444,
+                          style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
@@ -3457,7 +3526,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     f.featureState(f2) != FilterPriority.none)
                                 .length;
                             return _FilterSection(
-                              title: 'מאפיינים חשובים',
+                              title: AppLocalizations.of(context)!
+                                  .discoverScreen64680a66,
                               icon: IconsaxPlusLinear.filter,
                               badge:
                                   selectedCount > 0 ? '$selectedCount' : null,
@@ -3491,17 +3561,20 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         const SizedBox(height: 20),
                         // ── מקומות בסביבה ──
                         _FilterSection(
-                          title: 'מקומות בסביבה שחשובים לי',
+                          title: AppLocalizations.of(context)!
+                              .discoverScreen485ce069,
                           icon: IconsaxPlusLinear.location,
                           badge: f.preferredNearby.isNotEmpty
                               ? '${f.preferredNearby.length}'
                               : null,
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(right: 2, top: 2, bottom: 10),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              right: 2, top: 2, bottom: 10),
                           child: Text(
-                            'מה שתבחרו יופיע ראשון בעמוד הדירה וישפיע על הדירוג',
-                            style: TextStyle(
+                            AppLocalizations.of(context)!
+                                .discoverScreen6ca5e778,
+                            style: const TextStyle(
                                 fontSize: 12, color: AppColors.textSecondary),
                           ),
                         ),
@@ -3509,7 +3582,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            for (final opt in _nearbyPrefOptions)
+                            for (final opt in _nearbyPrefOptions(context))
                               _NearbyKindChip(
                                 label: opt.$2,
                                 icon: opt.$3,
@@ -3558,9 +3631,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               foregroundColor: AppColors.textSecondary,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
-                            child: const Text(
-                              'נקה הכל',
-                              style: TextStyle(
+                            child: Text(
+                              AppLocalizations.of(context)!
+                                  .discoverScreenEbbc108b,
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -3597,7 +3671,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 ),
                               ),
                               child: Text(
-                                'הצג $_visibleCount דירות',
+                                AppLocalizations.of(context)!
+                                    .discoverScreen51d46fb2(_visibleCount),
                                 key: ValueKey(_visibleCount),
                                 style: const TextStyle(
                                   fontSize: 15,
@@ -3689,20 +3764,20 @@ class _PriorityLegend extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _LegendChip(
-          label: 'מועדף',
+          label: AppLocalizations.of(context)!.discoverScreen0a12cf33,
           color: AppColors.primary,
           icon: Icons.favorite_rounded,
         ),
         const SizedBox(width: 8),
         _LegendChip(
-          label: 'חייב להיות',
+          label: AppLocalizations.of(context)!.discoverScreen19662bd6,
           color: AppColors.coral,
           icon: Icons.priority_high_rounded,
         ),
         const SizedBox(width: 10),
-        const Text(
-          'טאפ / דאבל טאפ',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context)!.discoverScreen4b54025b,
+          style: const TextStyle(
             fontSize: 10,
             color: AppColors.textSecondary,
             fontWeight: FontWeight.w600,
@@ -4341,7 +4416,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                       cardColor: Colors.white,
                     ),
                     child: PopupMenuButton<String>(
-                      tooltip: 'סוגי סינון',
+                      tooltip: AppLocalizations.of(context)!
+                          .discoverScreenE67a269a,
                       onSelected: (value) {
                         final provider =
                             Provider.of<DatingProvider>(context, listen: false);
@@ -4359,83 +4435,93 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                         side: const BorderSide(color: AppColors.border),
                       ),
                       itemBuilder: (BuildContext context) => [
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'price',
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('תקציב',
-                                  style: TextStyle(
+                              Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen3bb32ddd,
+                                  style: const TextStyle(
                                       color: AppColors.navy,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13.5)),
-                              SizedBox(width: 8),
-                              Icon(Icons.monetization_on_outlined,
+                              const SizedBox(width: 8),
+                              const Icon(Icons.monetization_on_outlined,
                                   color: AppColors.navy, size: 18),
                             ],
                           ),
                         ),
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'rooms',
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('חדרים',
-                                  style: TextStyle(
+                              Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreenB50b3974,
+                                  style: const TextStyle(
                                       color: AppColors.navy,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13.5)),
-                              SizedBox(width: 8),
-                              Icon(Icons.meeting_room_outlined,
+                              const SizedBox(width: 8),
+                              const Icon(Icons.meeting_room_outlined,
                                   color: AppColors.navy, size: 18),
                             ],
                           ),
                         ),
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'type',
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('סוג נכס',
-                                  style: TextStyle(
+                              Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreen7d93908e,
+                                  style: const TextStyle(
                                       color: AppColors.navy,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13.5)),
-                              SizedBox(width: 8),
-                              Icon(Icons.home_work_outlined,
+                              const SizedBox(width: 8),
+                              const Icon(Icons.home_work_outlined,
                                   color: AppColors.navy, size: 18),
                             ],
                           ),
                         ),
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'features',
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('מאפיינים',
-                                  style: TextStyle(
+                              Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreenE08c750c,
+                                  style: const TextStyle(
                                       color: AppColors.navy,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13.5)),
-                              SizedBox(width: 8),
-                              Icon(Icons.star_border_rounded,
+                              const SizedBox(width: 8),
+                              const Icon(Icons.star_border_rounded,
                                   color: AppColors.navy, size: 18),
                             ],
                           ),
                         ),
                         const PopupMenuDivider(),
-                        const PopupMenuItem<String>(
+                        PopupMenuItem<String>(
                           value: 'all',
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text('הצג את כל המסננים',
-                                  style: TextStyle(
+                              Text(
+                                  AppLocalizations.of(context)!
+                                      .discoverScreenE479e555,
+                                  style: const TextStyle(
                                       color: AppColors.navy,
                                       fontWeight: FontWeight.w900,
                                       fontSize: 13.5)),
-                              SizedBox(width: 8),
-                              Icon(Icons.tune_rounded,
+                              const SizedBox(width: 8),
+                              const Icon(Icons.tune_rounded,
                                   color: AppColors.navy, size: 18),
                             ],
                           ),
@@ -4467,8 +4553,11 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                             Expanded(
                               child: Text(
                                 widget.initialArea.id == 'all_israel'
-                                    ? 'סנן לפי...'
-                                    : 'סינון באזור ${widget.initialArea.name}',
+                                    ? AppLocalizations.of(context)!
+                                        .discoverScreen9ad9fd5e
+                                    : AppLocalizations.of(context)!
+                                        .discoverScreen8853fa88(
+                                            widget.initialArea.name),
                                 style: const TextStyle(
                                   color: AppColors.navy,
                                   fontSize: 14,
@@ -4573,9 +4662,10 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                             border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.08)),
                           ),
-                          child: const Text(
-                            'דירות באזור המסומן',
-                            style: TextStyle(
+                          child: Text(
+                            AppLocalizations.of(context)!
+                                .discoverScreenE2349334,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
@@ -4598,7 +4688,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                                 color: Colors.white.withValues(alpha: 0.08)),
                           ),
                           child: Text(
-                            '${_markers.length} תוצאות',
+                            AppLocalizations.of(context)!
+                                .discoverScreenC2dc6194(_markers.length),
                             style: const TextStyle(
                               color: Colors.white, // Solid white text
                               fontSize: 11.5,
@@ -4736,9 +4827,10 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                           },
                           icon: const Icon(Icons.refresh_rounded,
                               color: Colors.white, size: 18),
-                          label: const Text(
-                            'נקה',
-                            style: TextStyle(
+                          label: Text(
+                            AppLocalizations.of(context)!
+                                .discoverScreenE8b3a3d5,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
@@ -4784,7 +4876,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                             size: 18,
                           ),
                           label: Text(
-                            'שמור אזור',
+                            AppLocalizations.of(context)!
+                                .discoverScreen55e539c8,
                             style: TextStyle(
                               color: canSave
                                   ? Colors.white
@@ -4908,7 +5001,11 @@ class _PropertyPreviewCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isRent ? 'להשכרה' : 'למכירה',
+                            isRent
+                                ? AppLocalizations.of(context)!
+                                    .discoverScreenB336259f
+                                : AppLocalizations.of(context)!
+                                    .discoverScreen609fac18,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -5048,17 +5145,23 @@ class _PropertyPreviewCard extends StatelessWidget {
                             children: [
                               _buildSpecPill(
                                 icon: Icons.meeting_room_outlined,
-                                label: '${property.roomsLabel} חדרים',
+                                label: AppLocalizations.of(context)!
+                                    .discoverScreenD886d07f(
+                                        property.roomsLabel),
                               ),
                               _buildSpecPill(
                                 icon: Icons.crop_free_rounded,
-                                label: '${property.sizeM2} מ״ר',
+                                label: AppLocalizations.of(context)!
+                                    .discoverScreenFdb4eac7(property.sizeM2),
                               ),
                               _buildSpecPill(
                                 icon: Icons.layers_outlined,
                                 label: property.floor.isEmpty
-                                    ? 'קרקע'
-                                    : 'קומה ${property.floor}',
+                                    ? AppLocalizations.of(context)!
+                                        .discoverScreenCcc5c5a6
+                                    : AppLocalizations.of(context)!
+                                        .discoverScreenD068bb57(
+                                            property.floor),
                               ),
                             ],
                           ),
@@ -5126,13 +5229,13 @@ class _UndoButton extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            RentlyIcon(IconsaxPlusLinear.undo,
+          children: [
+            const RentlyIcon(IconsaxPlusLinear.undo,
                 size: 16, color: AppColors.textSecondary),
-            SizedBox(width: 5),
+            const SizedBox(width: 5),
             Text(
-              'בטל',
-              style: TextStyle(
+              AppLocalizations.of(context)!.discoverScreenAac4e7a2,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary,
@@ -5157,12 +5260,15 @@ class _NoMorePropertiesState extends StatelessWidget {
     final hasActiveSearch = city.isNotEmpty ||
         provider.filters.maxBudget != 0 ||
         provider.filters.minRooms > 1;
+    final l10n = AppLocalizations.of(context)!;
     final title = hasActiveSearch
-        ? (city.isNotEmpty ? 'אופס! לא מצאנו דירות ב$city' : 'אופס! אין דירות שמתאימות')
-        : 'ראית את כל הדירות!';
+        ? (city.isNotEmpty
+            ? l10n.discoverScreenBed527df(city)
+            : l10n.discoverScreenAd918daa)
+        : l10n.discoverScreen0d8b5e54;
     final subtitle = hasActiveSearch
-        ? 'לא נמצאו דירות זמינות לפי החיפוש הזה. אפשר להרחיב טווח, אזור או תקציב 👇'
-        : 'הרחב את החיפוש כדי למצוא עוד דירות';
+        ? l10n.discoverScreen2d250f3a
+        : l10n.discoverScreen044d147e;
 
     // Top-aligned + scrollable so the quick actions sit high on the screen
     // (raised out of the way of the navbar) and always fit.
@@ -5213,7 +5319,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             const SizedBox(height: 22),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.money,
-              label: 'הרחב תקציב ב-₪500',
+              label: l10n.discoverScreen30fb9443,
               onTap: () => provider.updateFilters(
                 provider.filters.copyWith(
                   maxBudget: provider.filters.maxBudget + 500,
@@ -5223,7 +5329,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             const SizedBox(height: 10),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.home,
-              label: 'הפחת דרישת חדרים ב-0.5',
+              label: l10n.discoverScreen76e4a755,
               onTap: () {
                 if (provider.filters.minRooms > 1) {
                   provider.updateFilters(
@@ -5237,7 +5343,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             const SizedBox(height: 10),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.maximize_4,
-              label: 'פתח גודל מ-20 מ"ר',
+              label: l10n.discoverScreen00256770,
               onTap: () => provider.updateFilters(
                 provider.filters.copyWith(
                   minSizeM2: provider.filters.minSizeM2 >= 20
@@ -5249,7 +5355,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             const SizedBox(height: 18),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.undo,
-              label: 'אפס דירות שדילגתי',
+              label: l10n.discoverScreenB80f7438,
               onTap: () => provider.resetPassed(),
               filled: true,
             ),
@@ -5439,29 +5545,31 @@ String _compactPriceLabel(int value) {
   return _formatCurrency(value);
 }
 
-String _sortLabel(SearchSortOption option) {
+String _sortLabel(BuildContext context, SearchSortOption option) {
+  final l10n = AppLocalizations.of(context)!;
   switch (option) {
     case SearchSortOption.bestMatch:
-      return 'התאמה חכמה';
+      return l10n.discoverScreen8b3c043a;
     case SearchSortOption.priceLowToHigh:
-      return 'מחיר מהנמוך לגבוה';
+      return l10n.discoverScreen4b8d8771;
     case SearchSortOption.priceHighToLow:
-      return 'מחיר מהגבוה לנמוך';
+      return l10n.discoverScreen0126181a;
     case SearchSortOption.newestEntry:
-      return 'כניסה הכי קרובה';
+      return l10n.discoverScreenC2dd498c;
     case SearchSortOption.biggestFirst:
-      return 'הכי מרווחות';
+      return l10n.discoverScreen9613740e;
   }
 }
 
-String _listingSourceLabel(ListingSourceFilter source) {
+String _listingSourceLabel(BuildContext context, ListingSourceFilter source) {
+  final l10n = AppLocalizations.of(context)!;
   switch (source) {
     case ListingSourceFilter.any:
-      return 'הכל';
+      return l10n.discoverScreen5f8fb8a5;
     case ListingSourceFilter.privateOnly:
-      return 'בעלים פרטיים';
+      return l10n.discoverScreenAc35c5b6;
     case ListingSourceFilter.agencyOnly:
-      return 'תיווך בלבד';
+      return l10n.discoverScreen88edd37e;
   }
 }
 
@@ -5474,20 +5582,20 @@ class _LocationSuggestion {
     this.area,
   });
 
-  factory _LocationSuggestion.city(String city) {
+  factory _LocationSuggestion.city(BuildContext context, String city) {
     return _LocationSuggestion._(
       label: city,
       icon: IconsaxPlusLinear.building,
-      caption: 'עיר',
+      caption: AppLocalizations.of(context)!.discoverScreenB2136c90,
       isCity: true,
     );
   }
 
-  factory _LocationSuggestion.area(SearchArea area) {
+  factory _LocationSuggestion.area(BuildContext context, SearchArea area) {
     return _LocationSuggestion._(
       label: area.name,
       icon: IconsaxPlusLinear.location,
-      caption: 'אזור',
+      caption: AppLocalizations.of(context)!.discoverScreen7c0e2040,
       isCity: false,
       area: area,
     );
@@ -5591,20 +5699,24 @@ class _LocationSuggestionTile extends StatelessWidget {
   }
 }
 
-String _priceFilterLabel() => 'טווח מחיר';
+String _priceFilterLabel(BuildContext context) =>
+    AppLocalizations.of(context)!.discoverScreenE190c982;
 
 /// Display label for the size range slider.
 /// When maxSizeM2 is at or above the slider ceiling (2000) or "unlimited",
 /// we show a "2,000+ מ"ר" label instead of the raw large number.
-String _sizeDisplayValue(int minSizeM2, int maxSizeM2) {
+String _sizeDisplayValue(BuildContext context, int minSizeM2, int maxSizeM2) {
+  final l10n = AppLocalizations.of(context)!;
   final minStr = minSizeM2 == 0 ? '0' : '$minSizeM2';
   if (maxSizeM2 >= 1000000) {
-    return minSizeM2 == 0 ? 'ללא הגבלה' : '$minStr+ מ"ר';
+    return minSizeM2 == 0
+        ? l10n.discoverScreen09ae3918
+        : l10n.discoverScreen4ed4e191(minStr);
   }
   if (maxSizeM2 >= 2000) {
-    return '$minStr - 2,000+ מ"ר';
+    return l10n.discoverScreen6ba19199(minStr);
   }
-  return '$minStr - $maxSizeM2 מ"ר';
+  return l10n.discoverScreen9a6ba180(minStr, maxSizeM2);
 }
 
 double _priceSliderMin(TransactionTypeFilter type) {
@@ -5651,16 +5763,17 @@ int _roundedPriceForTransaction(TransactionTypeFilter type, double value) {
   }
 }
 
-String _moveInLabel(MoveInFilter option) {
+String _moveInLabel(BuildContext context, MoveInFilter option) {
+  final l10n = AppLocalizations.of(context)!;
   switch (option) {
     case MoveInFilter.any:
-      return 'כל מועד';
+      return l10n.discoverScreen232628d0;
     case MoveInFilter.immediate:
-      return 'מיידי';
+      return l10n.discoverScreenD02986c3;
     case MoveInFilter.within30Days:
-      return 'עד 30 יום';
+      return l10n.discoverScreen402285bd;
     case MoveInFilter.within90Days:
-      return 'עד 90 יום';
+      return l10n.discoverScreen23bb912d;
   }
 }
 
@@ -5923,7 +6036,7 @@ class _TransactionCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'חי',
+                        AppLocalizations.of(context)!.discoverScreen5d2540f2,
                         style: TextStyle(
                           fontSize: 8,
                           fontWeight: FontWeight.w700,
@@ -6374,7 +6487,7 @@ class _PillSelectorState extends State<_PillSelector> {
         final thumbW = isDiscover ? discW : forW;
 
         return Semantics(
-          label: 'בחירת תצוגת דירות',
+          label: AppLocalizations.of(context)!.discoverScreenFcde3740,
           child: SizedBox(
             width: width,
             height: 52,
@@ -6443,7 +6556,8 @@ class _PillSelectorState extends State<_PillSelector> {
                                 child: _segment(
                                   tab: DiscoverTab.discover,
                                   icon: IconsaxPlusLinear.gallery,
-                                  label: 'גלריה',
+                                  label: AppLocalizations.of(context)!
+                                      .discoverScreenEed2fbf3,
                                   isSelected: isDiscover,
                                 ),
                               ),
@@ -6452,7 +6566,8 @@ class _PillSelectorState extends State<_PillSelector> {
                                 child: _segment(
                                   tab: DiscoverTab.forYou,
                                   icon: IconsaxPlusBold.flash,
-                                  label: 'במיוחד בשבילך',
+                                  label: AppLocalizations.of(context)!
+                                      .discoverScreen2d073fb0,
                                   isSelected: !isDiscover,
                                 ),
                               ),
@@ -6551,7 +6666,7 @@ class _PillSelectorState extends State<_PillSelector> {
     final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
     return Semantics(
       button: true,
-      label: 'מפה',
+      label: AppLocalizations.of(context)!.discoverScreen876e3baa,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _mapPressed = true),
@@ -6665,26 +6780,39 @@ class _SlidingSelectorThumb extends StatelessWidget {
 /// Curated nearby-place categories offered in the search filter (short labels +
 /// the same icons the property card uses). The seeker's picks are surfaced first
 /// on the property page AND boost the matching ranking dimensions.
-const List<(NearbyKind, String, IconData)> _nearbyPrefOptions = [
-  (NearbyKind.schools, 'בתי ספר', IconsaxPlusLinear.teacher),
-  (NearbyKind.kindergartens, 'גנים', IconsaxPlusLinear.emoji_happy),
-  (NearbyKind.playgrounds, 'גני שעשועים', IconsaxPlusLinear.game),
-  (NearbyKind.parks, 'פארקים', IconsaxPlusLinear.tree),
-  (NearbyKind.supermarkets, 'סופרים', IconsaxPlusLinear.shopping_cart),
-  (NearbyKind.clinics, 'קופות חולים', IconsaxPlusLinear.hospital),
-  (NearbyKind.pharmacies, 'בתי מרקחת', IconsaxPlusLinear.health),
-  (NearbyKind.hospitals, 'בתי חולים', IconsaxPlusLinear.heart),
-  (NearbyKind.transit, 'תחבורה ציבורית', IconsaxPlusLinear.bus),
-  (NearbyKind.gyms, 'חדרי כושר', IconsaxPlusLinear.weight),
-  (NearbyKind.pools, 'בריכות', IconsaxPlusLinear.drop),
-  (NearbyKind.dining, 'מסעדות ובתי קפה', IconsaxPlusLinear.reserve),
-  (NearbyKind.nightlife, 'בילוי', IconsaxPlusLinear.cup),
-  (NearbyKind.culture, 'תרבות', IconsaxPlusLinear.gallery),
-  (NearbyKind.synagogues, 'בתי כנסת', IconsaxPlusLinear.buildings),
-  (NearbyKind.dogParks, 'גינות כלבים', IconsaxPlusLinear.pet),
-  (NearbyKind.coworking, 'חללי עבודה', IconsaxPlusLinear.briefcase),
-  (NearbyKind.parking, 'חניונים', IconsaxPlusLinear.car),
-];
+List<(NearbyKind, String, IconData)> _nearbyPrefOptions(
+    BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return [
+    (NearbyKind.schools, l10n.discoverScreenFa8c72dc, IconsaxPlusLinear.teacher),
+    (NearbyKind.kindergartens, l10n.discoverScreenBabfce71,
+        IconsaxPlusLinear.emoji_happy),
+    (NearbyKind.playgrounds, l10n.discoverScreen36bca392,
+        IconsaxPlusLinear.game),
+    (NearbyKind.parks, l10n.discoverScreen387c3b70, IconsaxPlusLinear.tree),
+    (NearbyKind.supermarkets, l10n.discoverScreenD2d5595e,
+        IconsaxPlusLinear.shopping_cart),
+    (NearbyKind.clinics, l10n.discoverScreen88915bc2,
+        IconsaxPlusLinear.hospital),
+    (NearbyKind.pharmacies, l10n.discoverScreen82e78f66,
+        IconsaxPlusLinear.health),
+    (NearbyKind.hospitals, l10n.discoverScreenFeb803ce, IconsaxPlusLinear.heart),
+    (NearbyKind.transit, l10n.discoverScreen91db7436, IconsaxPlusLinear.bus),
+    (NearbyKind.gyms, l10n.discoverScreen83339279, IconsaxPlusLinear.weight),
+    (NearbyKind.pools, l10n.discoverScreenAa390576, IconsaxPlusLinear.drop),
+    (NearbyKind.dining, l10n.discoverScreenB86d6f75,
+        IconsaxPlusLinear.reserve),
+    (NearbyKind.nightlife, l10n.discoverScreenCc34e5d3, IconsaxPlusLinear.cup),
+    (NearbyKind.culture, l10n.discoverScreen6432de42,
+        IconsaxPlusLinear.gallery),
+    (NearbyKind.synagogues, l10n.discoverScreenF93de50d,
+        IconsaxPlusLinear.buildings),
+    (NearbyKind.dogParks, l10n.discoverScreen56619b6e, IconsaxPlusLinear.pet),
+    (NearbyKind.coworking, l10n.discoverScreen49d8274a,
+        IconsaxPlusLinear.briefcase),
+    (NearbyKind.parking, l10n.discoverScreenA6b678a2, IconsaxPlusLinear.car),
+  ];
+}
 
 /// A binary (important / not) selectable chip for a nearby-place category.
 class _NearbyKindChip extends StatelessWidget {

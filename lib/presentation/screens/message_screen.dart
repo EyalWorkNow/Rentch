@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/chat_partner_profile_screen.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -234,7 +235,8 @@ class _MessageScreenState extends State<MessageScreen> {
     final match = dating.matchById(widget.matchId);
     if (match == null) return;
 
-    final senderName = dating.tenantProfile?.name ?? 'השוכר';
+    final senderName = dating.tenantProfile?.name ??
+        AppLocalizations.of(context)!.messageScreenFd0ec7ac;
     _chatProvider = ChatProvider(
       matchId: widget.matchId,
       senderName: senderName,
@@ -284,18 +286,19 @@ class _MessageScreenState extends State<MessageScreen> {
     final raw = _msgCtrl.text.trim();
     if (raw.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context)!;
     if (InputSanitizer.isMessageTooLong(raw)) {
       _snack(
-          'הודעה ארוכה מדי (מקסימום ${SecurityConfig.maxMessageLength} תווים)',
+          l10n.messageScreenF41cdb94(SecurityConfig.maxMessageLength),
           error: true);
       return;
     }
     if (!RateLimiter.instance.allowMessage()) {
-      _snack('שלחת יותר מדי הודעות. המתן רגע.', error: true);
+      _snack(l10n.messageScreenF7c12aab, error: true);
       return;
     }
     if (InputSanitizer.containsObjectionableContent(raw)) {
-      _snack('ההודעה מכילה תוכן לא הולם ולכן לא נשלחה.', error: true);
+      _snack(l10n.messageScreen89cca91f, error: true);
       return;
     }
 
@@ -342,7 +345,10 @@ class _MessageScreenState extends State<MessageScreen> {
         unawaited(_sendImageOptimistic(provider, senderName, f.path));
       }
     } catch (_) {
-      if (mounted) _snack('לא ניתן לגשת לגלריה', error: true);
+      if (mounted) {
+        _snack(AppLocalizations.of(context)!.messageScreenEfc93a8e,
+            error: true);
+      }
     }
   }
 
@@ -360,7 +366,10 @@ class _MessageScreenState extends State<MessageScreen> {
       if (file == null || !mounted) return;
       await _sendImageOptimistic(provider, senderName, file.path);
     } catch (_) {
-      if (mounted) _snack('לא ניתן לפתוח את המצלמה', error: true);
+      if (mounted) {
+        _snack(AppLocalizations.of(context)!.messageScreenE779f1ba,
+            error: true);
+      }
     }
   }
 
@@ -369,19 +378,20 @@ class _MessageScreenState extends State<MessageScreen> {
   // Turns AwsApiClient.lastUploadError into a specific Hebrew message so a failed
   // upload says WHY (sign in / no connection / server) instead of a generic line.
   String _uploadFailMessage(String noun) {
+    final l10n = AppLocalizations.of(context)!;
     final e = AwsApiClient.instance.lastUploadError ?? '';
     if (e == 'not_authenticated' ||
         e.startsWith('http_401') ||
         e.startsWith('http_403')) {
-      return 'יש להתחבר לחשבון כדי לשלוח $noun';
+      return l10n.messageScreen210fc1ff(noun);
     }
     if (e.contains('Socket') ||
         e.contains('timeout') ||
         e.contains('Network') ||
         e.contains('Connection')) {
-      return 'אין חיבור לרשת. נסו שוב.';
+      return l10n.messageScreen96aac67d;
     }
-    return 'העלאת ה$noun נכשלה. נסו שוב.';
+    return l10n.messageScreen439e8c64(noun);
   }
 
   // Optimistic image send: the bubble shows INSTANTLY with the local file, then
@@ -404,7 +414,7 @@ class _MessageScreenState extends State<MessageScreen> {
     final ok = url != null && url.isNotEmpty;
     await cp.resolveMedia(
         tempId, ok ? ChatMediaCodec.encodeImage(url!) : null);
-    if (mounted && !ok) _snack(_uploadFailMessage('תמונה'), error: true);
+    if (mounted && !ok) _snack(_uploadFailMessage(AppLocalizations.of(context)!.messageScreenAda826e5), error: true);
   }
 
   // Fallback for the (rare) case with no realtime chat provider — blocking send.
@@ -416,7 +426,7 @@ class _MessageScreenState extends State<MessageScreen> {
           .uploadFile(localPath, folder: 'chat/images');
       if (!mounted) return;
       if (url == null || url.isEmpty) {
-        _snack(_uploadFailMessage('תמונה'), error: true);
+        _snack(_uploadFailMessage(AppLocalizations.of(context)!.messageScreenAda826e5), error: true);
         return;
       }
       await provider.sendMessage(
@@ -426,7 +436,7 @@ class _MessageScreenState extends State<MessageScreen> {
       );
       _scrollToBottom();
     } catch (_) {
-      if (mounted) _snack(_uploadFailMessage('תמונה'), error: true);
+      if (mounted) _snack(_uploadFailMessage(AppLocalizations.of(context)!.messageScreenAda826e5), error: true);
     } finally {
       if (mounted) setState(() => _uploadingMedia = false);
     }
@@ -436,7 +446,10 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _startVoiceRecording() async {
     try {
       if (!await _voiceRecorder.hasPermission()) {
-        if (mounted) _snack('נדרשת הרשאת מיקרופון', error: true);
+        if (mounted) {
+          _snack(AppLocalizations.of(context)!.messageScreenC6e4a13e,
+              error: true);
+        }
         return;
       }
       final dir = await getTemporaryDirectory();
@@ -456,7 +469,10 @@ class _MessageScreenState extends State<MessageScreen> {
       });
       setState(() => _isRecording = true);
     } catch (_) {
-      if (mounted) _snack('לא ניתן להתחיל הקלטה', error: true);
+      if (mounted) {
+        _snack(AppLocalizations.of(context)!.messageScreenDfe417f8,
+            error: true);
+      }
     }
   }
 
@@ -482,7 +498,9 @@ class _MessageScreenState extends State<MessageScreen> {
     _voicePath = null;
     // Ignore accidental sub-second taps — but tell the user why nothing sent.
     if (path == null || elapsed.inMilliseconds < 800) {
-      if (path != null) _snack('ההקלטה קצרה מדי');
+      if (path != null) {
+        _snack(AppLocalizations.of(context)!.messageScreenEac28ea1);
+      }
       return;
     }
 
@@ -496,7 +514,7 @@ class _MessageScreenState extends State<MessageScreen> {
             folder: 'chat/voice', contentType: 'audio/mp4');
         if (!mounted) return;
         if (url == null || url.isEmpty) {
-          _snack(_uploadFailMessage('הקלטה'), error: true);
+          _snack(_uploadFailMessage(AppLocalizations.of(context)!.messageScreen27be9d06), error: true);
           return;
         }
         await provider.sendMessage(
@@ -506,7 +524,10 @@ class _MessageScreenState extends State<MessageScreen> {
         );
         _scrollToBottom();
       } catch (_) {
-        if (mounted) _snack('שליחת ההקלטה נכשלה', error: true);
+        if (mounted) {
+          _snack(AppLocalizations.of(context)!.messageScreenB3f49023,
+              error: true);
+        }
       } finally {
         if (mounted) setState(() => _uploadingMedia = false);
       }
@@ -526,7 +547,7 @@ class _MessageScreenState extends State<MessageScreen> {
     final ok = url != null && url.isNotEmpty;
     await cp.resolveMedia(
         tempId, ok ? ChatMediaCodec.encodeAudio(url!, ms) : null);
-    if (mounted && !ok) _snack(_uploadFailMessage('הקלטה'), error: true);
+    if (mounted && !ok) _snack(_uploadFailMessage(AppLocalizations.of(context)!.messageScreen27be9d06), error: true);
   }
 
   String _fmtDuration(Duration d) {
@@ -538,6 +559,7 @@ class _MessageScreenState extends State<MessageScreen> {
   // ── Block user ────────────────────────────────────────────────────────────
 
   void _showBlockConfirm(DatingProvider provider, String ownerName) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (dialogCtx) => Directionality(
@@ -563,9 +585,9 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'חסום משתמש',
-                style: TextStyle(
+              Text(
+                l10n.messageScreen2461f753,
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w900,
                   fontSize: 17,
@@ -574,7 +596,7 @@ class _MessageScreenState extends State<MessageScreen> {
             ],
           ),
           content: Text(
-            'האם לחסום את "$ownerName"?\n\nכל המודעות שלהם יוסרו מהפיד שלך מיידית. הדיווח יועבר לצוות Rently.',
+            l10n.messageScreen006255cf(ownerName),
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13.5,
@@ -587,9 +609,9 @@ class _MessageScreenState extends State<MessageScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.textSecondary,
               ),
-              child: const Text(
-                'ביטול',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                l10n.messageScreenA7c55a8d,
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
             FilledButton(
@@ -608,9 +630,9 @@ class _MessageScreenState extends State<MessageScreen> {
                 await provider.blockOwner(ownerName);
                 if (mounted) Navigator.of(context).pop();
               },
-              child: const Text(
-                'חסום',
-                style: TextStyle(fontWeight: FontWeight.w900),
+              child: Text(
+                l10n.messageScreen1257849a,
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
           ],
@@ -676,19 +698,20 @@ class _MessageScreenState extends State<MessageScreen> {
                 if (existing != null) {
                   _openContract(existing.id, match.id);
                 } else if (provider.isLandlord) {
+                  final l10n = AppLocalizations.of(context)!;
                   final confirmed = await SwipeToConfirmSheet.show(
                     context,
-                    title: 'לשלוח חוזה?',
-                    message:
-                        'האם אתה בטוח שאתה רוצה לשלוח חוזה לצד השני?',
+                    title: l10n.messageScreen6f321fdb,
+                    message: l10n.messageScreen23895061,
                   );
                   if (!confirmed || !mounted) return;
                   Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => ContractFormScreen(matchId: match.id),
                   ));
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('ממתין שבעל הדירה ישלח חוזה לחתימה'),
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                        AppLocalizations.of(context)!.messageScreen3529112c),
                   ));
                 }
               },
@@ -735,8 +758,9 @@ class _MessageScreenState extends State<MessageScreen> {
     if (contract != null) {
       _openSignFlow(contract.id, matchId);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('החוזה לא נמצא. נסו לרענן את הצ׳אט.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text(AppLocalizations.of(context)!.messageScreen16a8f330),
       ));
     }
   }
@@ -809,13 +833,15 @@ class _MessageScreenState extends State<MessageScreen> {
     );
     await _sendStructured(
         provider, senderName, SlotMessageCodec.encodeConfirm(confirm));
+    final l10n = AppLocalizations.of(context)!;
     await NotificationService.instance.scheduleReminder(
       id: NotificationService.instance.viewingReminderId(option.slotId),
-      title: 'צפייה בדירה בעוד שעה',
-      body: 'צפייה ב${property.address} בשעה ${_formatTime(option.start)}',
+      title: l10n.messageScreenB94a0f72,
+      body: l10n.messageScreen011b615a(
+          property.address, _formatTime(option.start)),
       when: option.start.subtract(const Duration(hours: 1)),
     );
-    if (mounted) _snack('הצפייה אושרה — נשלחה הודעה ונקבעה תזכורת');
+    if (mounted) _snack(l10n.messageScreenE41cd6f3);
   }
 
   // Landlord-side confirm→booking processing now lives in
@@ -843,16 +869,19 @@ class _MessageScreenState extends State<MessageScreen> {
         break;
       }
     }
+    final l10n = AppLocalizations.of(context)!;
     final partnerName = provider.isLandlord
-        ? (incomingSender ?? 'מועמד/ת להשכרה')
-        : (property.ownerName.isNotEmpty ? property.ownerName : 'בעל הדירה');
+        ? (incomingSender ?? l10n.messageScreen6fe74d6a)
+        : (property.ownerName.isNotEmpty
+            ? property.ownerName
+            : l10n.messageScreenC6c7d5f7);
     // Avatar: we have no real photo of the PERSON (landlord or tenant), so pass
     // none — the profile shows an initials circle. (Never borrow the apartment
     // photo as the person's avatar; that's the flat, not them.)
     const partnerAvatar = '';
     final partnerSubtitle = provider.isLandlord
-        ? 'מועמד/ת · ${property.city}'
-        : 'בעל הדירה · ${property.city}';
+        ? l10n.messageScreenCf639c9f(property.city)
+        : l10n.messageScreenE374171b(property.city);
 
     // Media actually SHARED in this conversation (images + voice notes), so the
     // profile page can surface it WhatsApp-style — the genuinely useful content.
@@ -897,17 +926,21 @@ class _MessageScreenState extends State<MessageScreen> {
       builder: (context, provider, _) {
         final match = provider.matchById(widget.matchId);
         if (match == null) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: _bg,
-            body: Center(child: Text('ההתאמה לא נמצאה')),
+            body: Center(
+                child:
+                    Text(AppLocalizations.of(context)!.messageScreen64d404c8)),
           );
         }
 
         final property = provider.propertyById(match.propertyId);
         if (property == null) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: _bg,
-            body: Center(child: Text('הנכס לא נמצא')),
+            body: Center(
+                child:
+                    Text(AppLocalizations.of(context)!.messageScreen6f11e9ea)),
           );
         }
 
@@ -916,7 +949,8 @@ class _MessageScreenState extends State<MessageScreen> {
         final isLoading = _chatProvider?.isLoading ?? false;
         final isRemote = _chatProvider?.isRemoteEnabled ?? false;
         final isConnected = _chatProvider?.realtimeConnected ?? false;
-        final tenantName = provider.tenantProfile?.name ?? 'השוכר';
+        final tenantName = provider.tenantProfile?.name ??
+            AppLocalizations.of(context)!.messageScreenFd0ec7ac;
         final imageUrl =
             property.imageUrls.isNotEmpty ? property.imageUrls.first : '';
         final chatTheme = provider.isBroker
@@ -1254,18 +1288,18 @@ class _MessageScreenState extends State<MessageScreen> {
                   color: theme.primaryText,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 12,
                       height: 12,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     ),
-                    SizedBox(width: 8),
-                    Text('טוען הודעות...',
-                        style: TextStyle(
+                    const SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.messageScreen686a53ea,
+                        style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
@@ -1321,20 +1355,26 @@ class _ContractBar extends StatelessWidget {
   bool get _iNeedToSign =>
       !_done && (isLandlord ? !match.ownerSigned : !match.tenantSigned);
 
-  String get _label {
-    if (_done) return 'החוזה נחתם על-ידי שני הצדדים ✓';
+  String _label(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    if (_done) return l10n.messageScreen932b91b9;
     if (_iNeedToSign) {
-      final other = isLandlord ? 'השוכר/ת' : 'בעל הדירה';
+      final other =
+          isLandlord ? l10n.messageScreen9ad15d69 : l10n.messageScreenC6c7d5f7;
       final otherSigned = isLandlord ? match.tenantSigned : match.ownerSigned;
-      return otherSigned ? '$other חתם/ה · ממתין לחתימתך' : 'ממתין לחתימתך';
+      return otherSigned
+          ? l10n.messageScreen8f2415a0(other)
+          : l10n.messageScreen52607a5e;
     }
     // I already signed → waiting on the other side.
-    final other = isLandlord ? 'השוכר/ת' : 'בעל הדירה';
-    return 'חתמת · ממתין לחתימת $other';
+    final other =
+        isLandlord ? l10n.messageScreen9ad15d69 : l10n.messageScreenC6c7d5f7;
+    return l10n.messageScreenB4cd149c(other);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final action = _iNeedToSign ? onSign : onView;
     return GestureDetector(
       onTap: action,
@@ -1352,7 +1392,7 @@ class _ContractBar extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _label,
+              _label(context),
               style: TextStyle(
                 color: _done ? AppColors.success : AppColors.navy,
                 fontSize: 12.5,
@@ -1370,7 +1410,7 @@ class _ContractBar extends StatelessWidget {
                   : Border.all(color: AppColors.borderLight),
             ),
             child: Text(
-              _iNeedToSign ? 'חתום' : 'הצג',
+              _iNeedToSign ? l10n.messageScreen132c5cba : l10n.messageScreen193535e0,
               style: TextStyle(
                   color: _iNeedToSign ? Colors.white : AppColors.navy,
                   fontSize: 12,
@@ -1412,26 +1452,27 @@ class _ActionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final actions = [
       _ActionItem(
         icon: IconsaxPlusLinear.pen_tool,
-        label: 'חתימת בעלים',
+        label: l10n.messageScreen9767b9b6,
         subtitle: !match.contractSent
-            ? 'זמין אחרי שליחת חוזה'
+            ? l10n.messageScreen55859a69
             : match.ownerSigned
-                ? 'הושלם ✓'
-                : 'חתום על החוזה',
+                ? l10n.messageScreen3108cb11
+                : l10n.messageScreen5c64f9aa,
         enabled: match.contractSent && !match.ownerSigned,
         onTap: onOwnerSign,
       ),
       _ActionItem(
         icon: IconsaxPlusLinear.edit,
-        label: 'חתימת שוכר',
+        label: l10n.messageScreen92432ae3,
         subtitle: !match.contractSent
-            ? 'זמין אחרי שליחת חוזה'
+            ? l10n.messageScreen55859a69
             : match.tenantSigned
-                ? 'הושלם ✓'
-                : 'אשר חתימת שוכר',
+                ? l10n.messageScreen3108cb11
+                : l10n.messageScreen8f1b5e04,
         enabled: match.contractSent && !match.tenantSigned,
         onTap: onTenantSign,
       ),
@@ -1460,8 +1501,8 @@ class _ActionsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('פעולות שיחה',
-              style: TextStyle(
+          Text(l10n.messageScreenEc10129a,
+              style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 16,
                   fontWeight: FontWeight.w900)),
@@ -1471,7 +1512,7 @@ class _ActionsSheet extends StatelessWidget {
               Expanded(
                 child: _QuickActionButton(
                   icon: IconsaxPlusLinear.message_text,
-                  label: 'הודעה מהירה',
+                  label: l10n.messageScreen06c776cc,
                   onTap: onQuickMessage,
                 ),
               ),
@@ -1479,7 +1520,7 @@ class _ActionsSheet extends StatelessWidget {
               Expanded(
                 child: _QuickActionButton(
                   icon: IconsaxPlusLinear.document_upload,
-                  label: 'קובץ',
+                  label: l10n.messageScreen9c5e5f89,
                   onTap: onAttachFile,
                 ),
               ),
@@ -1487,7 +1528,7 @@ class _ActionsSheet extends StatelessWidget {
               Expanded(
                 child: _QuickActionButton(
                   icon: IconsaxPlusLinear.gallery,
-                  label: 'מדיה',
+                  label: l10n.messageScreen4a140235,
                   onTap: onAttachMedia,
                 ),
               ),
@@ -1535,9 +1576,9 @@ class _ActionsSheet extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'חסום משתמש זה',
-                            style: TextStyle(
+                          Text(
+                            l10n.messageScreen90b9bf3d,
+                            style: const TextStyle(
                               color: AppColors.coral,
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
@@ -1545,8 +1586,8 @@ class _ActionsSheet extends StatelessWidget {
                           ),
                           Text(
                             ownerName.isNotEmpty
-                                ? 'הסר את "$ownerName" מהפיד שלך'
-                                : 'הסר משתמש זה מהפיד שלך',
+                                ? l10n.messageScreen981ea924(ownerName)
+                                : l10n.messageScreenB4610ada,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
@@ -1629,6 +1670,7 @@ class _SendContractCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final enabled = !sent && onTap != null;
     final accent = const Color(0xFF256BFD);
 
@@ -1681,7 +1723,7 @@ class _SendContractCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'שליחת חוזה',
+                      l10n.messageScreenDdc93140,
                       style: TextStyle(
                         color: enabled ? AppColors.navy : AppColors.textSecondary,
                         fontSize: 16,
@@ -1691,8 +1733,8 @@ class _SendContractCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       sent
-                          ? 'החוזה כבר נשלח לצד השני'
-                          : 'שלח טיוטת חוזה לחתימה דיגיטלית',
+                          ? l10n.messageScreen98f8e516
+                          : l10n.messageScreen848015c2,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12.5,
@@ -1797,6 +1839,7 @@ class _EmptyChat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -1814,16 +1857,16 @@ class _EmptyChat extends StatelessWidget {
                   color: AppColors.primary, size: 26),
             ),
             const SizedBox(height: 16),
-            const Text('הצ׳אט מוכן',
-                style: TextStyle(
+            Text(l10n.messageScreen14cb9c39,
+                style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            const Text(
-              'שלח הודעה כדי להתחיל את השיחה.',
+            Text(
+              l10n.messageScreen4726b342,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 13.5,
                   height: 1.55,
@@ -1988,9 +2031,9 @@ class _MessageBubble extends StatelessWidget {
                   ),
                   if (isTenant && message.failed) ...[
                     const SizedBox(width: 4),
-                    const Text(
-                      'לא נשלח',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context)!.messageScreen9e6a373e,
+                      style: const TextStyle(
                         color: Color(0xFFFFE0E0),
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -2152,7 +2195,7 @@ class _DateDivider extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              _formatDay(date),
+              _formatDay(context, date),
               style: TextStyle(
                 color: AppColors.primary,
                 fontSize: 12.5,
@@ -2204,6 +2247,7 @@ class _MessageInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottom = MediaQuery.of(context).padding.bottom;
 
     // While recording, the whole bar becomes a recording strip: cancel · timer ·
@@ -2236,8 +2280,8 @@ class _MessageInput extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w700)),
             const Spacer(),
-            const Text('בטל · שלח',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+            Text(l10n.messageScreenB6557f57,
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
             const SizedBox(width: 12),
             ScaleBounce(
               onTap: onStopVoice,
@@ -2335,9 +2379,9 @@ class _MessageInput extends StatelessWidget {
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'כתיבת הודעה...',
-                  hintStyle: TextStyle(
+                decoration: InputDecoration(
+                  hintText: l10n.messageScreen562b0c99,
+                  hintStyle: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -2401,62 +2445,63 @@ class _TemplateLibrarySheet extends StatelessWidget {
   _TemplateLibrarySheet({required this.onSelect});
   final ValueChanged<String> onSelect;
 
-  static const _templates = [
-    _TemplateMessage(
-      category: 'פתיחה',
-      label: 'הודעת ברכה',
-      text:
-          'שלום! קיבלתי את הבקשה שלך. אשמח לענות על שאלות ולתאם ביקור. מתי נוח לך?',
-      icon: IconsaxPlusLinear.home_2,
-    ),
-    _TemplateMessage(
-      category: 'פתיחה',
-      label: 'אישור עניין',
-      text:
-          'תודה על ההתעניינות! הדירה עדיין פנויה. אשמח לתאם ביקור בשבוע הקרוב.',
-      icon: IconsaxPlusLinear.tick_circle,
-    ),
-    _TemplateMessage(
-      category: 'ביקור',
-      label: 'תיאום ביקור',
-      text: 'אני זמין לביקור ביום __ בשעה __. האם מתאים לך?',
-      icon: IconsaxPlusLinear.calendar,
-    ),
-    _TemplateMessage(
-      category: 'ביקור',
-      label: 'אישור ביקור',
-      text: 'מעולה! מאשר ביקור ביום __ בשעה __. הכתובת: ___.',
-      icon: IconsaxPlusLinear.location,
-    ),
-    _TemplateMessage(
-      category: 'חוזה',
-      label: 'שליחת חוזה',
-      text: 'שלחתי את טיוטת החוזה. אנא קרא ותחזור אליי עם הערות.',
-      icon: IconsaxPlusLinear.document_text,
-    ),
-    _TemplateMessage(
-      category: 'חוזה',
-      label: 'בקשה לחתימה',
-      text: 'הכל מסודר מצידי — אנא חתום על החוזה כדי לסיים את התהליך.',
-      icon: IconsaxPlusLinear.pen_tool,
-    ),
-    _TemplateMessage(
-      category: 'סיום',
-      label: 'דחייה עדינה',
-      text: 'תודה על ההתעניינות. לצערי מצאנו שוכר מתאים. בהצלחה!',
-      icon: IconsaxPlusLinear.close_circle,
-    ),
-    _TemplateMessage(
-      category: 'סיום',
-      label: 'ברכות כניסה',
-      text: 'ברוך הבא לדירה! אני כאן לכל שאלה.',
-      icon: IconsaxPlusLinear.house,
-    ),
-  ];
+  List<_TemplateMessage> _templates(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      _TemplateMessage(
+        category: l10n.messageScreen1a1c4d24,
+        label: l10n.messageScreen2925dba0,
+        text: l10n.messageScreen6567b014,
+        icon: IconsaxPlusLinear.home_2,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreen1a1c4d24,
+        label: l10n.messageScreen21f42c17,
+        text: l10n.messageScreen390e6607,
+        icon: IconsaxPlusLinear.tick_circle,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreen9906bdda,
+        label: l10n.messageScreenB691bc6c,
+        text: l10n.messageScreenB3c76e4e,
+        icon: IconsaxPlusLinear.calendar,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreen9906bdda,
+        label: l10n.messageScreen9bcbf905,
+        text: l10n.messageScreen3c4a7e97,
+        icon: IconsaxPlusLinear.location,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreenF91ded23,
+        label: l10n.messageScreenDdc93140,
+        text: l10n.messageScreen8ee0ca6b,
+        icon: IconsaxPlusLinear.document_text,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreenF91ded23,
+        label: l10n.messageScreenFcfb868b,
+        text: l10n.messageScreen293a8ea3,
+        icon: IconsaxPlusLinear.pen_tool,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreenF600808f,
+        label: l10n.messageScreen74cdff02,
+        text: l10n.messageScreenA6b75beb,
+        icon: IconsaxPlusLinear.close_circle,
+      ),
+      _TemplateMessage(
+        category: l10n.messageScreenF600808f,
+        label: l10n.messageScreen4a708a34,
+        text: l10n.messageScreen010505cb,
+        icon: IconsaxPlusLinear.house,
+      ),
+    ];
+  }
 
-  Map<String, List<_TemplateMessage>> get _grouped {
+  Map<String, List<_TemplateMessage>> _grouped(BuildContext context) {
     final map = <String, List<_TemplateMessage>>{};
-    for (final t in _templates) {
+    for (final t in _templates(context)) {
       map.putIfAbsent(t.category, () => []).add(t);
     }
     return map;
@@ -2464,7 +2509,8 @@ class _TemplateLibrarySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _grouped;
+    final l10n = AppLocalizations.of(context)!;
+    final grouped = _grouped(context);
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -2498,19 +2544,19 @@ class _TemplateLibrarySheet extends StatelessWidget {
                       color: AppColors.primary, size: 16),
                 ),
                 const SizedBox(width: 10),
-                const Text('תבניות הודעה',
-                    style: TextStyle(
+                Text(l10n.messageScreenF03a8037,
+                    style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 16,
                         fontWeight: FontWeight.w900)),
               ]),
             ),
             const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('בחר תבנית — ניתן לערוך לפני שליחה',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(l10n.messageScreen9ebe91ae,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12)),
             ),
             const SizedBox(height: 12),
             Expanded(
@@ -2619,6 +2665,7 @@ class _ProposeTimesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final accent = const Color(0xFF256BFD);
 
     return Material(
@@ -2656,22 +2703,22 @@ class _ProposeTimesCard extends StatelessWidget {
                     size: 24, color: accent),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'הצע זמנים לצפייה',
-                      style: TextStyle(
+                      l10n.messageScreen20a086c2,
+                      style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'בחר עד 3 מועדים פנויים לשליחה לשוכר',
-                      style: TextStyle(
+                      l10n.messageScreenA4c847ba,
+                      style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
@@ -2744,6 +2791,7 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Container(
@@ -2781,9 +2829,9 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
                       color: AppColors.primary, size: 18),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
-                  child: Text('הצע זמנים לצפייה',
-                      style: TextStyle(
+                Expanded(
+                  child: Text(l10n.messageScreen20a086c2,
+                      style: const TextStyle(
                           color: AppColors.navy,
                           fontSize: 16,
                           fontWeight: FontWeight.w900)),
@@ -2791,8 +2839,9 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('בחר עד 3 מועדים פנויים — השוכר יוכל לאשר אחד מהם.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+            Text(l10n.messageScreenE95891e3,
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12.5)),
             const SizedBox(height: 14),
             if (_loading)
               Padding(
@@ -2843,8 +2892,8 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
                         },
                   child: Text(
                     _selected.isEmpty
-                        ? 'בחר מועדים לשליחה'
-                        : 'שלח ${_selected.length} מועדים לשוכר',
+                        ? l10n.messageScreenB22c28b7
+                        : l10n.messageScreen7eea2f56(_selected.length),
                     style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w900),
                   ),
@@ -2873,16 +2922,16 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
                 color: AppColors.primary, size: 26),
           ),
           const SizedBox(height: 14),
-          const Text('אין זמנים פנויים',
-              style: TextStyle(
+          Text(AppLocalizations.of(context)!.messageScreenEe0506aa,
+              style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 15,
                   fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
-          const Text(
-            'הוסף מועדים פנויים ביומן כדי שתוכל להציע אותם לשוכר.',
+          Text(
+            AppLocalizations.of(context)!.messageScreen8ac80938,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
                 color: AppColors.textSecondary, fontSize: 12.5, height: 1.5),
           ),
           const SizedBox(height: 16),
@@ -2898,8 +2947,9 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
                     borderRadius: BorderRadius.circular(14)),
               ),
               icon: const Icon(IconsaxPlusLinear.add, size: 18),
-              label: const Text('הוסף זמנים ביומן',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              label: Text(AppLocalizations.of(context)!.messageScreen584c93b0,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -2923,6 +2973,7 @@ class _SlotPickRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Opacity(
       opacity: disabled ? 0.5 : 1,
       child: Material(
@@ -2954,14 +3005,15 @@ class _SlotPickRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_formatSlotDate(slot.start),
+                      Text(_formatSlotDate(context, slot.start),
                           style: const TextStyle(
                               color: AppColors.navy,
                               fontSize: 14,
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
                       Text(
-                        '${_formatTime(slot.start)} · ${slot.durationMinutes} דק׳',
+                        l10n.messageScreen1aebd38a(
+                            _formatTime(slot.start), slot.durationMinutes),
                         style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12.5,
@@ -3148,7 +3200,7 @@ class _SlotProposalCard extends StatelessWidget {
     required this.createdAt,
     required this.confirmedSlotIds,
     required this.onConfirm,
-    this.ownerName = 'רונה',
+    this.ownerName = '',
   });
 
   final SlotProposal proposal;
@@ -3160,6 +3212,7 @@ class _SlotProposalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final anyConfirmed =
         proposal.options.any((o) => confirmedSlotIds.contains(o.slotId));
     final firstOption =
@@ -3168,8 +3221,8 @@ class _SlotProposalCard extends StatelessWidget {
         ? '${_formatTime(firstOption.start)}-${_formatTime(firstOption.start.add(Duration(minutes: firstOption.durationMinutes)))}'
         : '10:25-11:25';
     final dateLabel = firstOption != null
-        ? _formatSlotDate(firstOption.start)
-        : 'נובמבר 2026';
+        ? _formatSlotDate(context, firstOption.start)
+        : l10n.messageScreenCf6515cd;
 
     return Center(
       child: Container(
@@ -3192,7 +3245,9 @@ class _SlotProposalCard extends StatelessWidget {
           children: [
             // Card Title
             Text(
-              'הוזמנת לפגישת סיור בדירה של ${ownerName.isNotEmpty ? ownerName : 'רונה'}',
+              l10n.messageScreen1bcdb486(ownerName.isNotEmpty
+                  ? ownerName
+                  : l10n.messageScreenFa77db70),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 17,
@@ -3285,7 +3340,9 @@ class _SlotProposalCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          anyConfirmed ? 'מאושר' : 'אישור',
+                          anyConfirmed
+                              ? l10n.messageScreen8270663e
+                              : l10n.messageScreenF21acb6a,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -3323,6 +3380,7 @@ class _SlotOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Opacity(
       opacity: dimmed ? 0.5 : 1,
       child: Container(
@@ -3341,14 +3399,15 @@ class _SlotOptionRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_formatSlotDate(option.start),
+                  Text(_formatSlotDate(context, option.start),
                       style: const TextStyle(
                           color: AppColors.navy,
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
                   Text(
-                    '${_formatTime(option.start)} · ${option.durationMinutes} דק׳',
+                    l10n.messageScreenAbfb1f15(
+                        _formatTime(option.start), option.durationMinutes),
                     style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -3358,23 +3417,24 @@ class _SlotOptionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            _trailing(),
+            _trailing(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _trailing() {
+  Widget _trailing(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (confirmed) {
-      return const Row(
+      return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle_rounded,
+          const Icon(Icons.check_circle_rounded,
               color: AppColors.success, size: 16),
-          SizedBox(width: 4),
-          Text('מאושר',
-              style: TextStyle(
+          const SizedBox(width: 4),
+          Text(l10n.messageScreen8270663e,
+              style: const TextStyle(
                   color: AppColors.success,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w900)),
@@ -3392,14 +3452,14 @@ class _SlotOptionRow extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         onPressed: onConfirm,
-        child: const Text('אשר',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900)),
+        child: Text(l10n.messageScreen354ef2c7,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900)),
       );
     }
     // Sender's read-only pending label (only when nothing chosen yet).
     if (!dimmed) {
-      return const Text('ממתין לאישור',
-          style: TextStyle(
+      return Text(l10n.messageScreenC83c4f81,
+          style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11.5,
               fontWeight: FontWeight.w700));
@@ -3451,14 +3511,14 @@ class _SlotConfirmCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('צפייה מאושרת',
-                    style: TextStyle(
+                Text(AppLocalizations.of(context)!.messageScreen94eb6af0,
+                    style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 14.5,
                         fontWeight: FontWeight.w900)),
                 const SizedBox(height: 3),
                 Text(
-                  '${_formatSlotDate(confirm.start)} · ${_formatTime(confirm.start)}',
+                  '${_formatSlotDate(context, confirm.start)} · ${_formatTime(confirm.start)}',
                   style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
@@ -3480,38 +3540,60 @@ class _SlotConfirmCard extends StatelessWidget {
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-const _slotDaysHeb = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-const _slotMonthsHeb = [
-  '',
-  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
-];
+List<String> _slotDays(AppLocalizations l10n) => [
+      l10n.messageScreenDae6b270,
+      l10n.messageScreen47f34119,
+      l10n.messageScreenDb0c22fc,
+      l10n.messageScreenDa1dae77,
+      l10n.messageScreenCe94cfff,
+      l10n.messageScreen7e718908,
+      l10n.messageScreen4203bd7e,
+    ];
 
-/// e.g. "יום שני · 20 ביולי". RTL-safe (pure Hebrew + digits).
-String _formatSlotDate(DateTime d) {
+List<String> _slotMonths(AppLocalizations l10n) => [
+      '',
+      l10n.messageScreen89d6e050,
+      l10n.messageScreenE974ea8b,
+      l10n.messageScreenC0394ea3,
+      l10n.messageScreenA1ac81be,
+      l10n.messageScreen5fa88202,
+      l10n.messageScreen4dee19aa,
+      l10n.messageScreenCf58b8a7,
+      l10n.messageScreen3551b598,
+      l10n.messageScreenD7106337,
+      l10n.messageScreen45ded998,
+      l10n.messageScreen712a2e4f,
+      l10n.messageScreen1774bb5f,
+    ];
+
+/// e.g. "יום שני · 20 ביולי" (Hebrew) or "Monday · Jul 20" (other locales).
+String _formatSlotDate(BuildContext context, DateTime d) {
+  final l10n = AppLocalizations.of(context)!;
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final target = DateTime(d.year, d.month, d.day);
   final diff = target.difference(today).inDays;
   final dayPart = diff == 0
-      ? 'היום'
+      ? l10n.messageScreen95d86d7f
       : diff == 1
-          ? 'מחר'
-          : 'יום ${_slotDaysHeb[d.weekday % 7]}';
-  return '$dayPart · ${d.day} ב${_slotMonthsHeb[d.month]}';
+          ? l10n.messageScreen840835ac
+          : l10n.messageScreenC254edb1(_slotDays(l10n)[d.weekday % 7]);
+  final monthName = _slotMonths(l10n)[d.month];
+  return l10n.messageScreenA118b482(dayPart, d.day.toString(), monthName);
 }
 
 String _formatTime(DateTime v) {
   return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
 }
 
-String _formatDay(DateTime v) {
+String _formatDay(BuildContext context, DateTime v) {
+  final l10n = AppLocalizations.of(context)!;
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final target = DateTime(v.year, v.month, v.day);
   final diff = today.difference(target).inDays;
-  if (diff == 0) return 'היום';
-  if (diff == 1) return 'אתמול';
+  if (diff == 0) return l10n.messageScreen95d86d7f;
+  if (diff == 1) return l10n.messageScreenBe285a01;
   return '${v.day.toString().padLeft(2, '0')}.${v.month.toString().padLeft(2, '0')}.${v.year}';
 }
 

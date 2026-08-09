@@ -9,6 +9,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_likes_repository.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/assistant/erik_chat_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:flutter/material.dart';
@@ -526,6 +527,8 @@ void main() {
       ChangeNotifierProvider<DatingProvider>.value(
         value: provider,
         child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: ExploreScreen(embedded: true)),
         ),
       ),
@@ -719,6 +722,8 @@ void main() {
       ChangeNotifierProvider<DatingProvider>.value(
         value: provider,
         child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ErikChatScreen(),
         ),
       ),

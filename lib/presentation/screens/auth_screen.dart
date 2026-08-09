@@ -8,6 +8,7 @@ import 'package:dating_app/core/services/apple_auth_service.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:dating_app/core/services/notif_admin_gate.dart';
 import 'package:dating_app/core/services/notification_permission_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/admin/notif_console_screen.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -180,11 +181,12 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _loginWithGoogleForWelcome() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_googleLoading) return;
     if (!AppConfig.enableGoogleSignIn) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreenE60dc428)));
       return;
     }
     FocusScope.of(context).unfocus();
@@ -206,10 +208,9 @@ class _AuthScreenState extends State<AuthScreen>
       // no-op
     } on GoogleAuthConfigException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content:
-              Text('הכניסה עם Google לא זמינה כרגע. נסו שוב מאוחר יותר.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreen014274ee)));
     } catch (error) {
       if (!mounted) return;
       final msg = error.toString().toLowerCase();
@@ -219,15 +220,16 @@ class _AuthScreenState extends State<AuthScreen>
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text(l10n.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
   }
 
   Future<void> _loginWithAppleForWelcome() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_appleLoading) return;
     FocusScope.of(context).unfocus();
     setState(() => _appleLoading = true);
@@ -248,13 +250,13 @@ class _AuthScreenState extends State<AuthScreen>
       // user dismissed — no-op
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
-      _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
+      _showAppleError(l10n.authScreenE8a66331);
     } on SignInWithAppleAuthorizationException catch (e, st) {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
       debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
       _showAppleError(
-          'הכניסה עם Apple נכשלה.\n\nקוד: ${e.code.name}\nפרטים: ${e.message}');
+          l10n.authScreen3219b950(e.code.name, '${e.message}'));
     } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
@@ -263,37 +265,39 @@ class _AuthScreenState extends State<AuthScreen>
     } catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] GENERIC ${e.runtimeType}: $e\n$st');
-      _showAppleError('הכניסה עם Apple נכשלה.\n\n${e.runtimeType}: $e');
+      _showAppleError(l10n.authScreen129e293c('${e.runtimeType}', '$e'));
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
   }
 
   String _appleFirebaseErrorMessage(String code) {
+    final l10n = AppLocalizations.of(context)!;
     switch (code) {
       case 'operation-not-allowed':
-        return 'כניסה עם Apple לא מופעלת כרגע. נסו שוב מאוחר יותר.';
+        return l10n.authScreenF8a2e73f;
       case 'account-exists-with-different-credential':
-        return 'כתובת המייל כבר רשומה עם שיטת כניסה אחרת. נסו להיכנס עם Google.';
+        return l10n.authScreen7859b4af;
       case 'invalid-credential':
-        return 'פרטי ה-Apple אינם תקינים. נסו שוב.';
+        return l10n.authScreenF38c0181;
       case 'user-disabled':
-        return 'החשבון הזה הושבת. פנו לתמיכה.';
+        return l10n.authScreen8732894f;
       default:
-        return 'הכניסה עם Apple נכשלה ($code). נסו שוב.';
+        return l10n.authScreen03eefe21(code);
     }
   }
 
   void _showAppleError(String message) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'כניסה עם Apple',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+        title: Text(
+          l10n.authScreenB47b239c,
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: SingleChildScrollView(
           child: SelectableText(message,
               style: const TextStyle(color: AppColors.slate600, height: 1.4)),
@@ -302,7 +306,7 @@ class _AuthScreenState extends State<AuthScreen>
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child:
-                const Text('סגור', style: TextStyle(color: AppColors.slate500)),
+                Text(l10n.authScreen55247199, style: const TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -314,7 +318,7 @@ class _AuthScreenState extends State<AuthScreen>
               Navigator.pop(ctx);
               _onGuestEnter();
             },
-            child: const Text('כניסה כאורח'),
+            child: Text(l10n.authScreenCb3a4292),
           ),
         ],
       ),
@@ -554,16 +558,18 @@ class _WideAccountTypeSelector extends StatelessWidget {
   final String role;
   final VoidCallback onPick;
 
-  static const _labels = {
-    'tenant': 'מחפש/ת דירה',
-    'landlord': 'בעל/ת דירה',
-    'broker': 'מתווך/ת נדל״ן',
-  };
+  Map<String, String> _labels(AppLocalizations l10n) => {
+        'tenant': l10n.authScreen466443ed,
+        'landlord': l10n.authScreenB651765c,
+        'broker': l10n.authScreen244b2e78,
+      };
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final labels = _labels(l10n);
     final isTenant = role == 'tenant';
-    final label = _labels[role] ?? _labels['tenant']!;
+    final label = labels[role] ?? labels['tenant']!;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onPick,
@@ -594,8 +600,8 @@ class _WideAccountTypeSelector extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('סוג חשבון',
-                    style: TextStyle(
+                Text(l10n.authScreen9a81c6ab,
+                    style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600)),
@@ -607,7 +613,7 @@ class _WideAccountTypeSelector extends StatelessWidget {
               ],
             ),
           ),
-          Text(isTenant ? 'בעל דירה / מתווך' : 'שינוי',
+          Text(isTenant ? l10n.authScreenD882def5 : l10n.authScreenE94abfe2,
               style: TextStyle(
                   color: _kBrandTeal,
                   fontSize: 13,
@@ -693,6 +699,7 @@ class _LogoHeader extends StatelessWidget {
 class _WideHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -708,9 +715,9 @@ class _WideHero extends StatelessWidget {
                   fontWeight: FontWeight.w900)),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'הדרך המהירה\nלמצוא את הבית הבא שלך.',
-          style: TextStyle(
+        Text(
+          l10n.authScreen9108bd8e,
+          style: const TextStyle(
               fontFamily: 'SF Hebrew Rounded',
               color: AppColors.navy,
               fontSize: 42,
@@ -720,7 +727,7 @@ class _WideHero extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Text(
-          'Rently מחבר שוכרים ומשכירים בחוויה חכמה, מהירה וברורה.',
+          l10n.authScreen196178b9,
           style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
@@ -737,21 +744,22 @@ class _WideHero extends StatelessWidget {
 class _WideFeatureList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Column(children: const [
+    final l10n = AppLocalizations.of(context)!;
+    return Column(children: [
       _WideFeatureItem(
           icon: IconsaxPlusLinear.building,
-          title: 'גלילת דירות חכמה',
-          subtitle: 'מציג רק את מה שמתאים לפרופיל שלך'),
-      SizedBox(height: 12),
+          title: l10n.authScreen8ba10a13,
+          subtitle: l10n.authScreen4726806c),
+      const SizedBox(height: 12),
       _WideFeatureItem(
           icon: IconsaxPlusLinear.heart,
-          title: 'התאמה דו-כיוונית',
-          subtitle: 'שוכרים ומשכירים מאשרים זה את זה'),
-      SizedBox(height: 12),
+          title: l10n.authScreenB312f1ad,
+          subtitle: l10n.authScreenB92874cd),
+      const SizedBox(height: 12),
       _WideFeatureItem(
           icon: IconsaxPlusLinear.message,
-          title: 'צ׳אט ישיר',
-          subtitle: 'תקשורת ממוקדת בין הצדדים'),
+          title: l10n.authScreen4bc28625,
+          subtitle: l10n.authScreen4ec7649d),
     ]);
   }
 }
@@ -802,6 +810,7 @@ class _SimpleTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return TabBar(
       controller: controller,
       indicatorColor: _kBrandTeal,
@@ -813,9 +822,9 @@ class _SimpleTabBar extends StatelessWidget {
       labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       unselectedLabelStyle:
           const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-      tabs: const [
-        Tab(text: 'כניסה'),
-        Tab(text: 'הרשמה'),
+      tabs: [
+        Tab(text: l10n.authScreen2f6783cd),
+        Tab(text: l10n.authScreen070f0a6c),
       ],
     );
   }
@@ -842,6 +851,7 @@ class _LoginPopupSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Container(
@@ -866,16 +876,16 @@ class _LoginPopupSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text('התחברות לחשבון',
+            Text(l10n.authScreen0e36c58d,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text('התחברו כדי להמשיך',
+            Text(l10n.authScreen988da9b2,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary)),
@@ -890,14 +900,14 @@ class _LoginPopupSheet extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('אין לך חשבון? ',
-                    style: TextStyle(
+                Text(l10n.authScreen20f9f23f,
+                    style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary)),
                 GestureDetector(
                   onTap: onRegister,
-                  child: Text('להרשמה',
+                  child: Text(l10n.authScreenAa4727fb,
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
@@ -1062,7 +1072,7 @@ class _OrDivider extends StatelessWidget {
       Expanded(child: Divider(color: lineColor)),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Text('או',
+        child: Text(AppLocalizations.of(context)!.authScreenFbff31ee,
             style: TextStyle(
                 color: textColor,
                 fontSize: 13,
@@ -1080,6 +1090,7 @@ class _GuestModeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
@@ -1107,37 +1118,37 @@ class _GuestModeDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('המשך כאורח',
-                      style: TextStyle(
+                  Text(l10n.authScreen7e02b34c,
+                      style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           color: Colors.white)),
                   const SizedBox(height: 8),
                   Text(
-                    'בחרו האם להיכנס כבעל דירה או כדייר שמחפש דירה.',
+                    l10n.authScreen6bf26430,
                     style: TextStyle(
                         fontSize: 14, height: 1.5, color: Colors.white.withOpacity(0.7)),
                   ),
                   const SizedBox(height: 20),
                   _GuestRoleOption(
-                    title: 'אורח כדייר מחפש דירה',
-                    subtitle: 'דירות פעילות ומאצ׳ים פתוחים.',
+                    title: l10n.authScreen10683ed0,
+                    subtitle: l10n.authScreen24eb3d5b,
                     icon: IconsaxPlusLinear.profile_circle,
                     color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('tenant'),
                   ),
                   const SizedBox(height: 12),
                   _GuestRoleOption(
-                    title: 'אורח כבעל דירה',
-                    subtitle: 'נכסים פעילים ומועמדים בתהליך.',
+                    title: l10n.authScreen7e33e9cc,
+                    subtitle: l10n.authScreenBb12d654,
                     icon: IconsaxPlusLinear.home,
                     color: _kBrandTeal, // use primary brand color so it pops nicely on dark glass
                     onTap: () => Navigator.of(context).pop('landlord'),
                   ),
                   const SizedBox(height: 12),
                   _GuestRoleOption(
-                    title: 'אורח כמתווך נדל״ן',
-                    subtitle: 'ניהול נכסים, לידים והתאמות ללקוחות.',
+                    title: l10n.authScreen160b6f4f,
+                    subtitle: l10n.authScreen7345afa5,
                     icon: IconsaxPlusLinear.briefcase,
                     color: BrandPalette.broker.primary,
                     onTap: () => Navigator.of(context).pop('broker'),
@@ -1170,6 +1181,7 @@ class _LandlordAgentDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
@@ -1198,16 +1210,16 @@ class _LandlordAgentDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'כניסה כבעל דירה',
-                    style: TextStyle(
+                  Text(
+                    l10n.authScreen405e3450,
+                    style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'בחרו את סוג החשבון. מחפשי דירה נכנסים כברירת מחדל.',
+                    l10n.authScreen98539dbe,
                     style: TextStyle(
                         fontSize: 15,
                         height: 1.5,
@@ -1215,16 +1227,16 @@ class _LandlordAgentDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 22),
                   _GuestRoleOption(
-                    title: 'בעל/ת דירה',
-                    subtitle: 'פרסם נכסים, נהל בקשות ומצא דיירים.',
+                    title: l10n.authScreenB651765c,
+                    subtitle: l10n.authScreenF2529a48,
                     icon: IconsaxPlusLinear.home,
                     color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('landlord'),
                   ),
                   const SizedBox(height: 12),
                   _GuestRoleOption(
-                    title: 'מתווך/ת נדל״ן',
-                    subtitle: 'ניהול נכסים, לידים והתאמות ללקוחות.',
+                    title: l10n.authScreen244b2e78,
+                    subtitle: l10n.authScreen7345afa5,
                     icon: IconsaxPlusLinear.briefcase,
                     color: BrandPalette.broker.primary,
                     onTap: () => Navigator.of(context).pop('broker'),
@@ -1343,10 +1355,11 @@ class _LoginTabState extends State<_LoginTab> {
   }
 
   Future<void> _showTerms() async {
+    final l10n = AppLocalizations.of(context)!;
     await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'תנאי השימוש',
+      barrierLabel: l10n.authScreenA25bd15a,
       barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 360),
       pageBuilder: (ctx, anim1, anim2) {
@@ -1375,15 +1388,16 @@ class _LoginTabState extends State<_LoginTab> {
   }
 
   Future<void> _login() async {
+    final l10n = AppLocalizations.of(context)!;
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
     if (email.isEmpty || password.isEmpty) {
       _shakeCtrl.shake();
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('יש למלא אימייל וסיסמה')));
+          .showSnackBar(SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text(l10n.authScreen6525ddbe)));
       return;
     }
     setState(() => _loading = true);
@@ -1409,34 +1423,35 @@ class _LoginTabState extends State<_LoginTab> {
         'user-not-found' ||
         'wrong-password' ||
         'invalid-credential' =>
-          'אימייל או סיסמה שגויים',
-        'user-disabled' => 'החשבון מושבת',
-        'too-many-requests' => 'יותר מדי ניסיונות, נסה שוב מאוחר יותר',
-        _ => 'שגיאה בכניסה, נסה שוב',
+          l10n.authScreen50aeb2c9,
+        'user-disabled' => l10n.authScreen831cf0fb,
+        'too-many-requests' => l10n.authScreen19cf13ef,
+        _ => l10n.authScreenB4d2edd3,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2500),
           content: Text(msg)));
     } on TimeoutException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 3000),
-          content: Text('אין חיבור לרשת. בדוק את החיבור לאינטרנט ונסה שוב.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(l10n.authScreenCe759227)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _resetPassword() async {
+    final l10n = AppLocalizations.of(context)!;
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
     final emailValid =
         RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
     if (email.isEmpty || !emailValid) {
       _shakeCtrl.shake();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('הזינו קודם את כתובת האימייל שלכם לאיפוס הסיסמה')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreenF887665d)));
       return;
     }
     try {
@@ -1444,34 +1459,35 @@ class _LoginTabState extends State<_LoginTab> {
           .sendPasswordResetEmail(email: email)
           .timeout(const Duration(seconds: 20));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 3000),
-          content: Text('שלחנו קישור לאיפוס סיסמה למייל שלך')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(l10n.authScreen293d3e32)));
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
-        'invalid-email' => 'כתובת האימייל אינה תקינה',
-        'user-not-found' => 'לא נמצא חשבון עם האימייל הזה',
-        'too-many-requests' => 'יותר מדי ניסיונות, נסה שוב מאוחר יותר',
-        _ => 'שגיאה בשליחת קישור האיפוס, נסה שוב',
+        'invalid-email' => l10n.authScreen2d361111,
+        'user-not-found' => l10n.authScreenFf749680,
+        'too-many-requests' => l10n.authScreen19cf13ef,
+        _ => l10n.authScreen2c3813b7,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2500),
           content: Text(msg)));
     } on TimeoutException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 3000),
-          content: Text('אין חיבור לרשת. בדוק את החיבור לאינטרנט ונסה שוב.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(l10n.authScreenCe759227)));
     }
   }
 
   Future<void> _loginWithGoogle() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_googleLoading) return;
     if (!AppConfig.enableGoogleSignIn) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreenE60dc428)));
       return;
     }
     FocusScope.of(context).unfocus();
@@ -1491,10 +1507,10 @@ class _LoginTabState extends State<_LoginTab> {
       // no-op
     } on GoogleAuthConfigException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 2500),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
           content:
-              Text('הכניסה עם Google לא זמינה כרגע. נסו שוב מאוחר יותר.')));
+              Text(l10n.authScreen014274ee)));
     } catch (error) {
       if (!mounted) return;
       final msg = error.toString().toLowerCase();
@@ -1504,15 +1520,16 @@ class _LoginTabState extends State<_LoginTab> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text(l10n.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
   }
 
   Future<void> _loginWithApple() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_appleLoading) return;
     FocusScope.of(context).unfocus();
     setState(() => _appleLoading = true);
@@ -1530,13 +1547,13 @@ class _LoginTabState extends State<_LoginTab> {
       // user dismissed — no-op
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
-      _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
+      _showAppleError(l10n.authScreenE8a66331);
     } on SignInWithAppleAuthorizationException catch (e, st) {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
       debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
       _showAppleError(
-          'הכניסה עם Apple נכשלה.\n\nקוד: ${e.code.name}\nפרטים: ${e.message}');
+          l10n.authScreen3219b950(e.code.name, '${e.message}'));
     } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
@@ -1545,37 +1562,39 @@ class _LoginTabState extends State<_LoginTab> {
     } catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] GENERIC ${e.runtimeType}: $e\n$st');
-      _showAppleError('הכניסה עם Apple נכשלה.\n\n${e.runtimeType}: $e');
+      _showAppleError(l10n.authScreen129e293c('${e.runtimeType}', '$e'));
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
   }
 
   String _appleFirebaseErrorMessage(String code) {
+    final l10n = AppLocalizations.of(context)!;
     switch (code) {
       case 'operation-not-allowed':
-        return 'כניסה עם Apple לא מופעלת כרגע. נסו שוב מאוחר יותר.';
+        return l10n.authScreenF8a2e73f;
       case 'account-exists-with-different-credential':
-        return 'כתובת המייל כבר רשומה עם שיטת כניסה אחרת. נסו להיכנס עם Google.';
+        return l10n.authScreen7859b4af;
       case 'invalid-credential':
-        return 'פרטי ה-Apple אינם תקינים. נסו שוב.';
+        return l10n.authScreenF38c0181;
       case 'user-disabled':
-        return 'החשבון הזה הושבת. פנו לתמיכה.';
+        return l10n.authScreen8732894f;
       default:
-        return 'הכניסה עם Apple נכשלה ($code). נסו שוב.';
+        return l10n.authScreen03eefe21(code);
     }
   }
 
   void _showAppleError(String message) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'כניסה עם Apple',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+        title: Text(
+          l10n.authScreenB47b239c,
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: SingleChildScrollView(
           child: SelectableText(message,
               style: const TextStyle(color: AppColors.slate600, height: 1.4)),
@@ -1584,7 +1603,7 @@ class _LoginTabState extends State<_LoginTab> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child:
-                const Text('סגור', style: TextStyle(color: AppColors.slate500)),
+                Text(l10n.authScreen55247199, style: const TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -1596,7 +1615,7 @@ class _LoginTabState extends State<_LoginTab> {
               Navigator.pop(ctx);
               widget.onGuestLogin();
             },
-            child: const Text('כניסה כאורח'),
+            child: Text(l10n.authScreenCb3a4292),
           ),
         ],
       ),
@@ -1605,6 +1624,7 @@ class _LoginTabState extends State<_LoginTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -1641,10 +1661,10 @@ class _LoginTabState extends State<_LoginTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Title
-                  const Text(
-                    'ברוכים השבים',
+                  Text(
+                    l10n.authScreenD8d84317,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.w900,
@@ -1658,10 +1678,10 @@ class _LoginTabState extends State<_LoginTab> {
                         ]),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'התחברו עם כתובת האימייל והסיסמה שלכם כדי לגשת לחשבון.',
+                  Text(
+                    l10n.authScreenAdf821d4,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13.5,
                         height: 1.35,
@@ -1685,7 +1705,7 @@ class _LoginTabState extends State<_LoginTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Email
-                        const _FieldLabel(label: 'כתובת אימייל', isDark: true),
+                        _FieldLabel(label: l10n.authScreen98bcf26f, isDark: true),
                         const SizedBox(height: 4),
                         _CleanTextField(
                           controller: _emailCtrl,
@@ -1698,7 +1718,7 @@ class _LoginTabState extends State<_LoginTab> {
                         const SizedBox(height: 12),
 
                         // Password
-                        const _FieldLabel(label: 'סיסמה', isDark: true),
+                        _FieldLabel(label: l10n.authScreen0b490b5e, isDark: true),
                         const SizedBox(height: 4),
                         _CleanTextField(
                           controller: _passwordCtrl,
@@ -1746,9 +1766,9 @@ class _LoginTabState extends State<_LoginTab> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'זכור אותי',
-                            style: TextStyle(
+                          Text(
+                            l10n.authScreen3e35b351,
+                            style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600),
@@ -1762,9 +1782,9 @@ class _LoginTabState extends State<_LoginTab> {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text(
-                          'שכחת סיסמה?',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.authScreenD30f1cbd,
+                          style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 13,
                               fontWeight: FontWeight.w600),
@@ -1776,7 +1796,7 @@ class _LoginTabState extends State<_LoginTab> {
 
                   // Login CTA
                   _PillButton(
-                    label: 'התחברות',
+                    label: l10n.authScreen254e07f0,
                     loading: _loading,
                     onTap: _login,
                   ),
@@ -1788,18 +1808,18 @@ class _LoginTabState extends State<_LoginTab> {
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Text(
-                          'בהתחברות אני מאשר/ת את ',
-                          style: TextStyle(
+                        Text(
+                          l10n.authScreen73103765,
+                          style: const TextStyle(
                               color: Colors.white60,
                               fontSize: 12,
                               fontWeight: FontWeight.w500),
                         ),
                         GestureDetector(
                           onTap: _showTerms,
-                          child: const Text(
-                            'תנאי השימוש',
-                            style: TextStyle(
+                          child: Text(
+                            l10n.authScreenA25bd15a,
+                            style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
@@ -1827,7 +1847,7 @@ class _LoginTabState extends State<_LoginTab> {
                         children: [
                           Icon(IconsaxPlusLinear.eye, size: 14, color: Colors.white.withOpacity(0.7)),
                           const SizedBox(width: 6),
-                          Text('המשך כאורח',
+                          Text(l10n.authScreen7e02b34c,
                               style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -1844,14 +1864,14 @@ class _LoginTabState extends State<_LoginTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('אין לך חשבון? ',
-                            style: TextStyle(
+                        Text(l10n.authScreen20f9f23f,
+                            style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500)),
                         GestureDetector(
                           onTap: widget.onSwitchToRegister,
-                          child: Text('הרשמה',
+                          child: Text(l10n.authScreen070f0a6c,
                               style: TextStyle(
                                   color: _kBrandTeal,
                                   fontSize: 14,
@@ -1928,35 +1948,36 @@ class _RegisterFlowState extends State<_RegisterFlow> {
   }
 
   Future<void> _next() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_step == 0) {
       final name = _nameCtrl.text.trim();
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
       if (name.isEmpty) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(
-                duration: Duration(milliseconds: 2500),
-                content: Text('יש להזין שם מלא')));
+            .showSnackBar(SnackBar(
+                duration: const Duration(milliseconds: 2500),
+                content: Text(l10n.authScreen7fcb9eb9)));
         return;
       }
       if (email.isEmpty || !email.contains('@')) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                duration: Duration(milliseconds: 2500),
-                content: Text('יש להזין כתובת אימייל תקינה')));
+            SnackBar(
+                duration: const Duration(milliseconds: 2500),
+                content: Text(l10n.authScreen574b1fc6)));
         return;
       }
       if (password.length < 8) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                duration: Duration(milliseconds: 2500),
-                content: Text('הסיסמה חייבת להכיל לפחות 8 תווים')));
+            SnackBar(
+                duration: const Duration(milliseconds: 2500),
+                content: Text(l10n.authScreen2da8e039)));
         return;
       }
       if (!_agreedToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            duration: Duration(milliseconds: 2500),
-            content: Text('יש לאשר את תנאי השימוש ומדיניות הפרטיות')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(l10n.authScreen02f3dc71)));
         return;
       }
     }
@@ -1999,9 +2020,9 @@ class _RegisterFlowState extends State<_RegisterFlow> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text(AppLocalizations.of(context)!.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -2131,11 +2152,12 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       final msg = switch (e.code) {
-        'email-already-in-use' => 'כתובת האימייל כבר קיימת במערכת',
-        'weak-password' => 'הסיסמה חלשה מדי',
-        'invalid-email' => 'כתובת אימייל לא תקינה',
-        _ => 'שגיאה ביצירת החשבון, נסה שוב',
+        'email-already-in-use' => l10n.authScreen20ef8265,
+        'weak-password' => l10n.authScreen72765f55,
+        'invalid-email' => l10n.authScreenA2b3bad0,
+        _ => l10n.authScreen7e95f8ea,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2500),
@@ -2174,12 +2196,14 @@ class _RegisterFlowState extends State<_RegisterFlow> {
   }
 
   String get _nextLabel {
-    if (_step >= _totalSteps - 1) return 'בואו נתחיל';
-    return 'הבא';
+    final l10n = AppLocalizations.of(context)!;
+    if (_step >= _totalSteps - 1) return l10n.authScreenEf5731e6;
+    return l10n.authScreen5f9edf6e;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isOptionalStep = _role == 'landlord' && _step == 1;
     return Column(
       children: [
@@ -2286,14 +2310,14 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('כבר יש לך חשבון? ',
-                                  style: TextStyle(
+                              Text(l10n.authScreenE0c41b8a,
+                                  style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500)),
                               GestureDetector(
                                 onTap: widget.onSwitchToLogin,
-                                child: Text('התחברות',
+                                child: Text(l10n.authScreen254e07f0,
                                     style: TextStyle(
                                         color: _kBrandTeal,
                                         fontSize: 14,
@@ -2327,6 +2351,7 @@ class _EulaSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ClipPath(
       clipper: _DomeClipper(),
       child: Container(
@@ -2346,10 +2371,10 @@ class _EulaSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'תנאי השימוש ב-Rently',
+            Text(
+              l10n.authScreenC8443e85,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   color: Colors.black,
                   fontSize: 22,
                   fontWeight: FontWeight.w900),
@@ -2360,35 +2385,31 @@ class _EulaSheet extends StatelessWidget {
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
-                      'ברוך הבא ל-Rently!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
-                      style: TextStyle(
+                      l10n.authScreen45133532,
+                      style: const TextStyle(
                           color: AppColors.navy,
                           fontWeight: FontWeight.w800,
                           fontSize: 14,
                           height: 1.4),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _EulaSection(
-                        title: '1. תוכן הולם',
-                        body:
-                            'אין לפרסם תוכן פוגעני, גזעני, מיני, מאיים או כל תוכן שפוגע בזכויות אחרים.'),
+                        title: l10n.authScreen7293f5b9,
+                        body: l10n.authScreen2b76ec99),
                     _EulaSection(
-                        title: '2. ללא אלימות ואיום',
-                        body:
-                            'כל צורה של הטרדה, איום, בריונות או התנהגות פוגענית אסורה לחלוטין.'),
+                        title: l10n.authScreenA6ae0dee,
+                        body: l10n.authScreen47b2d219),
                     _EulaSection(
-                        title: '3. דיווח תוכן',
-                        body:
-                            'משתמשים יכולים לדווח על תוכן שפוגע בהנחיות. נטפל בכל דיווח תוך 24 שעות.'),
+                        title: l10n.authScreenD0daea7a,
+                        body: l10n.authScreen000cadd8),
                     _EulaSection(
-                        title: '4. חסימת משתמשים',
-                        body: 'ניתן לחסום כל משתמש שמתנהג בצורה לא הולמת.'),
+                        title: l10n.authScreen191d3078,
+                        body: l10n.authScreen7c37683f),
                     _EulaSection(
-                        title: '5. פרטיות',
-                        body:
-                            'אנו מכבדים את פרטיותך. המידע ישמש לצורך התאמת נכסים בלבד.'),
+                        title: l10n.authScreenFd03e34f,
+                        body: l10n.authScreenAde0b8ea),
                   ],
                 ),
               ),
@@ -2406,8 +2427,8 @@ class _EulaSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999)),
                     ),
-                    child: const Text('ביטול',
-                        style: TextStyle(
+                    child: Text(l10n.authScreenA7c55a8d,
+                        style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
@@ -2423,8 +2444,8 @@ class _EulaSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999)),
                     ),
-                    child: const Text('אני מסכים/ה',
-                        style: TextStyle(
+                    child: Text(l10n.authScreen5aa0e747,
+                        style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -2502,6 +2523,7 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ClipPath(
       clipper: _DomeClipper(),
       child: Container(
@@ -2586,19 +2608,19 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'הצלחה!',
-                    style: TextStyle(
+                  Text(
+                    l10n.authScreenFde2ad8e,
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'החשבון שלך נוצר בהצלחה ומוכן כעת.',
+                  Text(
+                    l10n.authScreen6253b039,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,
                       height: 1.5,
@@ -2619,9 +2641,9 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                      child: const Text(
-                        'המשך לאפליקציה',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.authScreenAd82fb71,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
@@ -2645,14 +2667,20 @@ class _StepProgress extends StatelessWidget {
   final int step;
   final int total;
 
-  static const _labels = ['חשבון', 'תפקיד', 'פרטים', 'נכס'];
+  List<String> _labels(AppLocalizations l10n) => [
+        l10n.authScreenE0fe08d4,
+        l10n.authScreenEd927047,
+        l10n.authScreenA4ce69e7,
+        l10n.authScreenB88c2d71,
+      ];
 
   @override
   Widget build(BuildContext context) {
+    final labels = _labels(AppLocalizations.of(context)!);
     return Row(
       children: [
         for (int i = 0; i < total; i++) ...[
-          _StepBubble(index: i, current: step, label: _labels[i]),
+          _StepBubble(index: i, current: step, label: labels[i]),
           if (i < total - 1)
             Expanded(
               child: Padding(
@@ -2763,6 +2791,7 @@ class _StepEmailPassword extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
@@ -2770,7 +2799,7 @@ class _StepEmailPassword extends StatelessWidget {
         children: [
           // Title
           Text(
-            'יצירת חשבון',
+            l10n.authScreen9c274654,
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? Colors.white : AppColors.navy,
@@ -2787,7 +2816,7 @@ class _StepEmailPassword extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'מלאו את שמכם המלא, אימייל וסיסמה כדי להירשם ולהתחיל.',
+            l10n.authScreen99e0559d,
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? Colors.white70 : AppColors.textSecondary,
@@ -2810,11 +2839,11 @@ class _StepEmailPassword extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Name
-          _FieldLabel(label: 'שם מלא', isDark: isDark),
+          _FieldLabel(label: l10n.authScreenCbdaff61, isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: nameCtrl,
-            hint: 'שם ושם משפחה',
+            hint: l10n.authScreen0e7dc6f6,
             textCapitalization: TextCapitalization.words,
             prefixIcon: IconsaxPlusLinear.user,
             isDark: isDark,
@@ -2822,7 +2851,7 @@ class _StepEmailPassword extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Email
-          _FieldLabel(label: 'כתובת אימייל', isDark: isDark),
+          _FieldLabel(label: l10n.authScreen98bcf26f, isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: emailCtrl,
@@ -2835,7 +2864,7 @@ class _StepEmailPassword extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Password
-          _FieldLabel(label: 'סיסמה', isDark: isDark),
+          _FieldLabel(label: l10n.authScreen0b490b5e, isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: passwordCtrl,
@@ -2881,16 +2910,16 @@ class _StepEmailPassword extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 13, color: isDark ? Colors.white : AppColors.textSecondary),
                     children: [
-                      TextSpan(text: 'אני מסכים/ה ל'),
+                      TextSpan(text: l10n.authScreen10fb73fe),
                       TextSpan(
-                        text: 'תנאי השימוש',
+                        text: l10n.authScreenA25bd15a,
                         style: TextStyle(
                             color: _kBrandTeal,
                             fontWeight: FontWeight.w700),
                       ),
-                      TextSpan(text: ' ו'),
+                      TextSpan(text: l10n.authScreen0e3bcbcf),
                       TextSpan(
-                        text: 'מדיניות הפרטיות',
+                        text: l10n.authScreenF52fda14,
                         style: TextStyle(
                             color: _kBrandTeal,
                             fontWeight: FontWeight.w700),
@@ -2926,13 +2955,14 @@ class _StepPersonal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isTenant = role == 'tenant';
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('תקציב השכירות שלך',
+          Text(l10n.authScreenFd025bb4,
               style: TextStyle(
                   color: isDark ? Colors.white : AppColors.navy,
                   fontSize: 22,
@@ -2940,7 +2970,7 @@ class _StepPersonal extends StatelessWidget {
                   letterSpacing: -0.5)),
           const SizedBox(height: 6),
           Text(
-              'הגדר את התקציב החודשי כדי שנוכל להתאים עבורך את הדירות הטובות ביותר.',
+              l10n.authScreenC178b5d4,
               style: TextStyle(
                   color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 14,
@@ -2980,7 +3010,7 @@ class _CompactBudgetPicker extends StatelessWidget {
       child: Column(
         children: [
           Row(children: [
-            Text('תקציב חודשי',
+            Text(AppLocalizations.of(context)!.authScreen4094ac8d,
                 style: TextStyle(
                     color: isDark ? Colors.white : AppColors.navy,
                     fontSize: 14,
@@ -3037,6 +3067,7 @@ class _NavButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3054,8 +3085,8 @@ class _NavButtons extends StatelessWidget {
                         borderRadius: BorderRadius.circular(27)),
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                   ),
-                  child: const Text('חזרה',
-                      style: TextStyle(
+                  child: Text(l10n.authScreen10a2352b,
+                      style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w800)),
                 ),
               ),
@@ -3080,7 +3111,7 @@ class _NavButtons extends StatelessWidget {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text('דלג על שלב זה',
+            child: Text(l10n.authScreen4bcd0220,
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -3336,6 +3367,7 @@ class _StepPropertyDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
@@ -3344,7 +3376,7 @@ class _StepPropertyDetails extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('פרטי הנכס',
+              Text(l10n.authScreen220d2733,
                   style: TextStyle(
                       color: isDark ? Colors.white : AppColors.navy,
                       fontSize: 22,
@@ -3357,7 +3389,7 @@ class _StepPropertyDetails extends StatelessWidget {
                   color: _kBrandTeal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('אופציונלי',
+                child: Text(l10n.authScreen726d9a57,
                     style: TextStyle(
                         color: _kBrandTeal,
                         fontSize: 11,
@@ -3366,7 +3398,7 @@ class _StepPropertyDetails extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text('הגדר את מאפייני הדירה שלך כדי שנוכל לחבר אותך לשוכרים המתאימים ביותר.',
+          Text(l10n.authScreen68d09f20,
               style: TextStyle(
                   color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 14,
@@ -3374,14 +3406,14 @@ class _StepPropertyDetails extends StatelessWidget {
           const SizedBox(height: 24),
           _AuthTextField(
             controller: cityCtrl,
-            label: 'עיר / שכונה',
+            label: l10n.authScreenDc8aec13,
             icon: IconsaxPlusLinear.location,
             isDark: isDark,
           ),
           const SizedBox(height: 18),
           _RoomsStepper(rooms: rooms, onRooms: onRooms, isDark: isDark),
           const SizedBox(height: 22),
-          Text('מה יש בנכס?',
+          Text(l10n.authScreen012ba394,
               style: TextStyle(
                   color: isDark ? Colors.white : AppColors.navy,
                   fontSize: 14,
@@ -3425,7 +3457,7 @@ class _RoomsStepper extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
       ),
       child: Row(children: [
-        Text('מספר חדרים',
+        Text(AppLocalizations.of(context)!.authScreen4f4cd24f,
             style: TextStyle(
                 color: isDark ? Colors.white : AppColors.navy,
                 fontSize: 14,
@@ -3622,6 +3654,7 @@ class _WelcomePortal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -3697,12 +3730,12 @@ class _WelcomePortal extends StatelessWidget {
                 const Spacer(),
 
                 // Title Text (Hebrew, right-aligned)
-                const Align(
+                Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'מצאו את המקום\nהמושלם עבורכם',
+                    l10n.authScreen06159b48,
                     textAlign: TextAlign.right,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
@@ -3725,7 +3758,7 @@ class _WelcomePortal extends StatelessWidget {
                     // Tenant Button (Vibrant Teal Gradient + Glass Badge + Shine)
                     Expanded(
                       child: _InteractiveRoleButton(
-                        label: 'מחפש דירה',
+                        label: l10n.authScreenB4cc85ed,
                         icon: IconsaxPlusLinear.search_normal,
                         isPrimary: true,
                         onTap: onLogin,
@@ -3736,7 +3769,7 @@ class _WelcomePortal extends StatelessWidget {
                     // Landlord Button (Obsidian Glassmorphism + Luxury Badge)
                     Expanded(
                       child: _InteractiveRoleButton(
-                        label: 'מפרסם דירה',
+                        label: l10n.authScreen4afeb9ec,
                         icon: IconsaxPlusLinear.building,
                         isPrimary: false,
                         onTap: onLandlordCta,
@@ -3747,11 +3780,11 @@ class _WelcomePortal extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // Other Ways to sign in
-                const Align(
+                Align(
                   alignment: Alignment.center,
                   child: Text(
-                    'או התחברו באמצעות',
-                    style: TextStyle(
+                    l10n.authScreen559301ee,
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -3824,9 +3857,9 @@ class _WelcomePortal extends StatelessWidget {
                   alignment: Alignment.center,
                   child: TextButton(
                     onPressed: onGuestLogin,
-                    child: const Text(
-                      'המשך כאורח',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.authScreen7e02b34c,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,

@@ -5,6 +5,7 @@ import 'package:dating_app/data/models/candidate_filters.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_likes_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/discover/action_button.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
@@ -189,6 +190,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         final currentProfile = provider.tenantProfile;
         // No FABRICATED person: when the viewer is a landlord, the card is driven
         // by the real interested tenant (the liker snapshot). This base carries
@@ -196,9 +198,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
         // so a lead that lacks a real liker shows an honest generic candidate
         // instead of the old made-up "נועה לוי, ₪14,500".
         final tenant = provider.isLandlord
-            ? const TenantProfile(
+            ? TenantProfile(
                 id: '',
-                name: 'מועמד/ת',
+                name: l10n.exploreScreen041446d3,
                 bio: '',
                 photoUrls: [],
                 budgetMax: 0,
@@ -248,7 +250,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'מועמדים',
+                    l10n.exploreScreenEb3c6f60,
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -468,10 +470,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                             },
                                             middleIcon:
                                                 Icons.info_outline_rounded,
-                                            middleLabel: 'פרטים',
-                                            middleTooltip: 'פרטי המועמד',
-                                            likeTooltip: 'אשר מועמד',
-                                            passTooltip: 'דלג',
+                                            middleLabel:
+                                                l10n.exploreScreenA4ce69e7,
+                                            middleTooltip:
+                                                l10n.exploreScreen81a45c4e,
+                                            likeTooltip:
+                                                l10n.exploreScreenE702c2a5,
+                                            passTooltip:
+                                                l10n.exploreScreen80a413c5,
                                           ),
                                         ),
                                       ),
@@ -566,14 +572,14 @@ class _LeadCard extends StatefulWidget {
     return m.isNotEmpty ? m : null;
   }
 
-  String? get displayOccupation {
+  String? displayOccupation(BuildContext context) {
     final o = _hasLiker ? liker!.occupation : tenant.occupation;
-    return (o != null && o.isNotEmpty) ? _occupationLabel(o) : null;
+    return (o != null && o.isNotEmpty) ? _occupationLabel(context, o) : null;
   }
 
-  String? get displayHousehold {
+  String? displayHousehold(BuildContext context) {
     final h = _hasLiker ? liker!.household : tenant.household;
-    return (h != null && h.isNotEmpty) ? _householdLabel(h) : null;
+    return (h != null && h.isNotEmpty) ? _householdLabel(context, h) : null;
   }
 
   int? get displayNumChildren =>
@@ -644,14 +650,15 @@ class _LeadCardState extends State<_LeadCard> {
 
   // Candidate interest intent → a plain-language status the landlord can filter
   // by: actively looking vs checking options vs just browsing.
-  static String? _intentLabel(String? token) {
+  String? _intentLabel(BuildContext context, String? token) {
+    final l10n = AppLocalizations.of(context)!;
     switch (token) {
       case 'now':
-        return 'מתעניין פעיל';
+        return l10n.exploreScreenCaab7e07;
       case 'soon':
-        return 'בודק אופציות';
+        return l10n.exploreScreen861f28cc;
       case 'browsing':
-        return 'צופה בלבד';
+        return l10n.exploreScreen9592be20;
       default:
         return null;
     }
@@ -659,55 +666,57 @@ class _LeadCardState extends State<_LeadCard> {
 
   /// The REAL, per-liker attribute facts — only non-null values are surfaced.
   List<_Fact> _buildFacts() {
+    final l10n = AppLocalizations.of(context)!;
     final facts = <_Fact>[];
     // Interest intent first — it's the signal the landlord triages leads by.
-    final intent = _intentLabel(widget.displayUrgency);
+    final intent = _intentLabel(context, widget.displayUrgency);
     if (intent != null) {
-      facts.add(_Fact(IconsaxPlusLinear.flash, 'התעניינות', intent));
+      facts.add(_Fact(IconsaxPlusLinear.flash, l10n.exploreScreen4189b321, intent));
     }
     final budget = widget.displayBudget;
     if (budget != null) {
-      facts.add(_Fact(IconsaxPlusLinear.wallet_money, 'תקציב', _fmt(budget)));
+      facts.add(_Fact(IconsaxPlusLinear.wallet_money, l10n.exploreScreen3bb32ddd, _fmt(budget)));
     }
     final rooms = widget.displayRooms;
     if (rooms != null) {
       final r = rooms.toStringAsFixed(rooms % 1 == 0 ? 0 : 1);
-      facts.add(_Fact(IconsaxPlusLinear.building, 'חדרים', '$r חדרים'));
+      facts.add(_Fact(IconsaxPlusLinear.building, l10n.exploreScreenB50b3974, l10n.exploreScreenF8eba562(r)));
     }
     final moveIn = widget.displayMoveIn;
     if (moveIn != null) {
-      facts.add(_Fact(IconsaxPlusLinear.calendar, 'כניסה', moveIn));
+      facts.add(_Fact(IconsaxPlusLinear.calendar, l10n.exploreScreen2f6783cd, moveIn));
     }
-    final occupation = widget.displayOccupation;
+    final occupation = widget.displayOccupation(context);
     if (occupation != null) {
-      facts.add(_Fact(IconsaxPlusLinear.briefcase, 'תעסוקה', occupation));
+      facts.add(_Fact(IconsaxPlusLinear.briefcase, l10n.exploreScreen6b84e37c, occupation));
     }
-    final household = widget.displayHousehold;
+    final household = widget.displayHousehold(context);
     final children = widget.displayNumChildren;
     if (household != null || (children != null && children > 0)) {
       final parts = <String>[
         if (household != null) household,
-        if (children != null && children > 0) '$children ילדים',
+        if (children != null && children > 0) l10n.exploreScreenC60ce521(children),
       ];
-      facts.add(_Fact(IconsaxPlusLinear.people, 'משק בית', parts.join(' · ')));
+      facts.add(_Fact(IconsaxPlusLinear.people, l10n.exploreScreen10f698cd, parts.join(' · ')));
     }
     final income = widget.displayIncome;
     if (income != null) {
-      facts.add(_Fact(IconsaxPlusLinear.money_recive, 'הכנסה', _fmt(income)));
+      facts.add(_Fact(IconsaxPlusLinear.money_recive, l10n.exploreScreen07bf27d4, _fmt(income)));
     }
     final lifestyle = <String>[
-      if (widget.displayHasCar == true) 'רכב',
-      if (widget.displayHasPets == true) 'חיית מחמד',
-      if (widget.displayWfh == true) 'עבודה מהבית',
+      if (widget.displayHasCar == true) l10n.exploreScreen7f1643b2,
+      if (widget.displayHasPets == true) l10n.exploreScreenAeee4760,
+      if (widget.displayWfh == true) l10n.exploreScreenEcddc928,
     ];
     if (lifestyle.isNotEmpty) {
-      facts.add(_Fact(IconsaxPlusLinear.car, 'אורח חיים', lifestyle.join(' · ')));
+      facts.add(_Fact(IconsaxPlusLinear.car, l10n.exploreScreen7778a202, lifestyle.join(' · ')));
     }
     return facts;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isAccepting = widget.hOffset > 10;
     final isRejecting = widget.hOffset < -10;
     final facts = _buildFacts();
@@ -914,7 +923,9 @@ class _LeadCardState extends State<_LeadCard> {
                               .withOpacity(0.08),
                         ),
                         child: Text(
-                          isAccepting ? '♥ מאשר' : 'דוחה',
+                          isAccepting
+                              ? l10n.exploreScreenFccc9519
+                              : l10n.exploreScreen0d79bffc,
                           style: TextStyle(
                             color: isAccepting
                                 ? AppColors.primary
@@ -972,7 +983,8 @@ class _LeadCardState extends State<_LeadCard> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'התעניין/ה ב: ${widget.property.address}',
+                                  l10n.exploreScreen046a972e(
+                                      widget.property.address),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -1100,14 +1112,14 @@ class _HighFitPill extends StatelessWidget {
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(IconsaxPlusBold.medal_star, color: Colors.white, size: 12),
-          SizedBox(width: 4),
+          const Icon(IconsaxPlusBold.medal_star, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
           Text(
-            'התאמה גבוהה',
-            style: TextStyle(
+            AppLocalizations.of(context)!.exploreScreen76b35661,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: 10.5,
@@ -1140,7 +1152,7 @@ class _MoreInterestedPill extends StatelessWidget {
           const Icon(IconsaxPlusBold.people, color: Colors.white, size: 12),
           const SizedBox(width: 4),
           Text(
-            '+$count מתעניינים',
+            AppLocalizations.of(context)!.exploreScreen6c2b3afd(count),
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -1167,14 +1179,14 @@ class _VerifiedShield extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(IconsaxPlusBold.shield_tick, color: Colors.white, size: 12),
-          SizedBox(width: 5),
+          const Icon(IconsaxPlusBold.shield_tick, color: Colors.white, size: 12),
+          const SizedBox(width: 5),
           Text(
-            'מאומת',
-            style: TextStyle(
+            AppLocalizations.of(context)!.exploreScreen7de9ac58,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w900,
               fontSize: 10.5,
@@ -1246,6 +1258,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final hasProperties = context.read<DatingProvider>().myProperties.isNotEmpty;
     final hasMatches = context.read<DatingProvider>().matches.isNotEmpty;
 
@@ -1269,10 +1282,10 @@ class _EmptyOwnerQueue extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'אין מועמדים חדשים',
+            Text(
+              l10n.exploreScreenA261278d,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
@@ -1281,8 +1294,8 @@ class _EmptyOwnerQueue extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               hasProperties
-                  ? 'כאשר שוכרים יאהבו את הנכסים שלך הם יופיעו כאן לאישור.'
-                  : 'הוסף נכס ראשון — שוכרים שיאהבו אותו יופיעו כאן.',
+                  ? l10n.exploreScreen4d90eb93
+                  : l10n.exploreScreen05ec83de,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textSecondary,
@@ -1300,7 +1313,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const AddPropertyScreen()),
                   ),
                   icon: const RentlyIcon(IconsaxPlusLinear.add_square, size: 17),
-                  label: const Text('הוסף נכס עכשיו'),
+                  label: Text(l10n.exploreScreen9bcc24df),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1327,7 +1340,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                     }
                   },
                   icon: const RentlyIcon(IconsaxPlusLinear.message, size: 17),
-                  label: const Text('עבור לשיחות'),
+                  label: Text(l10n.exploreScreen567d5a67),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,
                     side: const BorderSide(color: AppColors.borderLight),
@@ -1428,7 +1441,7 @@ class _FiltersIconButton extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              'סנן העדפות מועמדים',
+              AppLocalizations.of(context)!.exploreScreenEde0a5bb,
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
@@ -1481,7 +1494,7 @@ class _AutoLikeToggle extends StatelessWidget {
         ),
         const SizedBox(width: 5),
         Text(
-          'אישור אוטומטי',
+          AppLocalizations.of(context)!.exploreScreenB803dad3,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1564,6 +1577,7 @@ class _NoMatchingCandidates extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1584,20 +1598,20 @@ class _NoMatchingCandidates extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'אין מועמדים שתואמים למסננים',
+            Text(
+              l10n.exploreScreenE335275c,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'נסה להרחיב את המסננים כדי לראות עוד מתעניינים.',
+            Text(
+              l10n.exploreScreen86ad2dd3,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 height: 1.6,
                 fontSize: 14,
@@ -1610,7 +1624,7 @@ class _NoMatchingCandidates extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onClear,
                 icon: const RentlyIcon(IconsaxPlusLinear.close_circle, size: 17),
-                label: const Text('נקה מסננים'),
+                label: Text(l10n.exploreScreen9c08b083),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1645,6 +1659,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final maxHeight = MediaQuery.of(context).size.height * 0.9;
 
@@ -1707,9 +1722,9 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
               // ── Header: title (right) + close control (left) ──────────────
               Row(
                 children: [
-                  const Text(
-                    'סנן העדפות מועמדים',
-                    style: TextStyle(
+                  Text(
+                    l10n.exploreScreenEde0a5bb,
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: AppColors.navy,
@@ -1723,7 +1738,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       child: Padding(
                         padding: const EdgeInsets.only(left: 12),
                         child: Text(
-                          'נקה הכל',
+                          l10n.exploreScreenEbbc108b,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -1762,11 +1777,11 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // ── Fit score (0–100 RANGE) ────────────────────────────
-                      _sectionTitle('רמת התאמה', IconsaxPlusBold.medal_star),
+                      _sectionTitle(l10n.exploreScreen8f43e338, IconsaxPlusBold.medal_star),
                       const SizedBox(height: 4),
                       Text(
                         (_draft.minFitScore == null && _draft.maxFitScore == null)
-                            ? 'כל רמות ההתאמה'
+                            ? l10n.exploreScreenDaf1cf49
                             : '${fitStart.round()}% – ${fitEnd.round()}%',
                         style: const TextStyle(
                           fontSize: 13,
@@ -1803,12 +1818,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 16),
 
                       // ── Budget range (₪2,000 … ₪20,000) ────────────────────
-                      _sectionTitle('תקציב חודשי',
+                      _sectionTitle(l10n.exploreScreen4094ac8d,
                           IconsaxPlusLinear.money_recive),
                       const SizedBox(height: 4),
                       Text(
                         (_draft.budgetMin == null && _draft.budgetMax == null)
-                            ? 'כל התקציבים'
+                            ? l10n.exploreScreenBe539fd6
                             : '${_fmt(budgetStart.round())} – ${_fmt(budgetEnd.round())}',
                         style: const TextStyle(
                           fontSize: 13,
@@ -1845,11 +1860,11 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 16),
 
                       // ── Age range (18 … 70) ────────────────────────────────
-                      _sectionTitle('גיל', IconsaxPlusLinear.user),
+                      _sectionTitle(l10n.exploreScreenE5aeca16, IconsaxPlusLinear.user),
                       const SizedBox(height: 4),
                       Text(
                         (_draft.ageMin == null && _draft.ageMax == null)
-                            ? 'כל הגילאים'
+                            ? l10n.exploreScreenE5e69fd1
                             : '${ageStart.round()} – ${ageEnd.round()}',
                         style: const TextStyle(
                           fontSize: 13,
@@ -1886,7 +1901,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 16),
 
                       // ── Minimum rooms (chips) ──────────────────────────────
-                      _sectionTitle('מספר חדרים (מינימום)',
+                      _sectionTitle(l10n.exploreScreen5c2ad42a,
                           IconsaxPlusLinear.building),
                       const SizedBox(height: 12),
                       Wrap(
@@ -1909,7 +1924,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Life stage (multi-select) ──────────────────────────
-                      _sectionTitle('שלב חיים', IconsaxPlusLinear.user_octagon),
+                      _sectionTitle(l10n.exploreScreenD308ff19, IconsaxPlusLinear.user_octagon),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
@@ -1927,12 +1942,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Recent likes only ──────────────────────────────────
-                      _sectionTitle('עדכניות', IconsaxPlusLinear.clock),
+                      _sectionTitle(l10n.exploreScreenFe95da03, IconsaxPlusLinear.clock),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'רק לייקים מהשבוע האחרון',
+                            label: l10n.exploreScreen4b4fd824,
                             icon: IconsaxPlusLinear.flash_1,
                             selected: _draft.recentOnly,
                             onTap: () => setState(() {
@@ -1945,12 +1960,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 16),
 
                       // ── Monthly income (₪3,000 … ₪100,000+) ────────────────
-                      _sectionTitle('הכנסה חודשית מינימלית',
+                      _sectionTitle(l10n.exploreScreen959e2dfc,
                           IconsaxPlusLinear.wallet_money),
                       const SizedBox(height: 4),
                       Text(
                         _draft.incomeMin == null
-                            ? 'ללא סינון לפי הכנסה'
+                            ? l10n.exploreScreen07d495e1
                             : _incomeLabel(incomeValue),
                         style: const TextStyle(
                           fontSize: 13,
@@ -1976,13 +1991,14 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 16),
 
                       // ── Number of children (0 … 10+) ───────────────────────
-                      _sectionTitle('מספר ילדים (עד)',
+                      _sectionTitle(l10n.exploreScreenB0e336c6,
                           IconsaxPlusLinear.profile_2user),
                       const SizedBox(height: 4),
                       Text(
                         _draft.numChildrenMax == null
-                            ? 'ללא הגבלה'
-                            : 'עד ${_childrenLabel(childrenValue)}',
+                            ? l10n.exploreScreen09ae3918
+                            : l10n.exploreScreen8af90dc4(
+                                _childrenLabel(childrenValue)),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -2009,7 +2025,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
 
                       // ── Availability / move-in ─────────────────────────────
                       _sectionTitle(
-                          'מועד כניסה לנכס', IconsaxPlusLinear.calendar),
+                          l10n.exploreScreen61dc5b0a, IconsaxPlusLinear.calendar),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
@@ -2031,13 +2047,13 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Occupation (multi-select) ──────────────────────────
-                      _sectionTitle('תחום עיסוק', IconsaxPlusLinear.briefcase),
+                      _sectionTitle(l10n.exploreScreen15039c05, IconsaxPlusLinear.briefcase),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final entry in _kOccupationLabels.entries)
+                          for (final entry in _occupationLabels(context).entries)
                             _QuickChip(
                               label: entry.value,
                               selected: _draft.occupation.contains(entry.key),
@@ -2048,13 +2064,13 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Household type (multi-select) ──────────────────────
-                      _sectionTitle('סוג משק בית', IconsaxPlusLinear.people),
+                      _sectionTitle(l10n.exploreScreen2b9fb355, IconsaxPlusLinear.people),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final entry in _kHouseholdLabels.entries)
+                          for (final entry in _householdLabels(context).entries)
                             _QuickChip(
                               label: entry.value,
                               selected: _draft.household.contains(entry.key),
@@ -2065,14 +2081,14 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Lifestyle toggles (pets / car / WFH) ───────────────
-                      _sectionTitle('אורח חיים', IconsaxPlusLinear.pet),
+                      _sectionTitle(l10n.exploreScreen7778a202, IconsaxPlusLinear.pet),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _QuickChip(
-                            label: 'ללא חיית מחמד',
+                            label: l10n.exploreScreenE70cb0b4,
                             icon: IconsaxPlusLinear.pet,
                             selected: _draft.hasPets == false,
                             onTap: () => setState(() {
@@ -2082,7 +2098,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                             }),
                           ),
                           _QuickChip(
-                            label: 'בעל/ת רכב',
+                            label: l10n.exploreScreen7decda58,
                             icon: IconsaxPlusLinear.car,
                             selected: _draft.hasCar == true,
                             onTap: () => setState(() {
@@ -2092,7 +2108,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                             }),
                           ),
                           _QuickChip(
-                            label: 'עבודה מהבית',
+                            label: l10n.exploreScreenEcddc928,
                             icon: IconsaxPlusLinear.home_2,
                             selected: _draft.wfh == true,
                             onTap: () => setState(() {
@@ -2106,7 +2122,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Religious lifestyle fit (חילוני…חרדי) ──────────────
-                      _sectionTitle('אורח חיים', IconsaxPlusLinear.candle),
+                      _sectionTitle(l10n.exploreScreen7778a202, IconsaxPlusLinear.candle),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
@@ -2125,14 +2141,14 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Religious deal-breakers (Shabbat / kosher) ─────────
-                      _sectionTitle('שמירת מסורת', IconsaxPlusLinear.moon),
+                      _sectionTitle(l10n.exploreScreen81d92174, IconsaxPlusLinear.moon),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _QuickChip(
-                            label: 'שומר/ת שבת',
+                            label: l10n.exploreScreen8ac14f86,
                             icon: IconsaxPlusLinear.moon,
                             selected: _draft.shabbatObservant == true,
                             onTap: () => setState(() {
@@ -2142,7 +2158,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                             }),
                           ),
                           _QuickChip(
-                            label: 'שומר/ת כשרות',
+                            label: l10n.exploreScreen30524972,
                             icon: IconsaxPlusLinear.reserve,
                             selected: _draft.keepsKosher == true,
                             onTap: () => setState(() {
@@ -2156,7 +2172,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Pet policy (allow-list — permit a cat, exclude a big dog)
-                      _sectionTitle('חיות מחמד', IconsaxPlusLinear.pet),
+                      _sectionTitle(l10n.exploreScreen00549c82, IconsaxPlusLinear.pet),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
@@ -2173,14 +2189,14 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Noise deal-breakers (hosting / instrument) ─────────
-                      _sectionTitle('רעש ושקט', IconsaxPlusLinear.volume_low),
+                      _sectionTitle(l10n.exploreScreenD2ab88e9, IconsaxPlusLinear.volume_low),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _QuickChip(
-                            label: 'לא מארח/ת הרבה',
+                            label: l10n.exploreScreenB9558dae,
                             icon: IconsaxPlusLinear.profile_2user,
                             selected: _draft.hostsGuests == false,
                             onTap: () => setState(() {
@@ -2190,7 +2206,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                             }),
                           ),
                           _QuickChip(
-                            label: 'ללא כלי נגינה',
+                            label: l10n.exploreScreen73940096,
                             icon: IconsaxPlusLinear.music,
                             selected: _draft.playsInstrument == false,
                             onTap: () => setState(() {
@@ -2204,7 +2220,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Affordability: income-to-rent ratio ────────────────
-                      _sectionTitle('יחס הכנסה/שכ"ד',
+                      _sectionTitle(l10n.exploreScreen01759509,
                           IconsaxPlusLinear.chart_success),
                       const SizedBox(height: 12),
                       Wrap(
@@ -2213,8 +2229,8 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         children: [
                           for (final r in const <double>[2.0, 2.5, 3.0])
                             _QuickChip(
-                              label:
-                                  '×${r.toStringAsFixed(r % 1 == 0 ? 0 : 1)} ומעלה',
+                              label: l10n.exploreScreen7e55dfd4(
+                                  r.toStringAsFixed(r % 1 == 0 ? 0 : 1)),
                               selected: _draft.minIncomeToRentRatio == r,
                               onTap: () => setState(() {
                                 _draft = _draft.minIncomeToRentRatio == r
@@ -2228,12 +2244,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── New immigrant (עולה חדש) ──────────────────────────
-                      _sectionTitle('עולה חדש', IconsaxPlusLinear.global),
+                      _sectionTitle(l10n.exploreScreen5f3306da, IconsaxPlusLinear.global),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'עולה חדש בלבד',
+                            label: l10n.exploreScreenCe24a1b8,
                             icon: IconsaxPlusLinear.global,
                             selected: _draft.oleh == true,
                             onTap: () => setState(() {
@@ -2247,7 +2263,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Commute distance from work ─────────────────────────
-                      _sectionTitle('מרחק ממקום העבודה',
+                      _sectionTitle(l10n.exploreScreenC48f4680,
                           IconsaxPlusLinear.location),
                       const SizedBox(height: 12),
                       Wrap(
@@ -2256,7 +2272,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         children: [
                           for (final km in const <double>[5, 10, 20])
                             _QuickChip(
-                              label: 'עד ${km.round()} ק"מ',
+                              label: l10n.exploreScreen9b92340a(km.round()),
                               selected: _draft.maxCommuteKm == km,
                               onTap: () => setState(() {
                                 _draft = _draft.maxCommuteKm == km
@@ -2269,12 +2285,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Smoking ────────────────────────────────────────────
-                      _sectionTitle('עישון', IconsaxPlusLinear.forbidden_2),
+                      _sectionTitle(l10n.exploreScreen2a6f2e2a, IconsaxPlusLinear.forbidden_2),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'לא מעשן בלבד',
+                            label: l10n.exploreScreen5ad0c26b,
                             icon: IconsaxPlusLinear.forbidden_2,
                             selected: _draft.smoker == false,
                             onTap: () => setState(() {
@@ -2288,12 +2304,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Guarantor (ערב) ────────────────────────────────────
-                      _sectionTitle('ערבות', IconsaxPlusLinear.user_tick),
+                      _sectionTitle(l10n.exploreScreenA5928b66, IconsaxPlusLinear.user_tick),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'עם ערב',
+                            label: l10n.exploreScreenD7297c85,
                             icon: IconsaxPlusLinear.user_tick,
                             selected: _draft.hasGuarantor == true,
                             onTap: () => setState(() {
@@ -2307,7 +2323,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Desired lease length ───────────────────────────────
-                      _sectionTitle('משך שכירות מבוקש',
+                      _sectionTitle(l10n.exploreScreen9d40aa19,
                           IconsaxPlusLinear.calendar_1),
                       const SizedBox(height: 12),
                       Wrap(
@@ -2316,7 +2332,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         children: [
                           for (final m in const <int>[6, 12, 24])
                             _QuickChip(
-                              label: '$m+ חודשים',
+                              label: l10n.exploreScreenAb462e4c(m),
                               selected: _draft.minLeaseMonths == m,
                               onTap: () => setState(() {
                                 _draft = _draft.minLeaseMonths == m
@@ -2329,13 +2345,13 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       const SizedBox(height: 20),
 
                       // ── Income proof ready ─────────────────────────────────
-                      _sectionTitle('אסמכתאות הכנסה',
+                      _sectionTitle(l10n.exploreScreenAfe8dc6a,
                           IconsaxPlusLinear.document_text),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'אסמכתאות הכנסה מוכנות',
+                            label: l10n.exploreScreenA60a4948,
                             icon: IconsaxPlusLinear.document_text,
                             selected: _draft.incomeProofReady == true,
                             onTap: () => setState(() {
@@ -2350,12 +2366,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
 
                       // ── Verified only ──────────────────────────────────────
                       _sectionTitle(
-                          'אימות פרופיל', IconsaxPlusLinear.shield_tick),
+                          l10n.exploreScreen45e673e6, IconsaxPlusLinear.shield_tick),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
                           _QuickChip(
-                            label: 'מאומת בלבד',
+                            label: l10n.exploreScreenD6dcc370,
                             icon: IconsaxPlusLinear.shield_tick,
                             selected: _draft.verifiedOnly,
                             onTap: () => setState(() {
@@ -2387,7 +2403,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('נקה הכל'),
+                      child: Text(l10n.exploreScreenEbbc108b),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2401,8 +2417,8 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text(
-                        'החל מסננים',
+                      child: Text(
+                        l10n.exploreScreen5c514c37,
                         style: TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -2488,38 +2504,46 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
 
 // ─── Candidate attribute vocabularies (mirror the tenant profile editor) ──────
 
-/// Occupation keys → Hebrew label, matching the tenant profile / eligibility
+/// Occupation keys → localized label, matching the tenant profile / eligibility
 /// vocabulary so a liker's stored key renders and filters correctly.
-const Map<String, String> _kOccupationLabels = <String, String>{
-  'hightech': 'הייטק',
-  'healthcare': 'בריאות/רפואה',
-  'education': 'חינוך/הוראה',
-  'finance': 'פיננסים/בנקאות',
-  'law': 'משפטים',
-  'engineering': 'הנדסה',
-  'selfemployed': 'עצמאי/ת',
-  'public': 'שירות ציבורי',
-  'retail': 'מסחר/שירות',
-  'academia': 'אקדמיה',
-  'student': 'סטודנט/ית',
-  'other': 'אחר',
-};
+Map<String, String> _occupationLabels(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return <String, String>{
+    'hightech': l10n.exploreScreen40d56dee,
+    'healthcare': l10n.exploreScreen6dfb51f1,
+    'education': l10n.exploreScreen19981c32,
+    'finance': l10n.exploreScreenEbfcd4cb,
+    'law': l10n.exploreScreen4f8aded7,
+    'engineering': l10n.exploreScreen453fe1ed,
+    'selfemployed': l10n.exploreScreenE1cad55a,
+    'public': l10n.exploreScreenCb481f30,
+    'retail': l10n.exploreScreen2834587d,
+    'academia': l10n.exploreScreen2157ec10,
+    'student': l10n.exploreScreen42ed7e8d,
+    'other': l10n.exploreScreenCdf4bce0,
+  };
+}
 
-const Map<String, String> _kHouseholdLabels = <String, String>{
-  'family': 'משפחה',
-  'single': 'רווק/ה',
-  'couple': 'זוג',
-  'student': 'סטודנט/ית',
-};
+Map<String, String> _householdLabels(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return <String, String>{
+    'family': l10n.exploreScreen926c043f,
+    'single': l10n.exploreScreenB8d9266b,
+    'couple': l10n.exploreScreen4df994d0,
+    'student': l10n.exploreScreen42ed7e8d,
+  };
+}
 
 // kLifestyleLabels / kPetTypeLabels live in rental_models.dart (shared with the
 // tenant profile capture). Local aliases keep the sheet code terse.
 const Map<String, String> _kLifestyleLabels = kLifestyleLabels;
 const Map<String, String> _kPetTypeLabels = kPetTypeLabels;
 
-String _occupationLabel(String key) => _kOccupationLabels[key] ?? key;
+String _occupationLabel(BuildContext context, String key) =>
+    _occupationLabels(context)[key] ?? key;
 
-String _householdLabel(String key) => _kHouseholdLabels[key] ?? key;
+String _householdLabel(BuildContext context, String key) =>
+    _householdLabels(context)[key] ?? key;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

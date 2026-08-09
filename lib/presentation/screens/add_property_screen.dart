@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show PathMetric, ImageFilter;
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
@@ -48,7 +49,9 @@ class _PropertyMediaDraft {
 }
 
 extension _PropertyMediaTypeUi on PropertyMediaType {
-  String get label => this == PropertyMediaType.image ? 'תמונה' : 'וידאו';
+  String label(BuildContext context) => this == PropertyMediaType.image
+      ? AppLocalizations.of(context)!.addPropertyScreenada826e5
+      : AppLocalizations.of(context)!.addPropertyScreen773c5c3a;
 
   IconData get icon => this == PropertyMediaType.image
       ? IconsaxPlusLinear.image
@@ -67,27 +70,30 @@ const int _kMaxSalePrice = 20000000; // 20M ₪
 // label shown to the landlord. Keys MUST match the taxonomy the /audience/suggest
 // endpoint and the match engine use, so a suggested cohort merges cleanly into
 // the landlord's declared picks.
-const List<(String, String)> _audienceCohortOptions = [
-  ('family', 'משפחה'),
-  ('couple', 'זוג'),
-  ('single', 'רווק/ה'),
-  ('young_professional', 'צעיר/ה מקצועי/ת'),
-  ('student', 'סטודנט/ית'),
-  ('new_parents', 'הורים טריים'),
-  ('single_parent', 'הורה יחיד'),
-  ('remote', 'עובד/ת מרחוק'),
-  ('senior', 'גיל הזהב'),
-  ('oleh', 'עולה חדש'),
-  ('arab_family', 'משפחה ערבית'),
-  ('charedi', 'חרדי'),
-  ('dati_leumi', 'דתי-לאומי'),
-  ('investor', 'משקיע'),
-];
+List<(String, String)> _audienceCohortOptions(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return [
+    ('family', l10n.addPropertyScreen926c043f),
+    ('couple', l10n.addPropertyScreen4df994d0),
+    ('single', l10n.addPropertyScreenb8d9266b),
+    ('young_professional', l10n.addPropertyScreend663155d),
+    ('student', l10n.addPropertyScreen42ed7e8d),
+    ('new_parents', l10n.addPropertyScreendc7a9892),
+    ('single_parent', l10n.addPropertyScreen5b1afce7),
+    ('remote', l10n.addPropertyScreenf5203dea),
+    ('senior', l10n.addPropertyScreen0aa42aa1),
+    ('oleh', l10n.addPropertyScreen5f3306da),
+    ('arab_family', l10n.addPropertyScreen8ef7538b),
+    ('charedi', l10n.addPropertyScreenfed27efc),
+    ('dati_leumi', l10n.addPropertyScreen4193112f),
+    ('investor', l10n.addPropertyScreene49ffe99),
+  ];
+}
 
-// Hebrew label for a cohort key; falls back to the raw key for any unknown
+// Localized label for a cohort key; falls back to the raw key for any unknown
 // cohort the backend might return so nothing renders blank.
-String _audienceCohortLabel(String key) {
-  for (final option in _audienceCohortOptions) {
+String _audienceCohortLabel(BuildContext context, String key) {
+  for (final option in _audienceCohortOptions(context)) {
     if (option.$1 == key) return option.$2;
   }
   return key;
@@ -134,13 +140,16 @@ class AddPropertyScreen extends StatefulWidget {
 }
 
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
-  static const _stepLabels = [
-    'מיקום',
-    'פרטי הנכס',
-    'מאפיינים',
-    'קהל יעד',
-    'מדיה'
-  ];
+  List<String> _stepLabels(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.addPropertyScreen26d0e7de,
+      l10n.addPropertyScreen220d2733,
+      l10n.addPropertyScreene08c750c,
+      l10n.addPropertyScreen9af0e89b,
+      l10n.addPropertyScreen4a140235,
+    ];
+  }
 
   final _pageCtrl = PageController();
   int _step = 0;
@@ -328,11 +337,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 ? PropertyTourStatus.processing
                 : PropertyTourStatus.failed,
             processingStage: isTeleport
-                ? 'הסיור התלת־ממדי בעיבוד (בערך שעה). אפשר לשמור את הדירה — הוא יופיע אוטומטית כשיהיה מוכן.'
+                ? AppLocalizations.of(context)!.addPropertyScreen949b4a98
                 : '',
             errorMessage: isTeleport
                 ? ''
-                : 'עיבוד הסריקה לקח יותר מדי זמן. נסה שוב מאוחר יותר.',
+                : AppLocalizations.of(context)!.addPropertyScreen9abff18f,
             updatedAt: DateTime.now().toUtc(),
           );
         });
@@ -352,7 +361,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           setState(() {
             _scanTourDraft = _scanTourDraft?.copyWith(
               status: PropertyTourStatus.failed,
-              errorMessage: 'שגיאה בבדיקת סטטוס הסריקה. נסה שוב.',
+              errorMessage: AppLocalizations.of(context)!.addPropertyScreen5b53dba2,
               updatedAt: DateTime.now().toUtc(),
             );
           });
@@ -392,9 +401,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   void _next() {
     if (!_validateCurrentStep()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('יש למלא את השדות הנדרשים'),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen660f2d8e),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -425,7 +434,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   Future<void> _pickPropertyImage(ImageSource source) async {
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen40b9326f);
       return;
     }
     try {
@@ -442,7 +451,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
       if (remoteUrl == null || remoteUrl.isEmpty) {
-        _showMediaError('שגיאה בהעלאת התמונה לשרת. בדוק את החיבור לאינטרנט ונסה שוב.');
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreenc7a300bf);
         return;
       }
       _assignPickedMedia(remoteUrl, PropertyMediaType.image);
@@ -453,7 +462,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   Future<void> _pickPropertyVideo(ImageSource source) async {
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen40b9326f);
       return;
     }
     try {
@@ -469,7 +478,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
       if (remoteUrl == null || remoteUrl.isEmpty) {
-        _showMediaError('שגיאה בהעלאת הוידאו לשרת. בדוק את החיבור לאינטרנט ונסה שוב.');
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreencc83e982);
         return;
       }
       _assignPickedMedia(remoteUrl, PropertyMediaType.video);
@@ -481,7 +490,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   Future<void> _pickScanVideo(ImageSource source) async {
     if (_wantsVerifiedListing) {
       _showMediaError(
-          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+          AppLocalizations.of(context)!.addPropertyScreen97c25fd2);
       return;
     }
     // A successful 3D reconstruction depends entirely on capture quality — the
@@ -502,8 +511,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       final rawSize = await file.length();
       if (rawSize > 400 * 1024 * 1024) {
         _showMediaError(
-          'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
-          'צלם סרטון קצר יותר של עד 60 שניות.',
+          AppLocalizations.of(context)!.addPropertyScreenc69dd25b(
+            (rawSize / 1024 / 1024).toStringAsFixed(0),
+          ),
         );
         return;
       }
@@ -531,7 +541,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           _isScanSubmitting = false;
         });
         _showMediaError(
-          'הסריקה נשמרה כטיוטה. שליחת הסריקה לעיבוד אינה זמינה כרגע.',
+          AppLocalizations.of(context)!.addPropertyScreen5ef6e641,
         );
         return;
       }
@@ -575,7 +585,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isScanSubmitting = false);
-      _showMediaError('סריקת ה־3D נכשלה: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen75007f0f(error.toString()));
     }
   }
 
@@ -583,7 +593,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     final service = ScaniverseService.instance;
     if (!service.isConfigured) {
       _showMediaError(
-        'ייבוא סריקות אינו זמין כרגע.',
+        AppLocalizations.of(context)!.addPropertyScreen71b19dc0,
       );
       return;
     }
@@ -626,32 +636,32 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       builder: (ctx) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('סריקת תלת-מימד כמו הדירה האמיתית'),
+          title: Text(AppLocalizations.of(context)!.addPropertyScreenae219326),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('כדי לקבל סריקה פוטוריאליסטית עם טקסטורות אמיתיות:'),
+              Text(AppLocalizations.of(context)!.addPropertyScreen43854d31),
               const SizedBox(height: 14),
               step('1',
-                  'הורידו את האפליקציה החינמית Scaniverse וסרקו את הדירה — הליכה איטית, תאורה טובה, חפיפה בין הזוויות.'),
+                  AppLocalizations.of(context)!.addPropertyScreendbf53e53),
               step('2',
-                  'ב-Scaniverse: Export → Gaussian Splat → פורמט PLY (זה מה שנותן את המראה האמיתי).'),
-              step('3', 'חזרו לכאן ובחרו את קובץ ה-PLY שיוצא.'),
+                  AppLocalizations.of(context)!.addPropertyScreen2a9831da),
+              step('3', AppLocalizations.of(context)!.addPropertyScreenb51e8e0e),
               const SizedBox(height: 4),
-              const Text(
-                'טיפ: GLB/OBJ נותנים משטח פשוט ללא מראה אמיתי; PLY נותן איכות מלאה.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              Text(
+                AppLocalizations.of(context)!.addPropertyScreen6db49fbf,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('ביטול')),
+                child: Text(AppLocalizations.of(context)!.addPropertyScreena7c55a8d)),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('בחר קובץ')),
+                child: Text(AppLocalizations.of(context)!.addPropertyScreen40625d63)),
           ],
         ),
       ),
@@ -661,7 +671,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   Future<void> _importScaniverseAssets() async {
     if (_wantsVerifiedListing) {
       _showMediaError(
-          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+          AppLocalizations.of(context)!.addPropertyScreen97c25fd2);
       return;
     }
     // Guide the user to the RIGHT artifact FIRST. A Gaussian-splat PLY looks like
@@ -695,8 +705,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       // viewer only shows the real-house quality from a Gaussian-splat PLY.
       if (imported.model3d.plyUrl.trim().isEmpty) {
         _showMediaError(
-          'הקובץ יובא. לאיכות פוטוריאליסטית מלאה (כמו הדירה האמיתית) '
-          'ייצאו מ-Scaniverse בפורמט Gaussian Splat · PLY.',
+          AppLocalizations.of(context)!.addPropertyScreen5d12163b,
         );
       }
     } on ScaniverseAssetImportException catch (error) {
@@ -710,7 +719,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isScanSubmitting = false);
-      _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreend93995bc(error.toString()));
     }
   }
 
@@ -750,7 +759,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isCapturingVerification = false);
-      _showMediaError('צילום וידאו האימות נכשל: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen4b627a97(error.toString()));
     }
   }
 
@@ -767,7 +776,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אי אפשר להוסיף מדיה ידנית או מהגלריה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreenddde6811);
       return;
     }
     final emptyIndex = _mediaDrafts.indexWhere(
@@ -782,7 +791,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
     if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
       _showMediaError(
-        'אפשר לצרף עד ${SecurityConfig.maxPropertyMediaItems} פריטי מדיה.',
+        AppLocalizations.of(context)!.addPropertyScreen2110e73c(SecurityConfig.maxPropertyMediaItems),
       );
       return;
     }
@@ -940,19 +949,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                       color: AppColors.primary, size: 24),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
-                  child: Text('הגעת ל-3 דירות',
-                      style: TextStyle(
+                Expanded(
+                  child: Text(AppLocalizations.of(context)!.addPropertyScreen6668d49a,
+                      style: const TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w900,
                           color: AppColors.slate900)),
                 ),
               ]),
               const SizedBox(height: 12),
-              const Text(
-                'פרסום של יותר מ-3 דירות זמין בחשבון סוכן נדל"ן — ניהול דירות '
-                'ולקוחות ללא הגבלה, כלים מתקדמים ומיתוג אישי. אפשר לעבור עכשיו '
-                'בחינם.',
+              Text(
+                AppLocalizations.of(context)!.addPropertyScreen770b3193,
                 style: TextStyle(
                     fontSize: 14,
                     height: 1.5,
@@ -969,16 +976,16 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                         borderRadius: BorderRadius.circular(26)),
                   ),
                   onPressed: () => Navigator.of(ctx).pop(true),
-                  child: const Text('מעבר לחשבון סוכן נדל"ן',
-                      style:
+                  child: Text(AppLocalizations.of(context)!.addPropertyScreena3390850,
+                      style: const
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
                 ),
               ),
               const SizedBox(height: 6),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('אולי מאוחר יותר',
-                    style: TextStyle(
+                child: Text(AppLocalizations.of(context)!.addPropertyScreen0261e82c,
+                    style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w700)),
               ),
@@ -996,9 +1003,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     // SEC-rate: prevent property spam
     if (!RateLimiter.instance.allowPropertyAdd()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('הוספת יותר מדי נכסים לאחרונה. נסה שוב מאוחר יותר.'),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen8aa60741),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -1007,10 +1014,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     if (!_acceptedPropertyTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
           content:
-              Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני פרסום נכס.'),
+              Text(AppLocalizations.of(context)!.addPropertyScreen8e578468),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -1036,9 +1043,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     ].join(' ');
     if (InputSanitizer.containsObjectionableContent(freeText)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 3000),
-          content: Text('הטקסט מכיל תוכן לא הולם. אנא תקנו ונסו שוב.'),
+        SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen7c7eea47),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -1051,10 +1058,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         (sanitizedVerificationVideoUrl == null ||
             sanitizedVerificationVideoUrl.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
           content:
-              Text('כדי לפרסם דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
+              Text(AppLocalizations.of(context)!.addPropertyScreena9d8a4a6),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -1116,7 +1123,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           if (street.isNotEmpty) street,
           if (_streetNumCtrl.text.trim().isNotEmpty) _streetNumCtrl.text.trim(),
           if (city.isNotEmpty) city,
-          'ישראל',
+          AppLocalizations.of(context)!.addPropertyScreen7810f5bc,
         ];
         final locations = await locationFromAddress(addressParts.join(', '));
         if (locations.isNotEmpty) {
@@ -1157,7 +1164,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             maxLength: 20),
         condition: _condition,
         ownerName:
-            context.read<DatingProvider>().tenantProfile?.name ?? 'בעל הדירה',
+            context.read<DatingProvider>().tenantProfile?.name ?? AppLocalizations.of(context)!.addPropertyScreenc6c7d5f7,
         agencyListing: _agencyListing,
         features: _selectedFeatures.toList(),
         publishChannels: _publishChannels.toList(),
@@ -1221,8 +1228,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 4),
         backgroundColor: AppColors.navy,
-        content: Text('הדירה עלתה! ניקוד מודעה: $score/100 · '
-            '${ListingScore.label(score)}'),
+        content: Text(AppLocalizations.of(context)!.addPropertyScreenf5842882(
+          score,
+          ListingScore.label(score),
+        )),
       ));
       Navigator.of(context).pop();
     } catch (e) {
@@ -1235,7 +1244,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(milliseconds: 3000),
-        content: Text('שגיאה בשמירת הנכס. נסה שוב.'),
+        content: Text(AppLocalizations.of(context)!.addPropertyScreen79286e19),
         backgroundColor: AppColors.coral,
       ));
     } finally {
@@ -1252,21 +1261,23 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(low ? 'המחיר נמוך מהרגיל 🤔' : 'המחיר גבוה מהרגיל 🤔'),
+        title: Text(low ? AppLocalizations.of(context)!.addPropertyScreen9b83f0d4 : AppLocalizations.of(context)!.addPropertyScreen587839cb),
         content: Text(
-          'המחיר שהזנת נראה ${low ? 'נמוך' : 'גבוה'} משמעותית מהשוק לגודל ולעיר '
-          'הזו.\nטווח סביר: ${fmt(r.expectedLow)}–${fmt(r.expectedHigh)}.\n\n'
-          'אולי נפלה טעות? אפשר לתקן, או להמשיך אם המחיר נכון.',
+          low
+              ? AppLocalizations.of(context)!.addPropertyScreen633c184b(
+                  fmt(r.expectedLow), fmt(r.expectedHigh))
+              : AppLocalizations.of(context)!.addPropertyScreenba865047(
+                  fmt(r.expectedLow), fmt(r.expectedHigh)),
           style: const TextStyle(height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('חזרה לתיקון'),
+            child: Text(AppLocalizations.of(context)!.addPropertyScreen167d6757),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('המחיר נכון, המשך'),
+            child: Text(AppLocalizations.of(context)!.addPropertyScreena0023ea0),
           ),
         ],
       ),
@@ -1288,7 +1299,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             onPressed: _prev,
           ),
           title: Text(
-            _stepLabels[_step],
+            _stepLabels(context)[_step],
             style: const TextStyle(
               color: Colors.white,
               fontSize: 17,
@@ -1300,7 +1311,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             child: _StepIndicator(
               step: _step,
               total: 5,
-              labels: _stepLabels,
+              labels: _stepLabels(context),
             ),
           ),
         ),
@@ -1592,7 +1603,7 @@ class _WizardNavBar extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onPrev,
                 icon: const RentlyIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
-                label: const Text('חזרה'),
+                label: Text(AppLocalizations.of(context)!.addPropertyScreen10a2352b),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
                   side: const BorderSide(color: AppColors.slate200, width: 1.5),
@@ -1617,8 +1628,8 @@ class _WizardNavBar extends StatelessWidget {
                   : Icon(isLast ? IconsaxPlusLinear.add_square : null,
                       size: 16),
               label: Text(isLoading
-                  ? 'שומר...'
-                  : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
+                  ? AppLocalizations.of(context)!.addPropertyScreen522e3eb2
+                  : (isLast ? (saveLabel ?? AppLocalizations.of(context)!.addPropertyScreenbd5a7818) : AppLocalizations.of(context)!.addPropertyScreen4ca22f8c)),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -1668,8 +1679,8 @@ class _EditPropertyFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLast = step == total - 1;
     final isSale = transactionType == PropertyTransactionType.sale;
-    final activeLabel = isSale ? 'עדיין למכירה' : 'עדיין להשכרה';
-    final inactiveLabel = isSale ? 'לא למכירה / נמכר' : 'לא להשכרה / הושכר';
+    final activeLabel = isSale ? AppLocalizations.of(context)!.addPropertyScreen29eeeaf9 : AppLocalizations.of(context)!.addPropertyScreena2f81627;
+    final inactiveLabel = isSale ? AppLocalizations.of(context)!.addPropertyScreen9d93e38a : AppLocalizations.of(context)!.addPropertyScreen5a64ad70;
 
     return Container(
       // Lift the submit button ~15px higher (SafeArea-aware).
@@ -1731,9 +1742,9 @@ class _EditPropertyFooter extends StatelessWidget {
                 onPressed: onDelete,
                 icon: const RentlyIcon(IconsaxPlusLinear.trash,
                     color: AppColors.coral, size: 16),
-                label: const Text(
-                  'מחיקת נכס',
-                  style: TextStyle(
+                label: Text(
+                  AppLocalizations.of(context)!.addPropertyScreenf0632a71,
+                  style: const TextStyle(
                     color: AppColors.coral,
                     fontWeight: FontWeight.w800,
                     fontSize: 13.5,
@@ -1756,7 +1767,7 @@ class _EditPropertyFooter extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onPrev,
                     icon: const RentlyIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
-                    label: const Text('חזרה'),
+                    label: Text(AppLocalizations.of(context)!.addPropertyScreen10a2352b),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.navy,
                       side: const BorderSide(color: AppColors.slate200, width: 1.5),
@@ -1781,8 +1792,8 @@ class _EditPropertyFooter extends StatelessWidget {
                       : Icon(isLast ? IconsaxPlusLinear.add_square : null,
                           size: 16),
                   label: Text(isLoading
-                      ? 'שומר...'
-                      : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
+                      ? AppLocalizations.of(context)!.addPropertyScreen522e3eb2
+                      : (isLast ? (saveLabel ?? AppLocalizations.of(context)!.addPropertyScreenbd5a7818) : AppLocalizations.of(context)!.addPropertyScreen4ca22f8c)),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -1848,7 +1859,7 @@ class _StepLocationState extends State<_StepLocation> {
         backgroundColor: AppColors.coral,
         action: offerSettings
             ? SnackBarAction(
-                label: 'פתח הגדרות',
+                label: AppLocalizations.of(context)!.addPropertyScreenf41975d9,
                 textColor: Colors.white,
                 onPressed: () => Geolocator.openAppSettings(),
               )
@@ -1864,7 +1875,7 @@ class _StepLocationState extends State<_StepLocation> {
           await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _showLocationError(
-          'שירותי המיקום כבויים. אנא הפעל את ה-GPS במכשיר ונסה שוב.',
+          AppLocalizations.of(context)!.addPropertyScreen0ef54864,
           offerSettings: true,
         );
         return;
@@ -1876,13 +1887,13 @@ class _StepLocationState extends State<_StepLocation> {
       }
       if (permission == LocationPermission.denied) {
         _showLocationError(
-          'הרשאת המיקום נדחתה. ניתן להזין את הכתובת ידנית.',
+          AppLocalizations.of(context)!.addPropertyScreenaf3b65b4,
         );
         return;
       }
       if (permission == LocationPermission.deniedForever) {
         _showLocationError(
-          'הרשאות המיקום חסומות בהגדרות. פתח את ההגדרות כדי לאפשר גישה למיקום.',
+          AppLocalizations.of(context)!.addPropertyScreen505591bb,
           offerSettings: true,
         );
         return;
@@ -1907,7 +1918,7 @@ class _StepLocationState extends State<_StepLocation> {
 
       if (position == null) {
         _showLocationError(
-          'לא הצלחנו לקבל מיקום (ייתכן שאתה במקום סגור). נסה שוב בחוץ או הזן כתובת ידנית.',
+          AppLocalizations.of(context)!.addPropertyScreend59e06c9,
         );
         return;
       }
@@ -1938,9 +1949,9 @@ class _StepLocationState extends State<_StepLocation> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('המיקום זוהה והוזן בהצלחה!'),
+            SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text(AppLocalizations.of(context)!.addPropertyScreen1dec9ba9),
               backgroundColor: AppColors.success,
             ),
           );
@@ -1950,8 +1961,8 @@ class _StepLocationState extends State<_StepLocation> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               duration: const Duration(seconds: 4),
-              content: const Text(
-                'מצאנו את המיקום אך לא את הכתובת המדויקת. אנא הזן את הרחוב ידנית.',
+              content: Text(
+                AppLocalizations.of(context)!.addPropertyScreen071559e6,
               ),
               backgroundColor: AppColors.primary,
             ),
@@ -1959,7 +1970,7 @@ class _StepLocationState extends State<_StepLocation> {
         }
       }
     } catch (e) {
-      _showLocationError('שגיאה בזיהוי המיקום. נסה שוב או הזן כתובת ידנית.');
+      _showLocationError(AppLocalizations.of(context)!.addPropertyScreen693dc98a);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1972,8 +1983,8 @@ class _StepLocationState extends State<_StepLocation> {
       children: [
         _SectionHint(
           icon: IconsaxPlusLinear.location,
-          title: 'איפה נמצאת הדירה?',
-          subtitle: 'מלא עיר ורחוב לפחות',
+          title: AppLocalizations.of(context)!.addPropertyScreen51e40a86,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreen7affb975,
         ),
         const SizedBox(height: 16),
         ElevatedButton.icon(
@@ -1999,7 +2010,7 @@ class _StepLocationState extends State<_StepLocation> {
                 )
               : const RentlyIcon(IconsaxPlusLinear.gps, size: 18),
           label: Text(
-            _isLoading ? 'מזהה מיקום...' : 'זהה מיקום אוטומטית לפי ה-GPS',
+            _isLoading ? AppLocalizations.of(context)!.addPropertyScreen72daab72 : AppLocalizations.of(context)!.addPropertyScreenf0e12300,
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13.5,
@@ -2012,7 +2023,7 @@ class _StepLocationState extends State<_StepLocation> {
             children: [
               _AutocompleteField(
                 ctrl: widget.cityCtrl,
-                label: 'עיר *',
+                label: AppLocalizations.of(context)!.addPropertyScreend9b329d6,
                 icon: IconsaxPlusLinear.map,
                 enabled: _locationsReady,
                 optionsBuilder: (query) =>
@@ -2027,7 +2038,7 @@ class _StepLocationState extends State<_StepLocation> {
               const SizedBox(height: 12),
               _Field(
                   ctrl: widget.neighborhoodCtrl,
-                  label: 'שכונה (אופציונלי)',
+                  label: AppLocalizations.of(context)!.addPropertyScreen4ce111ab,
                   icon: IconsaxPlusLinear.map_1),
               const SizedBox(height: 12),
               Row(
@@ -2036,7 +2047,7 @@ class _StepLocationState extends State<_StepLocation> {
                     flex: 2,
                     child: _AutocompleteField(
                       ctrl: widget.streetCtrl,
-                      label: 'רחוב *',
+                      label: AppLocalizations.of(context)!.addPropertyScreen01a07bfa,
                       icon: IconsaxPlusLinear.routing,
                       enabled: _locationsReady,
                       optionsBuilder: (query) => IsraelLocations.streetsOf(
@@ -2050,7 +2061,7 @@ class _StepLocationState extends State<_StepLocation> {
                   Expanded(
                     child: _Field(
                       ctrl: widget.streetNumCtrl,
-                      label: 'מספר',
+                      label: AppLocalizations.of(context)!.addPropertyScreenc19510f4,
                       icon: IconsaxPlusLinear.hashtag,
                       numeric: true,
                     ),
@@ -2087,13 +2098,13 @@ class _TransactionTypeToggle extends StatelessWidget {
       child: Row(
         children: [
           _segment(
-            label: 'להשכרה',
+            label: AppLocalizations.of(context)!.addPropertyScreenb336259f,
             icon: IconsaxPlusLinear.key,
             selected: value == PropertyTransactionType.rent,
             onTap: () => onChanged(PropertyTransactionType.rent),
           ),
           _segment(
-            label: 'למכירה',
+            label: AppLocalizations.of(context)!.addPropertyScreen609fac18,
             icon: IconsaxPlusLinear.tag,
             selected: value == PropertyTransactionType.sale,
             onTap: () => onChanged(PropertyTransactionType.sale),
@@ -2212,7 +2223,7 @@ class _StepDetails extends StatelessWidget {
         _SectionHint(
           icon: IconsaxPlusLinear.building,
           title: 'פרטי הנכס',
-          subtitle: 'גודל הדירה הוא שדה חובה',
+          subtitle: AppLocalizations.of(context)!.addPropertyScreen284dcfc6,
         ),
         const SizedBox(height: 16),
         _TransactionTypeToggle(
@@ -2226,7 +2237,7 @@ class _StepDetails extends StatelessWidget {
               _SliderWithEntry(
                 // For a sale the price is a one-time total; for rent it's
                 // monthly. Label + range follow the selected mode.
-                label: isSale ? 'מחיר מבוקש (סה"כ)' : 'מחיר לחודש',
+                label: isSale ? AppLocalizations.of(context)!.addPropertyScreen32fecb03 : AppLocalizations.of(context)!.addPropertyScreen0b9f7ab3,
                 value: price.toDouble(),
                 min: 0,
                 max: isSale ? _kMaxSalePrice.toDouble() : 50000,
@@ -2251,19 +2262,19 @@ class _StepDetails extends StatelessWidget {
                 ),
               const SizedBox(height: 10),
               _SliderWithEntry(
-                label: 'מספר חדרים',
+                label: AppLocalizations.of(context)!.addPropertyScreen4f4cd24f,
                 value: rooms,
                 min: 0,
                 max: 15,
                 divisions: 30,
-                unitSuffix: 'חד׳',
+                unitSuffix: AppLocalizations.of(context)!.addPropertyScreen98c2a61b,
                 allowDecimals: true,
                 onChanged: onRoomsChanged,
               ),
               const SizedBox(height: 14),
               _Field(
                 ctrl: sizeCtrl,
-                label: 'גודל הנכס במ"ר *',
+                label: AppLocalizations.of(context)!.addPropertyScreen50e1cc8f,
                 icon: IconsaxPlusLinear.maximize_3,
                 numeric: true,
               ),
@@ -2277,7 +2288,7 @@ class _StepDetails extends StatelessWidget {
                   Expanded(
                     child: _Field(
                       ctrl: totalFloorsCtrl,
-                      label: 'סה"כ קומות',
+                      label: AppLocalizations.of(context)!.addPropertyScreen12a06cf7,
                       icon: IconsaxPlusLinear.buildings,
                       numeric: true,
                     ),
@@ -2286,7 +2297,7 @@ class _StepDetails extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _DropdownRow(
-                label: 'סוג נכס',
+                label: AppLocalizations.of(context)!.addPropertyScreen7d93908e,
                 value: propertyType,
                 options: const [
                   'דירה',
@@ -2301,7 +2312,7 @@ class _StepDetails extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _DropdownRow(
-                label: 'מצב הנכס',
+                label: AppLocalizations.of(context)!.addPropertyScreen357b4923,
                 value: condition,
                 options: const ['חדש מקבלן', 'משופץ', 'תקין', 'ישן'],
                 onChanged: onConditionChanged,
@@ -2421,8 +2432,8 @@ class _StepFeatures extends StatelessWidget {
       children: [
         _SectionHint(
           icon: IconsaxPlusLinear.star,
-          title: 'מאפיינים ויתרונות',
-          subtitle: 'בחר את כל המאפיינים הרלוונטיים',
+          title: AppLocalizations.of(context)!.addPropertyScreene3af9561,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreena45d761d,
         ),
         const SizedBox(height: 16),
         _FormCard(
@@ -2434,7 +2445,7 @@ class _StepFeatures extends StatelessWidget {
                 children: [
                   if (selectedFeatures.isNotEmpty)
                     Text(
-                      '${selectedFeatures.length} נבחרו מתוך ${allFeatures.length}',
+                      AppLocalizations.of(context)!.addPropertyScreenad864fbf(selectedFeatures.length, allFeatures.length),
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.primary,
@@ -2443,7 +2454,7 @@ class _StepFeatures extends StatelessWidget {
                     )
                   else
                     Text(
-                      'בחר מאפיינים (${allFeatures.length} אפשרויות)',
+                      AppLocalizations.of(context)!.addPropertyScreenf96bc686(allFeatures.length),
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -2521,8 +2532,8 @@ class _StepFeatures extends StatelessWidget {
         const SizedBox(height: 20),
         _SectionHint(
           icon: IconsaxPlusLinear.export_3,
-          title: 'ערוצי פרסום',
-          subtitle: 'איפה הנכס מפורסם? (Rently מסומן כברירת מחדל)',
+          title: AppLocalizations.of(context)!.addPropertyScreenb8283dde,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreencf89b9f4,
         ),
         const SizedBox(height: 12),
         _FormCard(
@@ -2530,12 +2541,12 @@ class _StepFeatures extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final ch in const [
+              for (final ch in [
                 ('rently', 'Rently'),
-                ('yad2', 'יד2'),
-                ('madlan', 'מדלן'),
-                ('facebook', 'פייסבוק'),
-                ('komo', 'קומו'),
+                ('yad2', AppLocalizations.of(context)!.addPropertyScreena0d84eba),
+                ('madlan', AppLocalizations.of(context)!.addPropertyScreen0eb8cbf6),
+                ('facebook', AppLocalizations.of(context)!.addPropertyScreen4c5623c0),
+                ('komo', AppLocalizations.of(context)!.addPropertyScreen11985996),
               ])
                 FilterChip(
                   selected: publishChannels.contains(ch.$1),
@@ -2597,17 +2608,17 @@ class _StepAudience extends StatelessWidget {
       children: [
         _SectionHint(
           icon: IconsaxPlusLinear.people,
-          title: 'למי הדירה מתאימה?',
-          subtitle: 'עוזר לנו להראות את הדירה לשוכרים הנכונים',
+          title: AppLocalizations.of(context)!.addPropertyScreen5a3d760f,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreenee3ba7dc,
         ),
         const SizedBox(height: 16),
         _FormCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'תיאור חופשי',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context)!.addPropertyScreen0dfe6469,
+                style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w700,
@@ -2626,7 +2637,7 @@ class _StepAudience extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'תאר/י בכמה מילים למי הדירה הכי מתאימה',
+                  hintText: AppLocalizations.of(context)!.addPropertyScreen9d7f0ccc,
                   hintStyle: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -2657,8 +2668,8 @@ class _StepAudience extends StatelessWidget {
         const SizedBox(height: 20),
         _SectionHint(
           icon: IconsaxPlusLinear.user_tag,
-          title: 'קהלי יעד',
-          subtitle: 'בחר/י את הקהלים שהדירה מתאימה להם',
+          title: AppLocalizations.of(context)!.addPropertyScreen3700d2e3,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreen8df397b9,
         ),
         const SizedBox(height: 12),
         _FormCard(
@@ -2669,7 +2680,7 @@ class _StepAudience extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    '${selectedCohorts.length} קהלים נבחרו',
+                    AppLocalizations.of(context)!.addPropertyScreena638b329(selectedCohorts.length),
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.primary,
@@ -2680,7 +2691,7 @@ class _StepAudience extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 10,
-                children: _audienceCohortOptions.map((option) {
+                children: _audienceCohortOptions(context).map((option) {
                   final key = option.$1;
                   final selected = selectedCohorts.contains(key);
                   return _AudienceChip(
@@ -2708,7 +2719,7 @@ class _StepAudience extends StatelessWidget {
                   )
                 : Icon(IconsaxPlusLinear.magic_star,
                     size: 18, color: AppColors.primary),
-            label: Text(isSuggesting ? 'מחפש קהלים...' : 'הצע לי קהלים נוספים'),
+            label: Text(isSuggesting ? AppLocalizations.of(context)!.addPropertyScreend62ffbe2 : AppLocalizations.of(context)!.addPropertyScreen53c1e86a),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary, width: 1.5),
@@ -2719,11 +2730,11 @@ class _StepAudience extends StatelessWidget {
           ),
         ),
         if (suggestions.isNotEmpty && pendingSuggestions.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
             child: Text(
-              'כל הקהלים שהוצעו כבר נבחרו',
-              style: TextStyle(
+              AppLocalizations.of(context)!.addPropertyScreen29022c25,
+              style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
@@ -2736,9 +2747,9 @@ class _StepAudience extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'קהלים מוצעים · הקש/י כדי להוסיף',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.addPropertyScreen4543e3ff,
+                  style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.navy,
                     fontWeight: FontWeight.w800,
@@ -2761,8 +2772,8 @@ class _StepAudience extends StatelessWidget {
         // F2 exclusivity control.
         _SectionHint(
           icon: IconsaxPlusLinear.eye,
-          title: 'חשיפת הדירה',
-          subtitle: 'בקרה על מי רואה את המודעה',
+          title: AppLocalizations.of(context)!.addPropertyScreen7157bd90,
+          subtitle: AppLocalizations.of(context)!.addPropertyScreend50e4f12,
         ),
         const SizedBox(height: 12),
         _FormCard(
@@ -2771,10 +2782,10 @@ class _StepAudience extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'הצג את הדירה רק לשוכרים מתאימים',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.addPropertyScreen886a9c57,
+                      style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.navy,
                         fontWeight: FontWeight.w800,
@@ -2789,9 +2800,9 @@ class _StepAudience extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'שוכרים שאינם באחד הקהלים שבחרת לא יראו את המודעה בכלל.',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context)!.addPropertyScreen26e3bf17,
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
@@ -2816,7 +2827,7 @@ class _StepAudience extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'לא נבחרו קהלים — אף שוכר לא יראה את המודעה. בחר/י לפחות קהל אחד.',
+                          AppLocalizations.of(context)!.addPropertyScreen9805e992,
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.coral,
@@ -2921,7 +2932,7 @@ class _SuggestedAudienceRow extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        _audienceCohortLabel(suggestion.cohort),
+                        _audienceCohortLabel(context, suggestion.cohort),
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.navy,
@@ -2937,7 +2948,7 @@ class _SuggestedAudienceRow extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '$pct% התאמה',
+                          AppLocalizations.of(context)!.addPropertyScreen1db3ad15(pct),
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.primary,
@@ -3082,9 +3093,9 @@ class _StepPhotos extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'הוספת תמונה או סרטון',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.addPropertyScreen6ad485fc,
+                  style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -3101,7 +3112,7 @@ class _StepPhotos extends StatelessWidget {
                   children: [
                     _PickerOptionButton(
                       icon: IconsaxPlusLinear.gallery,
-                      label: 'תמונה מהגלריה',
+                      label: AppLocalizations.of(context)!.addPropertyScreena52badf2,
                       onTap: () {
                         Navigator.pop(ctx);
                         onPickImageFromGallery();
@@ -3109,7 +3120,7 @@ class _StepPhotos extends StatelessWidget {
                     ),
                     _PickerOptionButton(
                       icon: IconsaxPlusLinear.camera,
-                      label: 'צלם תמונה',
+                      label: AppLocalizations.of(context)!.addPropertyScreenfeddf7c6,
                       onTap: () {
                         Navigator.pop(ctx);
                         onPickImageFromCamera();
@@ -3117,7 +3128,7 @@ class _StepPhotos extends StatelessWidget {
                     ),
                     _PickerOptionButton(
                       icon: IconsaxPlusLinear.video,
-                      label: 'וידאו מהגלריה',
+                      label: AppLocalizations.of(context)!.addPropertyScreena75dc6ef,
                       onTap: () {
                         Navigator.pop(ctx);
                         onPickVideoFromGallery();
@@ -3125,7 +3136,7 @@ class _StepPhotos extends StatelessWidget {
                     ),
                     _PickerOptionButton(
                       icon: IconsaxPlusLinear.video_play,
-                      label: 'צלם וידאו',
+                      label: AppLocalizations.of(context)!.addPropertyScreen26b77aa9,
                       onTap: () {
                         Navigator.pop(ctx);
                         onPickVideoFromCamera();
@@ -3136,7 +3147,7 @@ class _StepPhotos extends StatelessWidget {
                 const SizedBox(height: 12),
                 _PickerOptionButton(
                   icon: IconsaxPlusLinear.link,
-                  label: 'הזן קישור ידנית (URL)',
+                  label: AppLocalizations.of(context)!.addPropertyScreenfaf87ec6,
                   isFullWidth: true,
                   onTap: () {
                     Navigator.pop(ctx);
@@ -3160,9 +3171,9 @@ class _StepPhotos extends StatelessWidget {
           backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text(
-            'הוספת קישור למדיה',
-            style: TextStyle(
+          title: Text(
+            AppLocalizations.of(context)!.addPropertyScreene31d1ebb,
+            style: const TextStyle(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
               fontSize: 16,
@@ -3172,7 +3183,7 @@ class _StepPhotos extends StatelessWidget {
             controller: ctrl,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: 'הדבק כתובת URL של תמונה או וידאו',
+              hintText: AppLocalizations.of(context)!.addPropertyScreend065f1c3,
               hintStyle:
                   const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               filled: true,
@@ -3186,8 +3197,8 @@ class _StepPhotos extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('ביטול',
-                  style: TextStyle(color: AppColors.textSecondary)),
+              child: Text(AppLocalizations.of(context)!.addPropertyScreena7c55a8d,
+                  style: const TextStyle(color: AppColors.textSecondary)),
             ),
             FilledButton(
               onPressed: () {
@@ -3204,7 +3215,7 @@ class _StepPhotos extends StatelessWidget {
                 }
                 Navigator.pop(ctx);
               },
-              child: const Text('הוסף'),
+              child: Text(AppLocalizations.of(context)!.addPropertyScreencf0a5531),
             ),
           ],
         );
@@ -3221,10 +3232,10 @@ class _StepPhotos extends StatelessWidget {
           icon: wantsVerifiedListing
               ? IconsaxPlusLinear.verify
               : IconsaxPlusLinear.gallery,
-          title: wantsVerifiedListing ? 'דירה מאומתת' : 'תמונות וסרטונים',
+          title: wantsVerifiedListing ? AppLocalizations.of(context)!.addPropertyScreen220a89be : AppLocalizations.of(context)!.addPropertyScreen2661e422,
           subtitle: wantsVerifiedListing
-              ? 'אימות דורש צילום וידאו מתוך האפליקציה בלבד'
-              : 'העלה תמונות וסרטונים המראים את הדירה במיטבה',
+              ? AppLocalizations.of(context)!.addPropertyScreena7b9e9c8
+              : AppLocalizations.of(context)!.addPropertyScreen17f383ab,
         ),
         const SizedBox(height: 16),
         _FormCard(
@@ -3331,8 +3342,8 @@ class _StepPhotos extends StatelessWidget {
           const SizedBox(height: 20),
           _SectionHint(
             icon: IconsaxPlusLinear.filter_search,
-            title: 'קריטריונים לשוכר',
-            subtitle: 'הגדר/י מי רואה את הדירה לפי תנאי סף',
+            title: AppLocalizations.of(context)!.addPropertyScreen4d0509a1,
+            subtitle: AppLocalizations.of(context)!.addPropertyScreen2793159b,
           ),
           const SizedBox(height: 12),
           EligibilityEntryCard(
@@ -3389,24 +3400,22 @@ class _VerifiedListingPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'פרסום דירה מאומתת',
-                    style: TextStyle(
+                    AppLocalizations.of(context)!.addPropertyScreen09c74548,
+                    style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 3),
+                  const SizedBox(height: 3),
                   Text(
-                    'דירה מאומתת היא דירה שצילמתם בה סרטון קצר ואמיתי מתוך '
-                    'האפליקציה. ככה השוכרים יודעים שהדירה אמיתית — והיא מוצגת '
-                    'ליותר אנשים ומופיעה גבוה יותר ברשימה.',
-                    style: TextStyle(
+                    AppLocalizations.of(context)!.addPropertyScreen8c1a2960,
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
                       height: 1.3,
@@ -3425,8 +3434,8 @@ class _VerifiedListingPanel extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             hasVideo
-                ? 'וידאו האימות נשמר מתוך המצלמה של האפליקציה.'
-                : 'כדי לאמת את הדירה צריך לצלם עכשיו וידאו קצר מתוך האפליקציה.',
+                ? AppLocalizations.of(context)!.addPropertyScreene7066c75
+                : AppLocalizations.of(context)!.addPropertyScreen9fcb2927,
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12.5,
@@ -3456,7 +3465,7 @@ class _VerifiedListingPanel extends StatelessWidget {
                     )
                   : const RentlyIcon(IconsaxPlusLinear.video_play, size: 17),
               label: Text(
-                isCapturingVerification ? 'פותח מצלמה...' : 'צלם וידאו אימות',
+                isCapturingVerification ? AppLocalizations.of(context)!.addPropertyScreenf6291745 : AppLocalizations.of(context)!.addPropertyScreeneff93e0f,
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -3531,9 +3540,9 @@ class _VerificationVideoPreview extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'וידאו אימות מוכן',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.addPropertyScreenede98a87,
+                  style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w900,
@@ -3556,7 +3565,7 @@ class _VerificationVideoPreview extends StatelessWidget {
                       onPressed: isCapturing ? null : onReplace,
                       icon:
                           const RentlyIcon(IconsaxPlusLinear.refresh, size: 14),
-                      label: const Text('צלם מחדש'),
+                      label: Text(AppLocalizations.of(context)!.addPropertyScreen3b32c520),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.navy,
                         side: const BorderSide(color: AppColors.borderLight),
@@ -3570,7 +3579,7 @@ class _VerificationVideoPreview extends StatelessWidget {
                     IconButton(
                       onPressed: isCapturing ? null : onClear,
                       icon: const Icon(Icons.close, color: AppColors.coral),
-                      tooltip: 'הסר וידאו אימות',
+                      tooltip: AppLocalizations.of(context)!.addPropertyScreen1ef6d872,
                     ),
                   ],
                 ),
@@ -3607,7 +3616,7 @@ class _VerifiedMediaLockNotice extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'בפרסום מאומת אין העלאה מהגלריה, קישור URL, תמונות או וידאו קיים. וידאו האימות המצולם הוא המדיה היחידה של הדירה.',
+              AppLocalizations.of(context)!.addPropertyScreen14bfc214,
               style: TextStyle(
                 color: AppColors.navy,
                 fontSize: 12.5,
@@ -3648,18 +3657,18 @@ class _PropertyRightsPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'זכויות שימוש והסכמה',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context)!.addPropertyScreen08bc4b8e,
+          style: const TextStyle(
             color: AppColors.navy,
             fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'אשר/י שהמדיה והמודל שייכים לך או הועלו ברשות, ובחר/י אילו שימושים מותרים.',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context)!.addPropertyScreen596fb349,
+          style: const TextStyle(
             color: AppColors.textSecondary,
             fontSize: 13,
             height: 1.45,
@@ -3680,9 +3689,9 @@ class _PropertyRightsPanel extends StatelessWidget {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                 controlAffinity: ListTileControlAffinity.leading,
-                title: const Text(
-                  'אני מאשר/ת תנאי שימוש, זכויות העלאה וחתימה דיגיטלית לנכס זה',
-                  style: TextStyle(
+                title: Text(
+                  AppLocalizations.of(context)!.addPropertyScreen5f839c99,
+                  style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -3695,21 +3704,21 @@ class _PropertyRightsPanel extends StatelessWidget {
                 onChanged: onThirdPartyTransferChanged,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                title: const Text('מותר להעביר את המידע לצד שלישי'),
+                title: Text(AppLocalizations.of(context)!.addPropertyScreen177fad3e),
               ),
               SwitchListTile(
                 value: commercialSaleAllowed,
                 onChanged: onCommercialSaleChanged,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                title: const Text('מותר שימוש מסחרי ומכירה עסקית של המידע'),
+                title: Text(AppLocalizations.of(context)!.addPropertyScreen3105947c),
               ),
               SwitchListTile(
                 value: aiTrainingAllowed,
                 onChanged: onAiTrainingChanged,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                title: const Text('מותר שימוש לאימון מודלים ו-AI'),
+                title: Text(AppLocalizations.of(context)!.addPropertyScreen25035307),
               ),
             ],
           ),
@@ -3763,7 +3772,7 @@ class _MediaGridItem extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'הוסף מדיה',
+                  AppLocalizations.of(context)!.addPropertyScreen01d89307,
                   style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 12,
@@ -3819,7 +3828,7 @@ class _MediaGridItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                draft.type.label,
+                draft.type.label(context),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 9.5,
@@ -4008,23 +4017,22 @@ class _Scan3dPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'סריקת תלת-מימד (מתקדם)',
-                    style: TextStyle(
+                    AppLocalizations.of(context)!.addPropertyScreen0774dd22,
+                    style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 3),
+                  const SizedBox(height: 3),
                   Text(
-                    'דורש צילום תוך כדי הליכה לאט בחלל. '
-                    '(לסיור נאמן ומומלץ השתמשו בסיור ה־360° למעלה.)',
-                    style: TextStyle(
+                    AppLocalizations.of(context)!.addPropertyScreen3ced3c61,
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
                       height: 1.35,
@@ -4050,15 +4058,15 @@ class _Scan3dPanel extends StatelessWidget {
           children: [
             _ScanTip(
               icon: Icons.wb_sunny_rounded,
-              label: 'אור חזק',
+              label: AppLocalizations.of(context)!.addPropertyScreen7a35525f,
             ),
             _ScanTip(
               icon: Icons.home_work_rounded,
-              label: 'חדר אחרי חדר',
+              label: AppLocalizations.of(context)!.addPropertyScreend3709dea,
             ),
             _ScanTip(
               icon: Icons.photo_camera_rounded,
-              label: 'מכל הזוויות',
+              label: AppLocalizations.of(context)!.addPropertyScreen0d1d50d5,
             ),
           ],
         ),
@@ -4125,7 +4133,7 @@ class _RoomScanEntry extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        has ? 'המשך סריקת חדרים' : 'התחל סריקת חדרים',
+                        has ? AppLocalizations.of(context)!.addPropertyScreend9728103 : AppLocalizations.of(context)!.addPropertyScreenee18cd86,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15.5,
@@ -4135,8 +4143,8 @@ class _RoomScanEntry extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         has
-                            ? '$roomScanCount חדרים נסרקו · אפשר להוסיף עוד'
-                            : 'סורקים חדר-חדר באיכות גבוהה',
+                            ? AppLocalizations.of(context)!.addPropertyScreen65134a55(roomScanCount)
+                            : AppLocalizations.of(context)!.addPropertyScreenc9059001,
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12.5,
@@ -4243,15 +4251,15 @@ class _ScanActions extends StatelessWidget {
                                 color: Colors.white,
                               ),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                RentlyIcon(IconsaxPlusLinear.video_play,
+                                const RentlyIcon(IconsaxPlusLinear.video_play,
                                     color: Colors.white, size: 18),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'צלם סריקה',
-                                  style: TextStyle(
+                                  AppLocalizations.of(context)!.addPropertyScreen3643cc83,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w800,
@@ -4285,16 +4293,16 @@ class _ScanActions extends StatelessWidget {
                   child: InkWell(
                     onTap: isSubmitting ? null : onPickFromGallery,
                     borderRadius: BorderRadius.circular(14),
-                    child: const Center(
+                    child: Center(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          RentlyIcon(IconsaxPlusLinear.video,
+                          const RentlyIcon(IconsaxPlusLinear.video,
                               color: AppColors.navy, size: 18),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
-                            'בחר וידאו',
-                            style: TextStyle(
+                            AppLocalizations.of(context)!.addPropertyScreena384ef27,
+                            style: const TextStyle(
                               color: AppColors.navy,
                               fontSize: 13.5,
                               fontWeight: FontWeight.w800,
@@ -4332,7 +4340,7 @@ class _ScanActions extends StatelessWidget {
                         color: AppColors.primary, size: 18),
                     SizedBox(width: 8),
                     Text(
-                      'קשר סריקה מ-Scaniverse',
+                      AppLocalizations.of(context)!.addPropertyScreena9b90f35,
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 13.5,
@@ -4359,18 +4367,18 @@ class _ScanActions extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.slate200),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       IconsaxPlusLinear.document_upload,
                       color: AppColors.navy,
                       size: 18,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
-                      'ייבא קבצי 3D מ-Scaniverse',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.addPropertyScreen01587fc6,
+                      style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
@@ -4421,7 +4429,7 @@ class _ScanStatusCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _statusLabel,
+                  _statusLabel(context),
                   style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 13.5,
@@ -4442,7 +4450,7 @@ class _ScanStatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            _detailLabel,
+            _detailLabel(context),
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12.5,
@@ -4456,7 +4464,7 @@ class _ScanStatusCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: isSubmitting ? null : onReplace,
                   icon: const RentlyIcon(IconsaxPlusLinear.refresh, size: 16),
-                  label: const Text('החלף סריקה'),
+                  label: Text(AppLocalizations.of(context)!.addPropertyScreenc68a292c),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,
                     side: const BorderSide(color: AppColors.borderLight),
@@ -4467,7 +4475,7 @@ class _ScanStatusCard extends StatelessWidget {
               IconButton(
                 onPressed: isSubmitting ? null : onClear,
                 icon: const Icon(Icons.close, color: AppColors.coral),
-                tooltip: 'הסר סריקה',
+                tooltip: AppLocalizations.of(context)!.addPropertyScreen080d69d6,
               ),
             ],
           ),
@@ -4489,28 +4497,28 @@ class _ScanStatusCard extends StatelessWidget {
     return AppColors.primary;
   }
 
-  String get _statusLabel {
-    if (tour.isReady) return 'סיור 3D מוכן לפרסום';
-    if (tour.hasFailed) return 'העיבוד נכשל';
-    if (tour.needsBackendUpload) return 'סריקה נשמרה וממתינה לעיבוד';
-    if (tour.status == PropertyTourStatus.uploading) return 'מעלה וידאו לסריקה';
-    return 'הסיור בעיבוד';
+  String _statusLabel(BuildContext context) {
+    if (tour.isReady) return AppLocalizations.of(context)!.addPropertyScreen2ff0e6d2;
+    if (tour.hasFailed) return AppLocalizations.of(context)!.addPropertyScreenf221fec9;
+    if (tour.needsBackendUpload) return AppLocalizations.of(context)!.addPropertyScreenc53121b7;
+    if (tour.status == PropertyTourStatus.uploading) return AppLocalizations.of(context)!.addPropertyScreen4e248a37;
+    return AppLocalizations.of(context)!.addPropertyScreen27a1ebbb;
   }
 
-  String get _detailLabel {
+  String _detailLabel(BuildContext context) {
     if (tour.hasFailed && tour.errorMessage.isNotEmpty) {
       return tour.errorMessage;
     }
     if (tour.needsBackendUpload) {
       if (!isBackendConfigured) {
-        return 'הווידאו נשמר במכשיר. כדי לשלוח לעיבוד יש לוודא שהגדרות השרת תקינות.';
+        return AppLocalizations.of(context)!.addPropertyScreend3437839;
       }
-      return 'לחץ על ״החלף סריקה״ לנסות שוב (ייתכן שיש להתחבר תחילה לחשבון).';
+      return AppLocalizations.of(context)!.addPropertyScreen4ca20c2a;
     }
     if (tour.processingStage.isNotEmpty) {
-      return 'שלב נוכחי: ${tour.processingStage}';
+      return AppLocalizations.of(context)!.addPropertyScreen029db6c7(tour.processingStage);
     }
-    return 'הלקוחות יראו כפתור סיור רק כשה־viewer יהיה מוכן.';
+    return AppLocalizations.of(context)!.addPropertyScreen96502cd7;
   }
 }
 
@@ -4721,7 +4729,7 @@ class _FloorDropdown extends StatelessWidget {
       initialValue: current.isEmpty ? null : current,
       isExpanded: true,
       decoration: InputDecoration(
-        labelText: 'קומה',
+        labelText: AppLocalizations.of(context)!.addPropertyScreen047e630b,
         labelStyle:
             const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         // AppColors.primary is a mutable static — never put it inside a const
@@ -4794,7 +4802,7 @@ class _EntryDatePicker extends StatelessWidget {
       initialDate: initial.isBefore(today) ? today : initial,
       firstDate: today,
       lastDate: DateTime(now.year + 5),
-      helpText: 'בחר תאריך כניסה',
+      helpText: AppLocalizations.of(context)!.addPropertyScreen1c463eec,
     );
     if (picked != null) {
       ctrl.text =
@@ -4828,7 +4836,7 @@ class _EntryDatePicker extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: InputDecorator(
             decoration: InputDecoration(
-              labelText: 'תאריך כניסה',
+              labelText: AppLocalizations.of(context)!.addPropertyScreenb7cdc163,
               labelStyle: const TextStyle(
                   color: AppColors.textSecondary, fontSize: 13),
               prefixIcon: Icon(IconsaxPlusLinear.calendar,
@@ -4839,7 +4847,7 @@ class _EntryDatePicker extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             ),
             child: Text(
-              hasValue ? ctrl.text : 'בחר תאריך',
+              hasValue ? ctrl.text : AppLocalizations.of(context)!.addPropertyScreen2f99f2f3,
               style: TextStyle(
                 color: hasValue ? AppColors.navy : AppColors.textSecondary,
                 fontSize: 14,
@@ -5031,14 +5039,17 @@ class _DesignTemplatePicker extends StatelessWidget {
   final ValueChanged<String> onTemplateChanged;
   final ValueChanged<int> onAccentChanged;
 
-  static const _hebLabels = {
-    'rently_classic': 'קלאסי',
-    'acid_hero': 'אורה',
-    'dashboard_glass': 'לוח שוק',
-    'estate_card': 'כרטיס נכס',
-    'gallery_editorial': 'גלריה',
-    'cinematic_glass': 'קולנועי',
-  };
+  static Map<String, String> _hebLabels(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'rently_classic': l10n.addPropertyScreen019fc466,
+      'acid_hero': l10n.addPropertyScreen49717ede,
+      'dashboard_glass': l10n.addPropertyScreen3af8a1a1,
+      'estate_card': l10n.addPropertyScreenb429eced,
+      'gallery_editorial': l10n.addPropertyScreeneed2fbf3,
+      'cinematic_glass': l10n.addPropertyScreen51ea6413,
+    };
+  }
 
   static const _defaultAccent = 0xFF13BEC9;
 
@@ -5087,17 +5098,17 @@ class _DesignTemplatePicker extends StatelessWidget {
               Icon(IconsaxPlusLinear.brush_4,
                   size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              const Text('עיצוב דף הדירה',
-                  style: TextStyle(
+              Text(AppLocalizations.of(context)!.addPropertyScreenf3fd4b5d,
+                  style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       color: AppColors.navy)),
             ],
           ),
           const SizedBox(height: 4),
-          const Text('בחרו תבנית לדף הנכס וצבע מותאם אישית',
+          Text(AppLocalizations.of(context)!.addPropertyScreend2c66acd,
               style:
-                  TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: crossAxisCount,
@@ -5109,7 +5120,7 @@ class _DesignTemplatePicker extends StatelessWidget {
             children: [
               for (final t in templates)
                 _TemplateChip(
-                  label: _hebLabels[t.id] ?? t.title,
+                  label: _hebLabels(context)[t.id] ?? t.title,
                   colors: _previewColors(t.id),
                   selected: _isSelected(t.id),
                   onTap: () => onTemplateChanged(t.id),
@@ -5121,8 +5132,8 @@ class _DesignTemplatePicker extends StatelessWidget {
             children: [
               Icon(IconsaxPlusLinear.colorfilter, size: 16, color: AppColors.primary),
               const SizedBox(width: 8),
-              const Text('צבע מותאם',
-                  style: TextStyle(
+              Text(AppLocalizations.of(context)!.addPropertyScreen171d2e69,
+                  style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.navy)),
@@ -5137,7 +5148,7 @@ class _DesignTemplatePicker extends StatelessWidget {
                 value: _defaultAccent,
                 selected: accent == _defaultAccent || accent == 0,
                 onTap: () => onAccentChanged(_defaultAccent),
-                label: 'ברירת מחדל',
+                label: AppLocalizations.of(context)!.addPropertyScreen9b5409b0,
               ),
               for (final c in _accentPresets.where((color) => color != _defaultAccent))
                 _AccentDot(
@@ -5429,13 +5440,16 @@ class EditPropertyScreen extends StatefulWidget {
 }
 
 class _EditPropertyScreenState extends State<EditPropertyScreen> {
-  static const _stepLabels = [
-    'מיקום',
-    'פרטי הנכס',
-    'מאפיינים',
-    'קהל יעד',
-    'מדיה'
-  ];
+  List<String> _stepLabels(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.addPropertyScreen26d0e7de,
+      l10n.addPropertyScreen220d2733,
+      l10n.addPropertyScreene08c750c,
+      l10n.addPropertyScreen9af0e89b,
+      l10n.addPropertyScreen4a140235,
+    ];
+  }
 
   final _pageCtrl = PageController();
   int _step = 0;
@@ -5654,11 +5668,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                 ? PropertyTourStatus.processing
                 : PropertyTourStatus.failed,
             processingStage: isTeleport
-                ? 'הסיור התלת־ממדי בעיבוד (בערך שעה). אפשר לשמור את הדירה — הוא יופיע אוטומטית כשיהיה מוכן.'
+                ? AppLocalizations.of(context)!.addPropertyScreen949b4a98
                 : '',
             errorMessage: isTeleport
                 ? ''
-                : 'עיבוד הסריקה לקח יותר מדי זמן. נסה שוב מאוחר יותר.',
+                : AppLocalizations.of(context)!.addPropertyScreen9abff18f,
             updatedAt: DateTime.now().toUtc(),
           );
         });
@@ -5678,7 +5692,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           setState(() {
             _scanTourDraft = _scanTourDraft?.copyWith(
               status: PropertyTourStatus.failed,
-              errorMessage: 'שגיאה בבדיקת סטטוס הסריקה. נסה שוב.',
+              errorMessage: AppLocalizations.of(context)!.addPropertyScreen5b53dba2,
               updatedAt: DateTime.now().toUtc(),
             );
           });
@@ -5718,9 +5732,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   void _next() {
     if (!_validateCurrentStep()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('יש למלא את השדות הנדרשים'),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen660f2d8e),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -5751,7 +5765,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   Future<void> _pickPropertyImage(ImageSource source) async {
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen40b9326f);
       return;
     }
     try {
@@ -5774,7 +5788,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   Future<void> _pickPropertyVideo(ImageSource source) async {
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen40b9326f);
       return;
     }
     try {
@@ -5797,7 +5811,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   Future<void> _pickScanVideo(ImageSource source) async {
     if (_wantsVerifiedListing) {
       _showMediaError(
-          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+          AppLocalizations.of(context)!.addPropertyScreen97c25fd2);
       return;
     }
     // A successful 3D reconstruction depends entirely on capture quality — the
@@ -5818,8 +5832,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       final rawSize = await file.length();
       if (rawSize > 400 * 1024 * 1024) {
         _showMediaError(
-          'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
-          'צלם סרטון קצר יותר של עד 60 שניות.',
+          AppLocalizations.of(context)!.addPropertyScreenc69dd25b(
+            (rawSize / 1024 / 1024).toStringAsFixed(0),
+          ),
         );
         return;
       }
@@ -5847,7 +5862,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           _isScanSubmitting = false;
         });
         _showMediaError(
-          'הסריקה נשמרה כטיוטה. שליחת הסריקה לעיבוד אינה זמינה כרגע.',
+          AppLocalizations.of(context)!.addPropertyScreen5ef6e641,
         );
         return;
       }
@@ -5891,7 +5906,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isScanSubmitting = false);
-      _showMediaError('סריקת ה־3D נכשלה: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen75007f0f(error.toString()));
     }
   }
 
@@ -5899,7 +5914,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     final service = ScaniverseService.instance;
     if (!service.isConfigured) {
       _showMediaError(
-        'ייבוא סריקות אינו זמין כרגע.',
+        AppLocalizations.of(context)!.addPropertyScreen71b19dc0,
       );
       return;
     }
@@ -5918,7 +5933,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   Future<void> _importScaniverseAssets() async {
     if (_wantsVerifiedListing) {
       _showMediaError(
-          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+          AppLocalizations.of(context)!.addPropertyScreen97c25fd2);
       return;
     }
     try {
@@ -5947,7 +5962,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isScanSubmitting = false);
-      _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreend93995bc(error.toString()));
     }
   }
 
@@ -5987,7 +6002,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isCapturingVerification = false);
-      _showMediaError('צילום וידאו האימות נכשל: $error');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreen4b627a97(error.toString()));
     }
   }
 
@@ -6004,7 +6019,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
     if (_wantsVerifiedListing) {
-      _showMediaError('בדירה מאומתת אי אפשר להוסיף מדיה ידנית או מהגלריה.');
+      _showMediaError(AppLocalizations.of(context)!.addPropertyScreenddde6811);
       return;
     }
     final emptyIndex = _mediaDrafts.indexWhere(
@@ -6019,7 +6034,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
     if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
       _showMediaError(
-        'אפשר לצרף עד ${SecurityConfig.maxPropertyMediaItems} פריטי מדיה.',
+        AppLocalizations.of(context)!.addPropertyScreen2110e73c(SecurityConfig.maxPropertyMediaItems),
       );
       return;
     }
@@ -6124,10 +6139,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
     if (!_acceptedPropertyTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
           content:
-              Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני שמירת הנכס.'),
+              Text(AppLocalizations.of(context)!.addPropertyScreen678addb0),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -6140,10 +6155,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         (sanitizedVerificationVideoUrl == null ||
             sanitizedVerificationVideoUrl.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
           content:
-              Text('כדי לשמור דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
+              Text(AppLocalizations.of(context)!.addPropertyScreen52572a81),
           backgroundColor: AppColors.coral,
         ),
       );
@@ -6250,9 +6265,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          duration: Duration(milliseconds: 2500),
-          content: Text('הנכס עודכן בהצלחה'),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreende01bf6a),
           backgroundColor: AppColors.success,
         ),
       );
@@ -6261,7 +6276,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(milliseconds: 3000),
-        content: Text('שגיאה בעדכון הנכס. נסה שוב.'),
+        content: Text(AppLocalizations.of(context)!.addPropertyScreen069e6d9c),
         backgroundColor: AppColors.coral,
       ));
     } finally {
@@ -6282,7 +6297,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           onPressed: _prev,
         ),
         title: Text(
-          'עריכת נכס · ${_stepLabels[_step]}',
+          AppLocalizations.of(context)!.addPropertyScreen9150f977(_stepLabels(context)[_step]),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 17,
@@ -6291,7 +6306,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
-          child: _StepIndicator(step: _step, total: 5, labels: _stepLabels),
+          child: _StepIndicator(step: _step, total: 5, labels: _stepLabels(context)),
         ),
       ),
       body: Column(
@@ -6447,7 +6462,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         step: _step,
         total: 5,
         isLoading: _isSaving,
-        saveLabel: 'עדכון הנכס',
+        saveLabel: AppLocalizations.of(context)!.addPropertyScreen66dab183,
         onNext: _next,
         onPrev: _prev,
         isActive: _isActive,
@@ -6462,23 +6477,23 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22)),
-              title: const Text(
-                'הסרת נכס',
-                style: TextStyle(
+              title: Text(
+                AppLocalizations.of(context)!.addPropertyScreeneb255ed5,
+                style: const TextStyle(
                     color: AppColors.navy,
                     fontWeight: FontWeight.w900),
               ),
               content: Text(
-                'להסיר את "${widget.property.address}"?\nהפעולה אינה ניתנת לביטול.',
+                AppLocalizations.of(context)!.addPropertyScreendb2a79db(widget.property.address),
                 style: const TextStyle(
                     color: AppColors.textSecondary, height: 1.4),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('ביטול',
+                  child: Text(AppLocalizations.of(context)!.addPropertyScreena7c55a8d,
                       style:
-                          TextStyle(color: AppColors.textSecondary)),
+                          const TextStyle(color: AppColors.textSecondary)),
                 ),
                 FilledButton(
                   style: FilledButton.styleFrom(
@@ -6487,7 +6502,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('הסר'),
+                  child: Text(AppLocalizations.of(context)!.addPropertyScreen10666b28),
                 ),
               ],
             ),
@@ -6591,21 +6606,21 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'בחר סריקה מ-Scaniverse',
-                          style: TextStyle(
+                          AppLocalizations.of(context)!.addPropertyScreen3f5d2c29,
+                          style: const TextStyle(
                             color: AppColors.navy,
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
                         Text(
-                          'סריקות מחשבון Niantic Spatial שלך',
-                          style: TextStyle(
+                          AppLocalizations.of(context)!.addPropertyScreen34c0f6af,
+                          style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
                           ),
@@ -6634,7 +6649,7 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
             CircularProgressIndicator(color: AppColors.primary),
             SizedBox(height: 12),
             Text(
-              'טוען סריקות...',
+              AppLocalizations.of(context)!.addPropertyScreen0516c738,
               style: TextStyle(color: AppColors.textSecondary),
             ),
           ],
@@ -6665,7 +6680,7 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
                   _load();
                 },
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('נסה שוב'),
+                label: Text(AppLocalizations.of(context)!.addPropertyScreenc5ffac09),
               ),
             ],
           ),
@@ -6674,10 +6689,10 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
     }
     final scans = _scans ?? [];
     if (scans.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'לא נמצאו סריקות בחשבון Scaniverse.',
-          style: TextStyle(color: AppColors.textSecondary),
+          AppLocalizations.of(context)!.addPropertyScreenf70797b1,
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
       );
     }
@@ -6768,7 +6783,7 @@ class _ScanTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            isReady ? 'מוכן' : 'בעיבוד',
+                            isReady ? AppLocalizations.of(context)!.addPropertyScreen4c43bbb7 : AppLocalizations.of(context)!.addPropertyScreen831251d3,
                             style: TextStyle(
                               color: statusColor,
                               fontSize: 10,
@@ -6831,26 +6846,26 @@ Future<String?> transcodeScanToMp4(String inputPath) async {
 /// covers the whole space — a quick pan or partial clip fails to rebuild and
 /// comes back as a failed scan. Returns true when the user chooses to record.
 Future<bool?> showScanCaptureGuide(BuildContext context) {
-  const tips = <(IconData, String, String)>[
+  final tips = <(IconData, String, String)>[
     (
       IconsaxPlusLinear.timer_1,
-      'צלמו לאט ויציב',
-      'הזיזו את הטלפון באיטיות וברציפות, בלי טלטולים — תנועה מהירה גורמת לטשטוש והסריקה נכשלת.',
+      AppLocalizations.of(context)!.addPropertyScreendabf278d,
+      AppLocalizations.of(context)!.addPropertyScreen12363d34,
     ),
     (
       IconsaxPlusLinear.rotate_left_1,
-      'הקיפו כל חדר',
-      'עברו סביב כל חדר וצלמו את הקירות, הפינות והרהיטים מכמה זוויות עם חפיפה ביניהן.',
+      AppLocalizations.of(context)!.addPropertyScreen6454f0d9,
+      AppLocalizations.of(context)!.addPropertyScreenf6144e67,
     ),
     (
       IconsaxPlusLinear.sun_1,
-      'תאורה טובה',
-      'הדליקו אורות ופתחו וילונות. חדר חשוך או נגד-אור פוגע בשחזור התלת-ממדי.',
+      AppLocalizations.of(context)!.addPropertyScreenc471ccde,
+      AppLocalizations.of(context)!.addPropertyScreen8df76593,
     ),
     (
       IconsaxPlusLinear.video,
-      'כל הדירה, 30–60 שניות',
-      'התחילו מהכניסה ועברו בין כל החללים ברצף אחד עד 60 שניות, בלי לדלג על חדרים.',
+      AppLocalizations.of(context)!.addPropertyScreen869f5479,
+      AppLocalizations.of(context)!.addPropertyScreen3a1c4b62,
     ),
   ];
   return showModalBottomSheet<bool>(
@@ -6878,10 +6893,10 @@ Future<bool?> showScanCaptureGuide(BuildContext context) {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'איך מצלמים סריקת 3D מוצלחת',
+            Text(
+              AppLocalizations.of(context)!.addPropertyScreenba7e182b,
               textAlign: TextAlign.right,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
@@ -6945,18 +6960,18 @@ Future<bool?> showScanCaptureGuide(BuildContext context) {
                   ),
                 ),
                 icon: const RentlyIcon(IconsaxPlusLinear.video, size: 18),
-                label: const Text(
-                  'הבנתי, התחל צילום',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                label: Text(
+                  AppLocalizations.of(context)!.addPropertyScreen1a2ea5e9,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
             const SizedBox(height: 6),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text(
-                'ביטול',
-                style: TextStyle(color: AppColors.textSecondary),
+              child: Text(
+                AppLocalizations.of(context)!.addPropertyScreena7c55a8d,
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
             ),
           ],
@@ -7028,9 +7043,9 @@ class _Panorama360Tile extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Flexible(
-                              child: Text('סיור 360° — מומלץ',
-                                  style: TextStyle(
+                            Flexible(
+                              child: Text(AppLocalizations.of(context)!.addPropertyScreen4de5edeb,
+                                  style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       fontSize: 16)),
@@ -7054,8 +7069,8 @@ class _Panorama360Tile extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           has
-                              ? '$count נקודות נוספו · הקש לעריכה או הוספה'
-                              : 'הסיור המומלץ — נאמן למציאות. צילום מודרך כמו Street View',
+                              ? AppLocalizations.of(context)!.addPropertyScreen960b1b81(count)
+                              : AppLocalizations.of(context)!.addPropertyScreen83b5eecd,
                           style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.92),
                               fontSize: 12.5,
