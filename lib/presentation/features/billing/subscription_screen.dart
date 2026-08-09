@@ -82,7 +82,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -158,7 +158,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final sub = context.watch<DatingProvider>().subscription;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(

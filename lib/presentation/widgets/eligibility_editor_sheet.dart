@@ -298,7 +298,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Padding(
         padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
         child: ConstrainedBox(

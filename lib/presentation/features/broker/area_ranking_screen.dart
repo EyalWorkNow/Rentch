@@ -59,7 +59,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -299,7 +299,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
           child: Column(mainAxisSize: MainAxisSize.min,

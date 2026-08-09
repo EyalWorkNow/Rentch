@@ -93,7 +93,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('למחוק את הבלעדיות?'),
           content: Text(m.propertyTitle.trim().isEmpty
@@ -121,7 +121,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -371,7 +371,7 @@ class _ExclusivityEditorState extends State<_ExclusivityEditor> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
         decoration: const BoxDecoration(

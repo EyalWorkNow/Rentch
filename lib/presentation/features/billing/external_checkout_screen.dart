@@ -77,7 +77,7 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(

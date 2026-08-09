@@ -100,7 +100,7 @@ class BrokerToolsScreen extends StatelessWidget {
     ];
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(

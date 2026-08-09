@@ -1369,7 +1369,7 @@ class _CandidateTopBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       child: Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: Row(
           children: [
             if (showFilters)
@@ -1678,7 +1678,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
     const roomsOptions = <double>[1, 1.5, 2, 2.5, 3, 4, 5];
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxHeight),
         child: Container(

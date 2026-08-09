@@ -126,7 +126,7 @@ class _SwipeToConfirmSheetState extends State<SwipeToConfirmSheet>
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

@@ -970,7 +970,7 @@ class _MoreOptionsSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: AppColors.inkSoft,
           title:
@@ -1006,7 +1006,7 @@ class _MoreOptionsSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: AppColors.inkSoft,
           title:

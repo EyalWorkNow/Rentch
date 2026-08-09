@@ -206,7 +206,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
   Widget build(BuildContext context) {
     if (!_loaded || _sections.isEmpty) return const SizedBox.shrink();
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
         clipBehavior: Clip.antiAlias,
@@ -687,7 +687,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape:

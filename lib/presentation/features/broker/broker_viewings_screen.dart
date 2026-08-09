@@ -133,7 +133,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
     final hasClash = clashingIds.isNotEmpty;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
@@ -375,7 +375,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
       ),
       builder: (sheetContext) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -552,7 +552,7 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

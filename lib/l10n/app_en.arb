@@ -1,0 +1,19 @@
+{
+  "@@locale": "en",
+  "onboardingHeadline": "Your apartment is waiting here",
+  "onboardingSubtitle": "Smart search based on what really matters to you — budget, area, and lifestyle. List an apartment in just a few taps, with all your matches and chats in one place.",
+  "getStarted": "Get Started",
+  "next": "Next",
+  "introSwipeTitle": "Discover apartments by swiping",
+  "introSwipeBody": "Swipe right 👍 to save an apartment you like, left 👎 to skip. You can also search with Ati (smart search), in the gallery, or on the map.",
+  "introAtiTitle": "Ati — Smart Search",
+  "introAtiBody": "Tell Ati what you're looking for, in your own words, and she'll find the best-matching apartments for you.",
+  "introTourTitle": "3D Tours",
+  "introTourBody": "Step inside before you even leave home — a 360° tour and a 3D experience right from your screen.",
+  "introMatchTitle": "Matches & Chat",
+  "introMatchBody": "When there's a mutual match, you can chat directly, schedule a viewing, and close the deal — all in one place.",
+  "introProfileTitle": "Your Profile",
+  "introProfileBody": "Fill in your details to get more accurate matches. The more complete your profile, the better the matches.",
+  "skip": "Skip",
+  "letsGetStarted": "Let's Get Started!"
+}

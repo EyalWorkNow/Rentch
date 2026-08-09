@@ -1641,7 +1641,6 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
               controller: widget.controller,
               focusNode: _focus,
               enabled: !busy,
-              textDirection: TextDirection.rtl,
               textInputAction: TextInputAction.search,
               onSubmitted: widget.onSubmit,
               maxLines: 1,
@@ -1660,7 +1659,6 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
                 filled: true,
                 fillColor: Colors.white,
                 hintText: 'חפש דירה במילים שלך…',
-                hintTextDirection: TextDirection.rtl,
                 hintStyle: TextStyle(
                   fontSize: 15,
                   color: AppColors.textSecondary.withValues(alpha: 0.8),
@@ -1704,7 +1702,6 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
     if (widget.summary == null) {
       return Text(
         'נסו: "3 חדרים בצפון ת״א עד 6000"',
-        textDirection: TextDirection.rtl,
         style: TextStyle(
           fontSize: 12,
           color: AppColors.textSecondary.withValues(alpha: 0.9),
@@ -1726,7 +1723,6 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
           Expanded(
             child: Text(
               widget.summary!,
-              textDirection: TextDirection.rtl,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -2334,7 +2330,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     final name = await showDialog<String>(
       context: context,
       builder: (dialogCtx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape:
@@ -2971,7 +2967,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               Expanded(
                                 child: TextField(
                                   controller: _locationCtrl,
-                                  textDirection: TextDirection.rtl,
                                   onChanged: (v) => setState(() {}),
                                   style: const TextStyle(
                                     fontSize: 14,
@@ -3036,7 +3031,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             scrollDirection: Axis.horizontal,
                             reverse: true,
                             child: Row(
-                              textDirection: TextDirection.rtl,
                               children: [
                                 for (final city in [
                                   'תל אביב',
@@ -3152,7 +3146,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           scrollDirection: Axis.horizontal,
                           reverse: true,
                           child: Row(
-                            textDirection: TextDirection.rtl,
                             children: SearchSortOption.values.map((option) {
                               final selected = f.sortBy == option;
                               return Padding(
@@ -3326,7 +3319,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           scrollDirection: Axis.horizontal,
                           reverse: true,
                           child: Row(
-                            textDirection: TextDirection.rtl,
                             children:
                                 provider.availablePropertyTypes.map((type) {
                               final state = f.propertyTypeState(type);

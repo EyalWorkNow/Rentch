@@ -624,7 +624,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('סריקת תלת-מימד כמו הדירה האמיתית'),
           content: Column(
@@ -905,7 +905,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: Container(
           decoration: const BoxDecoration(
             color: Colors.white,

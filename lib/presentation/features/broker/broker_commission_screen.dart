@@ -111,7 +111,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('למחוק את העסקה?'),
           content: Text(d.propertyTitle.trim().isEmpty
@@ -138,7 +138,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
   Widget build(BuildContext context) {
     final totals = commissionTotals(_deals, DateTime.now());
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -405,7 +405,7 @@ class _DealEditorState extends State<_DealEditor> {
         (liveAmount <= 0 || livePct <= 0) ? 0.0 : liveAmount * livePct / 100;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
         decoration: const BoxDecoration(

@@ -72,7 +72,7 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
     final selected = _resolveSelected(properties);
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(

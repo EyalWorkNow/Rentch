@@ -190,7 +190,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2306,7 +2306,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(

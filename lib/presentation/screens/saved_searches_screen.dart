@@ -92,7 +92,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -144,7 +144,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('למחוק את החיפוש?'),
           content: Text(

@@ -93,7 +93,7 @@ class _PaymentMethodSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final methods = _availableMethods();
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

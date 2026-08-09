@@ -57,7 +57,7 @@ class _ProfileCompletionSheet extends StatelessWidget {
       (IconsaxPlusBold.filter, 'סינון מראש של הצעות לא רלוונטיות'),
     ];
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

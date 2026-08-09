@@ -39,7 +39,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('ליד נסגר בהצלחה 🎉'),
           content: const Text('ליצור עסקה במעקב העמלות מהליד הזה?'),
@@ -150,7 +150,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       ..sort((a, b) => a.nextFollowUp!.compareTo(b.nextFollowUp!));
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
@@ -418,7 +418,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       ),
       builder: (sheetContext) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -600,7 +600,7 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

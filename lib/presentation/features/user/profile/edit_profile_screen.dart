@@ -545,7 +545,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           }
 
           return Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: Directionality.of(context),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
@@ -739,7 +739,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           // Name field
                           TextField(
                             controller: _nameCtrl,
-                            textDirection: TextDirection.rtl,
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
@@ -779,7 +778,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             controller: _bioCtrl,
                             maxLines: 4,
                             minLines: 3,
-                            textDirection: TextDirection.rtl,
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
@@ -1061,7 +1059,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                            textDirection: TextDirection.rtl,
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: _fieldDecoration(
@@ -1096,7 +1093,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 8),
                           TextField(
                             controller: _workAddressCtrl,
-                            textDirection: TextDirection.rtl,
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: _fieldDecoration(
@@ -2597,7 +2593,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
       expand: false,
       builder: (ctx, scrollCtrl) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: Column(
             children: [
               Container(
@@ -2628,7 +2624,6 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: TextField(
                   controller: _searchCtrl,
-                  textDirection: TextDirection.rtl,
                   onChanged: (v) => setState(() => _query = v),
                   style: const TextStyle(color: AppColors.navy, fontSize: 14),
                   decoration: InputDecoration(

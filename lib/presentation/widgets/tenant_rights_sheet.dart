@@ -51,7 +51,7 @@ class _TenantRightsBody extends StatelessWidget {
     );
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: FractionallySizedBox(
         heightFactor: 0.82,
         child: Container(

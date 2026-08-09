@@ -176,7 +176,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: FractionallySizedBox(

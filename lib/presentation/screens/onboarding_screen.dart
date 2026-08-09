@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -31,15 +32,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // One focused screen — the whole product in a single coherent message instead
   // of three separate intro slides.
-  static const _slides = [
-    _OnboardingSlide(
-      imageUrl:
-          'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85',
-      title: 'הדירה שלך מחכה כאן',
-      body:
-          'חיפוש חכם לפי מה שבאמת חשוב לך — תקציב, אזור וסגנון חיים. פרסום דירה בכמה נגיעות, וכל ההתאמות והשיחות במקום אחד.',
-    ),
-  ];
+  List<_OnboardingSlide> _slides(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      _OnboardingSlide(
+        imageUrl:
+            'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85',
+        title: l10n.onboardingHeadline,
+        body: l10n.onboardingSubtitle,
+      ),
+    ];
+  }
 
   @override
   void initState() {
@@ -80,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _next() {
-    if (_page == _slides.length - 1) {
+    if (_page == _slides(context).length - 1) {
       _openAuth();
       return;
     }
@@ -94,7 +97,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final maxWidth = size.width >= 600 ? 430.0 : double.infinity;
-    final slide = _slides[_page];
+    final slides = _slides(context);
+    final slide = slides[_page];
 
     return Scaffold(
       backgroundColor: AppColors.border,
@@ -106,11 +110,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               PageView.builder(
                 controller: _pageController,
-                itemCount: _slides.length,
+                itemCount: slides.length,
                 onPageChanged: (value) => setState(() => _page = value),
                 itemBuilder: (context, index) {
                   return Image.network(
-                    _slides[index].imageUrl,
+                    _slides(context)[index].imageUrl,
                     fit: BoxFit.cover,
                     alignment: Alignment.center,
                     errorBuilder: (_, __, ___) => const _OnboardingFallback(),
@@ -220,9 +224,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      if (_slides.length > 1) ...[
+                      if (slides.length > 1) ...[
                         _PageDots(
-                          count: _slides.length,
+                          count: slides.length,
                           activeIndex: _page,
                         ),
                         const SizedBox(height: 32),
@@ -248,14 +252,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  if (_page == _slides.length - 1)
+                                  if (_page == slides.length - 1)
                                     const SizedBox(width: 56) // spacer to offset the circle on opposite side
                                   else
                                     const SizedBox(width: 24),
                                   Expanded(
                                     child: Center(
                                       child: Text(
-                                        _page == _slides.length - 1 ? 'מתחילים' : 'הבא',
+                                        _page == slides.length - 1
+                                            ? AppLocalizations.of(context)!.getStarted
+                                            : AppLocalizations.of(context)!.next,
                                         style: const TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.w900,
@@ -264,7 +270,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       ),
                                     ),
                                   ),
-                                  if (_page == _slides.length - 1)
+                                  if (_page == slides.length - 1)
                                     Container(
                                       width: 50,
                                       height: 50,

@@ -3416,12 +3416,97 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                   },
                 ),
               ),
+              const SizedBox(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'שפת האפליקציה',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Consumer<DatingProvider>(
+                  builder: (context, provider, _) {
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _languageOptions.map((opt) {
+                        final isSelected = provider.languageCode == opt.code;
+                        return GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            provider.setLanguageCode(opt.code);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? (AppColors.customPrimary ??
+                                      const Color(0xFF059669))
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected) ...[
+                                  const Icon(Icons.check,
+                                      color: Colors.white, size: 14),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  opt.label,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  static const List<_LanguageOption> _languageOptions = [
+    _LanguageOption('he', 'עברית'),
+    _LanguageOption('en', 'English'),
+    _LanguageOption('ar', 'العربية'),
+    _LanguageOption('fr', 'Français'),
+    _LanguageOption('es', 'Español'),
+  ];
 
   static const List<Color> _themeColors = [
     Color(0xFF13BEC9), // Vibrant Teal
@@ -3433,6 +3518,12 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
     Color(0xFF0F172A), // Dark Slate
     Color(0xFF84CC16), // Lime Green
   ];
+}
+
+class _LanguageOption {
+  const _LanguageOption(this.code, this.label);
+  final String code;
+  final String label;
 }
 
 class _SubPageSettingItem {
@@ -3987,7 +4078,7 @@ class _DirectInputSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: Container(

@@ -1,0 +1,19 @@
+{
+  "@@locale": "fr",
+  "onboardingHeadline": "Votre appartement vous attend ici",
+  "onboardingSubtitle": "Une recherche intelligente basée sur ce qui compte vraiment pour vous — budget, quartier et style de vie. Publiez une annonce en quelques clics, avec toutes vos correspondances et discussions au même endroit.",
+  "getStarted": "Commencer",
+  "next": "Suivant",
+  "introSwipeTitle": "Découvrez des appartements en glissant",
+  "introSwipeBody": "Glissez à droite 👍 pour enregistrer un appartement que vous aimez, à gauche 👎 pour passer. Vous pouvez aussi chercher avec Ati (recherche intelligente), dans la galerie ou sur la carte.",
+  "introAtiTitle": "Ati — la recherche intelligente",
+  "introAtiBody": "Dites à Ati ce que vous cherchez, avec vos propres mots, et elle trouvera les appartements qui vous correspondent le mieux.",
+  "introTourTitle": "Visites en 3D",
+  "introTourBody": "Entrez dans l'appartement avant même de quitter chez vous — une visite à 360° et une expérience 3D directement depuis votre écran.",
+  "introMatchTitle": "Correspondances et chat",
+  "introMatchBody": "Lorsqu'il y a une correspondance mutuelle, vous pouvez discuter directement, planifier une visite et conclure l'affaire — le tout au même endroit.",
+  "introProfileTitle": "Votre profil",
+  "introProfileBody": "Complétez vos informations pour obtenir des correspondances plus précises. Plus votre profil est complet, meilleures sont les correspondances.",
+  "skip": "Passer",
+  "letsGetStarted": "C'est parti !"
+}

@@ -79,7 +79,7 @@ class PriceBadge extends StatelessWidget {
     final detail = parts.join(' · ');
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(

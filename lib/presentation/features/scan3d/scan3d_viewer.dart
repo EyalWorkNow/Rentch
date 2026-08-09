@@ -130,7 +130,7 @@ class _Scan3dViewerScreenState extends State<Scan3dViewerScreen> {
   Widget build(BuildContext context) {
     final roomTitle = _room.name.trim().isNotEmpty ? _room.name : widget.title;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(

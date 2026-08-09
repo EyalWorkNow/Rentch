@@ -67,7 +67,7 @@ class TermTooltip extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: _TermDefinitionSheet(term: term, definition: definition),
       ),
     );

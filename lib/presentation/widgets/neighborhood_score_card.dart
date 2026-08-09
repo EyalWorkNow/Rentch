@@ -105,7 +105,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
     final headlineInt = hasHeadline ? headline.round().clamp(0, 100) : null;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -237,7 +237,7 @@ class _NeighborhoodBreakdownSheet extends StatelessWidget {
     }
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: SafeArea(
         child: SingleChildScrollView(
           child: Padding(

@@ -105,7 +105,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -154,7 +154,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
     showDialog<void>(
       context: context,
       builder: (dctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape:
@@ -197,7 +197,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: StatefulBuilder(
           builder: (ctx, setSheet) => Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: Directionality.of(context),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
@@ -215,7 +215,6 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     const SizedBox(height: 14),
                     TextField(
                       controller: ctrl,
-                      textDirection: TextDirection.rtl,
                       maxLength: 24,
                       autofocus: true,
                       decoration: InputDecoration(
@@ -696,7 +695,6 @@ class _MatchesToolbar extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
-                    textDirection: TextDirection.rtl,
                     onChanged: onQueryChanged,
                     style: const TextStyle(
                       fontSize: 14,
@@ -776,7 +774,6 @@ class _MatchesToolbar extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 reverse: true,
                 child: Row(
-                  textDirection: TextDirection.rtl,
                   children: [
                     _FilterPill(
                       label: 'הכל',

@@ -22,6 +22,7 @@ import 'package:dating_app/presentation/screens/onboarding_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/firebase_options.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -274,6 +275,9 @@ class RentlyApp extends StatelessWidget {
             navigatorObservers: [_backNavObserver],
             debugShowCheckedModeBanner: false,
             theme: _buildTheme(),
+            locale: Locale(provider.languageCode),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             builder: (context, child) {
               // Cross-platform rendering parity (Android ↔ iOS):
               // 1) Clamp text scaling so a large Android system font-size can't
@@ -289,7 +293,8 @@ class RentlyApp extends StatelessWidget {
                     leadingDistribution: TextLeadingDistribution.even,
                   ),
                   child: Directionality(
-                    textDirection: TextDirection.rtl,
+                    textDirection:
+                        provider.isRtl ? TextDirection.rtl : TextDirection.ltr,
                     // Tap anywhere outside a field to dismiss the keyboard — app-wide,
                     // so it works on every page. translucent → real buttons/fields
                     // still get their taps; only "empty" taps unfocus.
@@ -611,6 +616,13 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
       // have arrived) while we were backgrounded — otherwise the new conversation
       // wouldn't appear until a full relaunch.
       unawaited(provider.refreshMatchesFromBackend());
+      // Re-attempt push registration on resume: on a fresh install the APNs
+      // token often provisions only after the first foreground cycle, so this
+      // catches devices that hadn't registered a token yet. Cheap + idempotent
+      // (skips if the token is unchanged).
+      if (FirebaseAuth.instance.currentUser != null) {
+        unawaited(PushNotificationService.instance.registerForUser());
+      }
       // Restart the insights window's periodic flush (stopped on pause).
       BehaviorInsights.instance.start();
     }

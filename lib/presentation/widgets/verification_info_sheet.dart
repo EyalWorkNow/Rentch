@@ -21,8 +21,8 @@ class VerificationInfoSheet {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const Directionality(
-        textDirection: TextDirection.rtl,
+      builder: (_) => Directionality(
+        textDirection: Directionality.of(context),
         child: _VerificationInfoSheetBody(),
       ),
     );

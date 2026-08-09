@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -58,43 +59,41 @@ class _AppIntroState extends State<AppIntro> {
   final _controller = PageController();
   int _index = 0;
 
-  List<_IntroPage> get _pages => [
-        _IntroPage(
-          icon: IconsaxPlusBold.building,
-          title: 'גלה דירות בהחלקה',
-          body:
-              'החליקו ימינה 👍 כדי לשמור דירה שאהבתם, שמאלה 👎 כדי לדלג. אפשר גם לחפש דרך אתי (חיפוש חכם), בגלריה או במפה.',
-          accent: AppColors.primary,
-        ),
-        _IntroPage(
-          icon: IconsaxPlusBold.search_normal_1,
-          title: 'אתי — החיפוש החכם',
-          body:
-              'ספרו לאתי מה אתם מחפשים בשפה חופשית, והיא תמצא עבורכם את הדירות המתאימות ביותר.',
-          accent: AppColors.coral,
-        ),
-        _IntroPage(
-          icon: IconsaxPlusBold.video_octagon,
-          title: 'סיורים תלת-ממדיים',
-          body:
-              'נכנסים לדירה עוד לפני שיוצאים מהבית — סיור 360° וחוויית תלת-ממד ישר מהמסך.',
-          accent: AppColors.navy,
-        ),
-        _IntroPage(
-          icon: IconsaxPlusBold.message,
-          title: 'התאמות וצ׳אט',
-          body:
-              'כשיש התאמה הדדית תוכלו לשוחח ישירות, לתאם סיור ולסגור עניין — הכל במקום אחד.',
-          accent: AppColors.primary,
-        ),
-        _IntroPage(
-          icon: IconsaxPlusBold.profile_circle,
-          title: 'הפרופיל שלכם',
-          body:
-              'מלאו את הפרטים שלכם כדי לקבל התאמות מדויקות יותר. ככל שהפרופיל שלם יותר — כך ההתאמות טובות יותר.',
-          accent: AppColors.coral,
-        ),
-      ];
+  List<_IntroPage> get _pages {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      _IntroPage(
+        icon: IconsaxPlusBold.building,
+        title: l10n.introSwipeTitle,
+        body: l10n.introSwipeBody,
+        accent: AppColors.primary,
+      ),
+      _IntroPage(
+        icon: IconsaxPlusBold.search_normal_1,
+        title: l10n.introAtiTitle,
+        body: l10n.introAtiBody,
+        accent: AppColors.coral,
+      ),
+      _IntroPage(
+        icon: IconsaxPlusBold.video_octagon,
+        title: l10n.introTourTitle,
+        body: l10n.introTourBody,
+        accent: AppColors.navy,
+      ),
+      _IntroPage(
+        icon: IconsaxPlusBold.message,
+        title: l10n.introMatchTitle,
+        body: l10n.introMatchBody,
+        accent: AppColors.primary,
+      ),
+      _IntroPage(
+        icon: IconsaxPlusBold.profile_circle,
+        title: l10n.introProfileTitle,
+        body: l10n.introProfileBody,
+        accent: AppColors.coral,
+      ),
+    ];
+  }
 
   Future<void> _finish() async {
     HapticFeedback.lightImpact();
@@ -126,7 +125,7 @@ class _AppIntroState extends State<AppIntro> {
     final isLast = _index >= pages.length - 1;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
@@ -140,8 +139,8 @@ class _AppIntroState extends State<AppIntro> {
                   child: TextButton(
                     key: const Key('intro_skip_button'),
                     onPressed: _finish,
-                    child: const Text(
-                      'דלג',
+                    child: Text(
+                      AppLocalizations.of(context)!.skip,
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w700,
@@ -196,7 +195,9 @@ class _AppIntroState extends State<AppIntro> {
                       ),
                     ),
                     child: Text(
-                      isLast ? 'מתחילים!' : 'הבא',
+                      isLast
+                          ? AppLocalizations.of(context)!.letsGetStarted
+                          : AppLocalizations.of(context)!.next,
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,

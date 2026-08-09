@@ -80,7 +80,7 @@ class _IntroNoteComposerState extends State<IntroNoteComposer> {
   Widget build(BuildContext context) {
     final remaining = IntroNoteComposer.maxLength - _text.text.characters.length;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

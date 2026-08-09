@@ -152,7 +152,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     // Rebuild on listing changes so the "X נכסים מתאימים" counts stay live.
     final properties = context.watch<DatingProvider>().allProperties;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -448,7 +448,7 @@ class _ClientMatchesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -657,7 +657,7 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottom),
         child: Container(
@@ -890,7 +890,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                 (c.displayName ?? '').toLowerCase().contains(q.toLowerCase()))
             .toList();
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: DraggableScrollableSheet(
         initialChildSize: 0.85,
         maxChildSize: 0.95,
@@ -925,7 +925,6 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
               ),
               const SizedBox(height: 10),
               TextField(
-                textDirection: TextDirection.rtl,
                 onChanged: (v) => setState(() => _q = v),
                 decoration: InputDecoration(
                   hintText: 'חיפוש איש קשר…',

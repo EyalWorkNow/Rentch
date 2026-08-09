@@ -59,7 +59,7 @@ class _RationaleDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: AlertDialog(
         backgroundColor: AppColors.surface,
         shape:

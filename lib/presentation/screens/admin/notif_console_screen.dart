@@ -136,7 +136,7 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('לשלוח לכל המשתמשים?'),
           content: const Text(
@@ -193,7 +193,7 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(

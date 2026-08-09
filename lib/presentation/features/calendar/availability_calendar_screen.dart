@@ -94,7 +94,7 @@ class _AvailabilityCalendarScreenState
       cancelText: 'ביטול',
       confirmText: 'אישור',
       builder: (ctx, child) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: Theme(
           data: Theme.of(ctx).copyWith(
             colorScheme: ColorScheme.light(
@@ -271,7 +271,7 @@ class _AvailabilityCalendarScreenState
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: AlertDialog(
             title: const Text('לבטל צפייה מאושרת?',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
@@ -335,7 +335,7 @@ class _AvailabilityCalendarScreenState
     final primaryColor = isBroker ? Colors.black : AppColors.primary;
     
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Theme(
         data: Theme.of(context).copyWith(
           textTheme: Theme.of(context).textTheme.apply(fontFamily: 'sf hebrew rounded'),
@@ -522,7 +522,7 @@ class _AvailabilityCalendarScreenState
                     color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
               ),
               child: Directionality(
-                textDirection: TextDirection.rtl,
+                textDirection: Directionality.of(context),
                 child: Stack(
                   children: [
                     AnimatedPositioned(
@@ -1122,7 +1122,7 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: DraggableScrollableSheet(
         initialChildSize: 0.78,
         minChildSize: 0.5,
@@ -1270,7 +1270,6 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                     _label('הערה (רשות)'),
                     TextField(
                       controller: _noteCtrl,
-                      textDirection: TextDirection.rtl,
                       maxLines: 2,
                       style: const TextStyle(fontSize: 16, color: AppColors.navy),
                       decoration: InputDecoration(

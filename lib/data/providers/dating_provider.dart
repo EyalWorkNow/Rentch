@@ -126,6 +126,9 @@ class DatingProvider extends ChangeNotifier {
 
   bool _isLoading = true;
   String _userRole = 'tenant';
+  // App display language — 'he' (default), 'en', 'ar', 'fr', 'es'. Drives
+  // MaterialApp.locale + the app-wide RTL/LTR Directionality in main.dart.
+  String _languageCode = 'he';
   bool _isGuestMode = false;
   bool _hasActiveSession = false;
   bool _roleExplicitlyChosen = false;
@@ -2605,6 +2608,21 @@ class DatingProvider extends ChangeNotifier {
         'DatingProvider.initialize: cleared swipe history to restore visible listings',
       );
     }
+  }
+
+  static const kSupportedLanguageCodes = ['he', 'en', 'ar', 'fr', 'es'];
+  static const kRtlLanguageCodes = ['he', 'ar'];
+
+  String get languageCode => _languageCode;
+  bool get isRtl => kRtlLanguageCodes.contains(_languageCode);
+
+  Future<void> setLanguageCode(String code) async {
+    if (!kSupportedLanguageCodes.contains(code) || code == _languageCode) {
+      return;
+    }
+    _languageCode = code;
+    await _persist();
+    notifyListeners();
   }
 
   Future<void> setUserRole(String role, {bool explicit = false}) async {
@@ -6088,6 +6106,10 @@ class DatingProvider extends ChangeNotifier {
             .toList();
 
     _userRole = storedState['userRole'] as String? ?? 'tenant';
+    final storedLang = storedState['languageCode'] as String?;
+    _languageCode = kSupportedLanguageCodes.contains(storedLang)
+        ? storedLang!
+        : 'he';
     _isGuestMode = storedState['isGuestMode'] as bool? ?? false;
     _autoLikeEnabled = storedState['autoLikeEnabled'] as bool? ?? false;
     _hasActiveSession =
@@ -6496,6 +6518,7 @@ class DatingProvider extends ChangeNotifier {
       ),
       'customProperties': _customProperties.map((p) => p.toJson()).toList(),
       'userRole': InputSanitizer.sanitizeRole(_userRole),
+      'languageCode': _languageCode,
       'isGuestMode': _isGuestMode,
       'hasActiveSession': _hasActiveSession,
       'roleExplicitlyChosen': _roleExplicitlyChosen,

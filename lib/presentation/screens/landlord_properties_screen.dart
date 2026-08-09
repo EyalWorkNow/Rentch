@@ -571,7 +571,6 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                                         controller: _searchCtrl,
                                         onChanged: (v) =>
                                             setState(() => _query = v.trim()),
-                                        textDirection: TextDirection.rtl,
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: AppColors.navy,
@@ -654,7 +653,6 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                           scrollDirection: Axis.horizontal,
                           reverse: true,
                           child: Row(
-                            textDirection: TextDirection.rtl,
                             children: [
                               _FilterPill(
                                 label: 'הכל',
@@ -1437,7 +1435,6 @@ class _ContractSourceButton extends StatelessWidget {
           ),
         ),
         child: Row(
-          textDirection: TextDirection.rtl,
           children: [
             Container(
               width: 44,

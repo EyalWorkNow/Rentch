@@ -147,7 +147,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('הערה לחודש'),
           content: TextField(
@@ -192,7 +192,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
     final ledger = _ledger;
     final bool isBroker = AppColors.isBrokerAccent;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -656,7 +656,7 @@ class _PaymentTrackingHubScreenState extends State<PaymentTrackingHubScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(

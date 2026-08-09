@@ -12,6 +12,11 @@ import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
+// The 5 `TextDirection.rtl` uses in this file are a DELIBERATE exception to
+// the app-wide language switch: rental contracts are Israeli legal documents
+// and stay Hebrew regardless of the reader's chosen app language — same
+// reasoning a lease wouldn't get machine-translated just because the UI did.
+// Do not "fix" these to follow `Directionality.of(context)`.
 /// Landlord-facing flow to draft + send a rental contract for a match.
 ///
 /// The body of the lease comes from one of two sources:

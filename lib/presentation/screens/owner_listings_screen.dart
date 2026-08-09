@@ -58,7 +58,7 @@ class OwnerListingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Consumer<DatingProvider>(
         builder: (context, provider, _) {
           final listings = _ownerListings(provider);

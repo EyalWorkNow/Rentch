@@ -30,14 +30,12 @@ class RecommendedForYouStrip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            textDirection: TextDirection.rtl,
             children: [
               RentlyIcon(IconsaxPlusLinear.magic_star,
                   size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
               const Text(
                 'מומלץ בשבילך',
-                textDirection: TextDirection.rtl,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
@@ -117,7 +115,6 @@ class _CompactCard extends StatelessWidget {
                 children: [
                   Text(
                     p.priceLabel,
-                    textDirection: TextDirection.rtl,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -129,7 +126,6 @@ class _CompactCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     p.address,
-                    textDirection: TextDirection.rtl,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -141,7 +137,6 @@ class _CompactCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     '${p.roomsLabel} חד׳ · ${p.sizeM2} מ״ר',
-                    textDirection: TextDirection.rtl,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

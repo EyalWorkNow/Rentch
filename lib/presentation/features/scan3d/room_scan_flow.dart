@@ -158,7 +158,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -499,7 +499,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
   Future<void> _showScanContinuingInBackground() => showDialog<void>(
         context: context,
         builder: (_) => Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: AlertDialog(
             title: const Text('הסריקה ממשיכה ברקע',
                 style: TextStyle(fontWeight: FontWeight.w900)),
@@ -522,7 +522,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('התכונה תיפתח בקרוב',
               style: TextStyle(fontWeight: FontWeight.w900)),
@@ -545,7 +545,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -843,7 +843,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: _error != null
@@ -1496,7 +1496,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.navy,
         body: SafeArea(
@@ -1752,7 +1752,7 @@ Future<bool?> _showConsentSheet(BuildContext context) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: AppColors.background,
@@ -1841,7 +1841,7 @@ Future<String?> showRoomNameSheet(BuildContext context) {
     backgroundColor: Colors.transparent,
     builder: (ctx) {
       return Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(ctx).viewInsets.bottom,

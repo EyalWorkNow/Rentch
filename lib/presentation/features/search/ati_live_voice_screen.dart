@@ -129,7 +129,7 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
     final caption = _userText.isNotEmpty ? _userText : _atiText;
     final isUser = _userText.isNotEmpty;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(

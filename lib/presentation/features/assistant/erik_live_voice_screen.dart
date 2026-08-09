@@ -119,7 +119,7 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
     final caption = _userText.isNotEmpty ? _userText : _erikText;
     final isUser = _userText.isNotEmpty;
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(

@@ -66,7 +66,7 @@ class _CompareScreenState extends State<CompareScreen> {
     final pool = _pool(provider);
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -1226,7 +1226,7 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                 p.address.toLowerCase().contains(q);
           }).toList();
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: DraggableScrollableSheet(
         initialChildSize: 0.85,
         maxChildSize: 0.95,
@@ -1255,7 +1255,6 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
               ),
               const SizedBox(height: 10),
               TextField(
-                textDirection: TextDirection.rtl,
                 autofocus: true,
                 onChanged: (v) => setState(() => _q = v),
                 decoration: InputDecoration(

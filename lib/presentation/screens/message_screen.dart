@@ -541,7 +541,7 @@ class _MessageScreenState extends State<MessageScreen> {
     showDialog<void>(
       context: context,
       builder: (dialogCtx) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -2745,7 +2745,7 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: const BoxDecoration(
           color: _surface,

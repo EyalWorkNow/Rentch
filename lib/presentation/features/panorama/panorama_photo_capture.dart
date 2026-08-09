@@ -878,7 +878,6 @@ class _ShotRingPainter extends CustomPainter {
               color: done ? Colors.greenAccent : Colors.white,
               fontSize: done ? 40 : 30,
               fontWeight: FontWeight.w900)),
-      textDirection: TextDirection.rtl,
     )..layout();
     tp.paint(canvas, c - Offset(tp.width / 2, tp.height / 2));
   }

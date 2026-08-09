@@ -560,7 +560,7 @@ class _AskRentlyEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: GestureDetector(
         onTap: () => showAskRentlySheet(
           context,
@@ -2446,10 +2446,8 @@ class _MessageRequestButton extends StatelessWidget {
               TextField(
                 controller: controller,
                 maxLines: 3,
-                textDirection: TextDirection.rtl,
                 decoration: InputDecoration(
                   hintText: 'כתוב הודעה קצרה… (למשל: מתי אפשר לראות?)',
-                  hintTextDirection: TextDirection.rtl,
                   filled: true,
                   fillColor: AppColors.slate100,
                   border: OutlineInputBorder(
