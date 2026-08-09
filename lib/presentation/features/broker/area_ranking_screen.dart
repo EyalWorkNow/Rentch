@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// "דרג אזורים בעיר" — pick a target persona + a city and rank ALL the city's CBS
 /// statistical blocks best→worst for that crowd, as a list AND a colour-graded
@@ -45,7 +46,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
       _loading = false;
       _ranked = ranked;
       if (ranked.isEmpty) {
-        _error = 'לא מצאתי אזורים סטטיסטיים לעיר הזו. נסה שם עיר מלא (למשל: תל אביב, חיפה, ירושלים).';
+        _error = AppLocalizations.of(context)!.areaRankingScreen55528b91;
       }
     });
   }
@@ -58,12 +59,13 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('דרג אזורים בעיר'),
+          title: Text(l10n.areaRankingScreen8b5f2411),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -73,7 +75,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
               IconButton(
                 onPressed: () => setState(() => _mapView = !_mapView),
                 icon: Icon(_mapView ? IconsaxPlusLinear.task_square : IconsaxPlusLinear.map_1),
-                tooltip: _mapView ? 'רשימה' : 'מפה',
+                tooltip: _mapView ? l10n.areaRankingScreenEf8f7b72 : l10n.areaRankingScreen876e3baa,
               ),
           ],
         ),
@@ -112,6 +114,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
       );
 
   Widget _personaChip(TargetPersona p) {
+    final l10n = AppLocalizations.of(context)!;
     final on = p.key == _persona;
     return GestureDetector(
       onTap: () {
@@ -127,7 +130,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: on ? AppColors.primary : AppColors.borderLight),
         ),
-        child: Text('${p.emoji} ${p.label}',
+        child: Text('${p.emoji} ${p.label(l10n)}',
             style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -143,7 +146,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => _rank(),
             decoration: InputDecoration(
-              hintText: 'עיר (למשל: תל אביב)',
+              hintText: AppLocalizations.of(context)!.areaRankingScreen80d6e90e,
               filled: true,
               fillColor: Colors.white,
               prefixIcon: Icon(IconsaxPlusLinear.buildings, color: AppColors.primary),
@@ -170,8 +173,8 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
                 ? const SizedBox(
                     width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('דרג',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                : Text(AppLocalizations.of(context)!.areaRankingScreen71771aec,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
           ),
         ),
       ]);
@@ -209,7 +212,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('אזור ${r.area.id}  ·  אשכול ${r.area.ses}/10',
+              Text(AppLocalizations.of(context)!.areaRankingScreen56ee2a52(r.area.id, r.area.ses),
                   style: const TextStyle(
                       fontSize: 14, fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary)),
@@ -293,6 +296,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
 
   void _showDetail(RankedArea r) {
     final p = r.profile;
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -305,7 +309,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
           child: Column(mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text('אזור ${r.area.id}',
+              Text(l10n.areaRankingScreen2d376c8a(r.area.id),
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.w900,
                       color: AppColors.textPrimary)),
@@ -315,7 +319,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
                 decoration: BoxDecoration(
                     color: _fitColor(r.fit.pct).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999)),
-                child: Text('${r.fit.pct}% התאמה',
+                child: Text(l10n.areaRankingScreen711ab217(r.fit.pct),
                     style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w900,
                         color: _fitColor(r.fit.pct))),
@@ -337,18 +341,18 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
                   ),
               ]),
             const SizedBox(height: 14),
-            _miniStat('אשכול סוציו-אקונומי', '${r.area.ses}/10'),
-            _miniStat('בטיחות', '${(p.safety * 100).round()}%'),
-            _miniStat('מרכזיות', '${(p.centrality * 100).round()}%'),
-            _miniStat('תחבורה', '${(p.transit * 100).round()}%'),
-            _miniStat('חינוך', '${(p.schools * 100).round()}%'),
-            _miniStat('ילדים / עובדים / 65+',
+            _miniStat(l10n.areaRankingScreen581d0b4f, '${r.area.ses}/10'),
+            _miniStat(l10n.areaRankingScreenE642cece, '${(p.safety * 100).round()}%'),
+            _miniStat(l10n.areaRankingScreen096a70c8, '${(p.centrality * 100).round()}%'),
+            _miniStat(l10n.areaRankingScreen8cf2e63d, '${(p.transit * 100).round()}%'),
+            _miniStat(l10n.areaRankingScreen930bb12c, '${(p.schools * 100).round()}%'),
+            _miniStat(l10n.areaRankingScreenC2a64aa6,
                 '${(p.childShare * 100).round()}% · ${(p.youngShare * 100).round()}% · ${(p.seniorShare * 100).round()}%'),
             const Divider(height: 20),
-            _miniStat('💰 ציון השקעה', '${p.investment.investmentScore}/100'),
-            _miniStat('ביקוש שכירות', '${(p.investment.rentability * 100).round()}%'),
+            _miniStat(l10n.areaRankingScreenDae2e4fc, '${p.investment.investmentScore}/100'),
+            _miniStat(l10n.areaRankingScreen9e42f94f, '${(p.investment.rentability * 100).round()}%'),
             if (p.investment.roughYieldPct != null)
-              _miniStat('הערכת תשואה (גסה)',
+              _miniStat(l10n.areaRankingScreen4d408308,
                   '~${p.investment.roughYieldPct!.toStringAsFixed(1)}%'),
           ]),
         ),

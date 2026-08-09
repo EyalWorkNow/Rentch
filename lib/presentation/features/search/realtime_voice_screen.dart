@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/core/services/realtime_voice_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
@@ -33,7 +34,9 @@ class RealtimeVoiceScreen extends StatefulWidget {
 class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
   RealtimeState _state = RealtimeState.connecting;
   String _userLine = '';
-  String _atiLine = 'שלום, אני אתי 👋 פשוט דברו איתי.';
+  // Falls back to a localized greeting (see build()) until the real transcript
+  // starts streaming in — kept empty here since l10n needs a BuildContext.
+  String _atiLine = '';
   List<ScoredProperty> _results = const [];
   final List<StreamSubscription> _subs = [];
 
@@ -83,25 +86,26 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
     }
   }
 
-  String get _status {
+  String _status(AppLocalizations l10n) {
     switch (_state) {
       case RealtimeState.connecting:
-        return 'מתחברת…';
+        return l10n.realtimeVoiceScreenA7587542;
       case RealtimeState.listening:
-        return 'מקשיבה לך…';
+        return l10n.realtimeVoiceScreen85084af4;
       case RealtimeState.thinking:
-        return 'רגע, חושבת…';
+        return l10n.realtimeVoiceScreenA6de1c7e;
       case RealtimeState.speaking:
-        return 'אתי מדברת · פשוט דברו כדי להפריע';
+        return l10n.realtimeVoiceScreen0658343f;
       case RealtimeState.idle:
-        return 'דברו איתי';
+        return l10n.realtimeVoiceScreen9aea3a09;
       case RealtimeState.error:
-        return 'הייתה תקלה בחיבור';
+        return l10n.realtimeVoiceScreenE60120ca;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -124,20 +128,20 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
                     onPressed: () => Navigator.of(context).maybePop(),
                   ),
                   const Spacer(),
-                  const Column(children: [
-                    Text('אתי',
-                        style: TextStyle(
+                  Column(children: [
+                    Text(l10n.realtimeVoiceScreen8e4d1523,
+                        style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.w800)),
-                    Text('שיחה חיה • Rently',
-                        style: TextStyle(color: Colors.white38, fontSize: 11)),
+                    Text(l10n.realtimeVoiceScreen5a17ea8a,
+                        style: const TextStyle(color: Colors.white38, fontSize: 11)),
                   ]),
                   const Spacer(),
                   const SizedBox(width: 48),
                 ]),
                 const Spacer(),
-                Text(_status,
+                Text(_status(l10n),
                     style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 16,
@@ -153,20 +157,22 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
                   child: Text(
                     _state == RealtimeState.listening && _userLine.isNotEmpty
                         ? _userLine
-                        : _atiLine,
+                        : (_atiLine.isEmpty
+                            ? l10n.realtimeVoiceScreenE3b9c24d
+                            : _atiLine),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: Colors.white, fontSize: 19, height: 1.5),
                   ),
                 ),
                 const Spacer(),
-                if (_results.isNotEmpty) _resultsStrip(),
+                if (_results.isNotEmpty) _resultsStrip(l10n),
                 // Safety net: if the live session misbehaves, drop to the reliable
                 // turn-based (tap-to-talk) screen.
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('עבור לשיחה רגילה 💬',
-                      style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  child: Text(l10n.realtimeVoiceScreenAf4fd15c,
+                      style: const TextStyle(color: Colors.white54, fontSize: 13)),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16, top: 4),
@@ -191,7 +197,7 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
   }
 
   // Same map/discover ("לאסו") card design + detailed "why", scrollable.
-  Widget _resultsStrip() {
+  Widget _resultsStrip(AppLocalizations l10n) {
     return Flexible(
       flex: 8,
       child: Column(
@@ -200,7 +206,7 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-            child: Text('מצאתי ${_results.length} דירות שמתאימות לך 👇',
+            child: Text(l10n.realtimeVoiceScreen38f0b537(_results.length),
                 style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 14,

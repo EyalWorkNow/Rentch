@@ -6,6 +6,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/availability_repository.dart';
 import 'package:dating_app/data/repositories/broker_viewing_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -81,10 +82,11 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
   }
 
   Future<void> _save(BrokerViewing viewing) async {
+    final l10n = AppLocalizations.of(context)!;
     final next = await _repo.save(viewing);
     if (!mounted) return;
     setState(() => _viewings = next);
-    _scheduleReminder(viewing);
+    _scheduleReminder(viewing, l10n);
   }
 
   Future<void> _delete(String id) async {
@@ -96,24 +98,27 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
 
   /// Schedule a one-hour-before nudge. Fail-soft inside NotificationService; we
   /// only schedule for still-scheduled, future viewings.
-  Future<void> _scheduleReminder(BrokerViewing v) async {
+  Future<void> _scheduleReminder(BrokerViewing v, AppLocalizations l10n) async {
     final id = _reminderIdBase + _viewingKey(v.id);
     if (v.status != ViewingStatus.scheduled) {
       await _notifications.cancel(id);
       return;
     }
-    final who = v.clientName.trim().isEmpty ? 'הלקוח' : v.clientName.trim();
+    final who = v.clientName.trim().isEmpty
+        ? l10n.brokerViewingsScreen870292f7
+        : v.clientName.trim();
     final where = v.propertyTitle.trim().isEmpty ? '' : ' — ${v.propertyTitle.trim()}';
     await _notifications.scheduleReminder(
       id: id,
-      title: 'צפייה בעוד שעה',
-      body: 'צפייה עם $who בשעה ${_timeLabel(v.dateTime)}$where',
+      title: l10n.brokerViewingsScreen9d30a0d7,
+      body: l10n.brokerViewingsScreen57c48e81(who, _timeLabel(v.dateTime), where),
       when: v.dateTime.subtract(const Duration(hours: 1)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final clashingIds = {
       ..._clashingIds(_viewings),
@@ -137,7 +142,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          title: const Text('תיאום צפיות'),
+          title: Text(l10n.brokerViewingsScreenBb5dc197),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -148,30 +153,32 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
           foregroundColor: Colors.white,
           onPressed: _openSchedule,
           icon: const Icon(Icons.add),
-          label: const Text(
-            'צפייה חדשה',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          label: Text(
+            l10n.brokerViewingsScreenCfa7c35a,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _viewings.isEmpty
-                ? _emptyState()
+                ? _emptyState(l10n)
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     children: [
-                      if (hasClash) _clashBanner(clashingIds.length),
-                      _sectionHeader('צפיות קרובות', upcoming.length),
+                      if (hasClash) _clashBanner(clashingIds.length, l10n),
+                      _sectionHeader(
+                          l10n.brokerViewingsScreen36f66af0, upcoming.length),
                       if (upcoming.isEmpty)
-                        _hint('אין צפיות מתוכננות')
+                        _hint(l10n.brokerViewingsScreen0b7ee118)
                       else
                         for (final v in upcoming)
-                          _viewingCard(v, clashingIds.contains(v.id), now),
+                          _viewingCard(v, clashingIds.contains(v.id), now, l10n),
                       if (history.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        _sectionHeader('היסטוריה', history.length),
+                        _sectionHeader(
+                            l10n.brokerViewingsScreen8726f8f5, history.length),
                         for (final v in history)
-                          _viewingCard(v, false, now),
+                          _viewingCard(v, false, now, l10n),
                       ],
                     ],
                   ),
@@ -179,7 +186,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -189,13 +196,13 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
             Icon(Icons.event_available_outlined,
                 size: 72, color: AppColors.primary.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
-            const Text('אין עדיין צפיות',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(l10n.brokerViewingsScreen1e2e6a34,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text(
-              'תאמו צפייה ותקבלו תזכורת שעה לפני',
+            Text(
+              l10n.brokerViewingsScreen5f6aa66c,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 17, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 17, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -203,7 +210,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
     );
   }
 
-  Widget _clashBanner(int count) {
+  Widget _clashBanner(int count, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -218,7 +225,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'יש $count צפיות שמתנגשות בלו"ז — בדקו את הסימון האדום',
+              l10n.brokerViewingsScreenE0d2c04b(count),
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
@@ -257,7 +264,8 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
     );
   }
 
-  Widget _viewingCard(BrokerViewing v, bool clashes, DateTime now) {
+  Widget _viewingCard(
+      BrokerViewing v, bool clashes, DateTime now, AppLocalizations l10n) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
@@ -289,12 +297,12 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
               if (clashes) ...[
                 const SizedBox(height: 6),
                 Row(
-                  children: const [
-                    Icon(Icons.warning_amber_rounded,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
                         size: 18, color: AppColors.coral),
-                    SizedBox(width: 4),
-                    Text('התנגשות בלו"ז',
-                        style: TextStyle(
+                    const SizedBox(width: 4),
+                    Text(l10n.brokerViewingsScreenA157f372,
+                        style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.coral)),
@@ -367,6 +375,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _openViewingActions(BrokerViewing v) async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -390,25 +399,26 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   _actionTile(sheetContext, Icons.check_circle_outline,
-                      'סמן: התקיימה', AppColors.success, () {
+                      l10n.brokerViewingsScreen54616e37, AppColors.success, () {
                     _save(v.copyWith(status: ViewingStatus.completed));
                   }),
                   _actionTile(sheetContext, Icons.person_off_outlined,
-                      'סמן: לא הגיע', AppColors.coral, () {
+                      l10n.brokerViewingsScreen09644fa4, AppColors.coral, () {
                     _save(v.copyWith(status: ViewingStatus.noShow));
                   }),
                   _actionTile(sheetContext, Icons.cancel_outlined,
-                      'סמן: בוטלה', AppColors.textSecondary, () {
+                      l10n.brokerViewingsScreenB041ac86, AppColors.textSecondary,
+                      () {
                     _save(v.copyWith(status: ViewingStatus.cancelled));
                   }),
                   if (v.status != ViewingStatus.scheduled)
                     _actionTile(sheetContext, Icons.event_repeat,
-                        'החזר לתכנון', AppColors.primary, () {
+                        l10n.brokerViewingsScreenC47d0392, AppColors.primary, () {
                       _save(v.copyWith(status: ViewingStatus.scheduled));
                     }),
                   const Divider(),
                   _actionTile(sheetContext, Icons.delete_outline,
-                      'מחיקה', AppColors.coral, () {
+                      l10n.brokerViewingsScreen7c8173fa, AppColors.coral, () {
                     _delete(v.id);
                   }),
                 ],
@@ -522,16 +532,17 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
   }
 
   void _submit() {
+    final l10n = AppLocalizations.of(context)!;
     final client = _client.text.trim();
     if (_dateTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('יש לבחור תאריך ושעה')),
+        SnackBar(content: Text(l10n.brokerViewingsScreen078baeac)),
       );
       return;
     }
     if (client.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('יש להזין שם לקוח')),
+        SnackBar(content: Text(l10n.brokerViewingsScreen18d43ef8)),
       );
       return;
     }
@@ -550,6 +561,7 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -564,14 +576,14 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Center(
-                child: Text('צפייה חדשה',
-                    style: TextStyle(
+              Center(
+                child: Text(l10n.brokerViewingsScreenCfa7c35a,
+                    style: const TextStyle(
                         fontSize: 22, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 20),
-              const Text('נכס:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(l10n.brokerViewingsScreenCd846d8d,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               DropdownButtonFormField<RentalProperty?>(
                 initialValue: _property,
@@ -583,11 +595,11 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                hint: const Text('בחר נכס (לא חובה)'),
+                hint: Text(l10n.brokerViewingsScreenEdf6c5ad),
                 items: [
-                  const DropdownMenuItem<RentalProperty?>(
+                  DropdownMenuItem<RentalProperty?>(
                     value: null,
-                    child: Text('ללא נכס'),
+                    child: Text(l10n.brokerViewingsScreenBf7d92b1),
                   ),
                   for (final p in widget.properties)
                     DropdownMenuItem<RentalProperty?>(
@@ -599,9 +611,9 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
                 onChanged: (p) => setState(() => _property = p),
               ),
               const SizedBox(height: 16),
-              _field(_client, 'שם הלקוח *', TextInputType.name),
+              _field(_client, l10n.brokerViewingsScreen83c5428d, TextInputType.name),
               const SizedBox(height: 12),
-              _field(_phone, 'טלפון', TextInputType.phone),
+              _field(_phone, l10n.brokerViewingsScreen737232c2, TextInputType.phone),
               const SizedBox(height: 16),
               InkWell(
                 onTap: _pickDateTime,
@@ -618,7 +630,7 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
                       const SizedBox(width: 12),
                       Text(
                         _dateTime == null
-                            ? 'בחר תאריך ושעה *'
+                            ? l10n.brokerViewingsScreenE8e0f191
                             : _dateTimeLabel(_dateTime!),
                         style: const TextStyle(fontSize: 17),
                       ),
@@ -637,8 +649,8 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
                         borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: _submit,
-                  child: const Text('שמירה',
-                      style: TextStyle(
+                  child: Text(l10n.brokerViewingsScreenE6932339,
+                      style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),

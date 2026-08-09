@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
@@ -34,8 +35,8 @@ class RecommendedForYouStrip extends StatelessWidget {
               RentlyIcon(IconsaxPlusLinear.magic_star,
                   size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
-              const Text(
-                'מומלץ בשבילך',
+              Text(
+                AppLocalizations.of(context)!.recommendedForYouStripBd1114e6,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
@@ -136,7 +137,9 @@ class _CompactCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${p.roomsLabel} חד׳ · ${p.sizeM2} מ״ר',
+                    AppLocalizations.of(context)!
+                        .recommendedForYouStrip0edc8568(
+                            p.roomsLabel, p.sizeM2),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -51,10 +52,11 @@ class _ProfileCompletionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const benefits = <(IconData, String)>[
-      (IconsaxPlusBold.eye, 'הגעה ליותר בעלי דירות'),
-      (IconsaxPlusBold.magic_star, 'התאמות מדויקות לפי מה שחשוב לך'),
-      (IconsaxPlusBold.filter, 'סינון מראש של הצעות לא רלוונטיות'),
+    final l10n = AppLocalizations.of(context)!;
+    final benefits = <(IconData, String)>[
+      (IconsaxPlusBold.eye, l10n.profileCompletionSheetAf5cd142),
+      (IconsaxPlusBold.magic_star, l10n.profileCompletionSheetBfe0b591),
+      (IconsaxPlusBold.filter, l10n.profileCompletionSheetB2401b38),
     ];
     return Directionality(
       textDirection: Directionality.of(context),
@@ -94,9 +96,9 @@ class _ProfileCompletionSheet extends StatelessWidget {
                   child: Icon(Icons.person, color: AppColors.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('השלמת הפרופיל שלך',
-                      style: TextStyle(
+                Expanded(
+                  child: Text(l10n.profileCompletionSheet314597be,
+                      style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color: AppColors.navy)),
@@ -104,9 +106,9 @@ class _ProfileCompletionSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'כדי להפיק את המירב מהאפליקציה, נשמח שתשלים את המידע החסר בפרופיל שלך.',
-              style: TextStyle(
+            Text(
+              l10n.profileCompletionSheet08b939a6,
+              style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
@@ -208,9 +210,9 @@ class _ProfileCompletionSheet extends StatelessWidget {
             const Divider(color: AppColors.borderLight, height: 1),
             const SizedBox(height: 12),
             // Bottom text
-            const Text(
-              'פרופיל מלא עוזר לאחרים להתחבר אליך ומשפר את החוויה הכוללת שלך באפליקציה.',
-              style: TextStyle(
+            Text(
+              l10n.profileCompletionSheetF7c1459b,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textSecondary,
@@ -231,8 +233,8 @@ class _ProfileCompletionSheet extends StatelessWidget {
                             borderRadius: BorderRadius.circular(24)),
                       ),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('אחר כך',
-                          style: TextStyle(
+                      child: Text(l10n.profileCompletionSheetC2fcc265,
+                          style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               color: AppColors.navy)),
@@ -253,8 +255,8 @@ class _ProfileCompletionSheet extends StatelessWidget {
                         HapticFeedback.selectionClick();
                         onComplete();
                       },
-                      child: const Text('השלמת הפרופיל',
-                          style: TextStyle(
+                      child: Text(l10n.profileCompletionSheetBbeffa00,
+                          style: const TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w900)),
                     ),
                   ),

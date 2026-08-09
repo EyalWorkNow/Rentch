@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -97,6 +98,7 @@ class _VerifiedHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -127,10 +129,10 @@ class _VerifiedHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'דירה מאומתת',
-                  style: TextStyle(
+                  l10n.verificationInfoSheet220a89be,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
@@ -140,10 +142,10 @@ class _VerifiedHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            'בעל הדירה צילם סרטון אמיתי של הדירה ישירות מתוך האפליקציה. '
-            'זה אומר שמדובר בדירה אמיתית וקיימת — לא תמונה שנלקחה מהאינטרנט.',
-            style: TextStyle(
+          Text(
+            '${l10n.verificationInfoSheet1079b7b6}'
+            '${l10n.verificationInfoSheetF194db27}',
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -157,9 +159,9 @@ class _VerifiedHeader extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Text(
-              'שימו לב: אימות מאשר שהדירה אמיתית — אבל תמיד כדאי לבדוק כל מודעה לפי הסימנים שלמטה.',
-              style: TextStyle(
+            child: Text(
+              l10n.verificationInfoSheet92ba2f6a,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -178,49 +180,47 @@ class _RedFlagsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
-          'שלושה סימני אזהרה להונאה',
-          style: TextStyle(
+          l10n.verificationInfoSheet7e5cc81f,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: AppColors.navy,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
-          'נכון לכל מודעה — גם למאומתת.',
-          style: TextStyle(
+          l10n.verificationInfoSheet515b9741,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,
           ),
         ),
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         _RedFlagCard(
           icon: IconsaxPlusBold.money_remove,
-          title: 'אל תשלמו כסף לפני שראיתם את הדירה פיזית',
-          body:
-              'אף פעם אל תעבירו מקדמה, פיקדון או "דמי רצינות" לפני שביקרתם בדירה במו עיניכם '
-              'ופגשתם את בעל הדירה. בקשה לתשלום מראש היא הסימן הכי נפוץ להונאה.',
+          title: l10n.verificationInfoSheet34c41aab,
+          body: '${l10n.verificationInfoSheetF3def21a}'
+              '${l10n.verificationInfoSheet62b9758c}',
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _RedFlagCard(
           icon: IconsaxPlusBold.shield_tick,
-          title: 'פיקדון חוקי מוגבל ל-3 חודשי שכירות',
-          body:
-              'לפי חוק שכירות הוגנת, בעל הדירה לא יכול לדרוש פיקדון גבוה משלושה חודשי שכירות. '
-              'דרישה לסכום גבוה בהרבה היא סימן אזהרה.',
+          title: l10n.verificationInfoSheet8e732266,
+          body: '${l10n.verificationInfoSheetEf8e2318}'
+              '${l10n.verificationInfoSheetF18547d6}',
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _RedFlagCard(
           icon: IconsaxPlusBold.warning_2,
-          title: 'מחיר נמוך בצורה חשודה = כנראה הונאה',
-          body:
-              'אם המחיר נמוך בהרבה מדירות דומות באזור, כנראה משהו לא בסדר. '
-              'מרמים מפתים עם מחיר זול כדי שתעבירו כסף מהר.',
+          title: l10n.verificationInfoSheet488f7486,
+          body: '${l10n.verificationInfoSheet0d24ccbd}'
+              '${l10n.verificationInfoSheet82cdbe86}',
         ),
       ],
     );
@@ -298,6 +298,7 @@ class _ReportNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -316,8 +317,8 @@ class _ReportNote extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
+              text: TextSpan(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.navy,
@@ -325,13 +326,12 @@ class _ReportNote extends StatelessWidget {
                 ),
                 children: [
                   TextSpan(
-                    text: 'נתקלתם במשהו חשוד? ',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                    text: l10n.verificationInfoSheet0cba7786,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   TextSpan(
-                    text:
-                        'לחצו על כפתור הדיווח (⋯) שבמודעה ובחרו "דיווח על מודעה". '
-                        'הצוות שלנו בודק כל דיווח ומסיר מודעות מזויפות.',
+                    text: '${l10n.verificationInfoSheetE3638d06}'
+                        '${l10n.verificationInfoSheet49e4fb5f}',
                   ),
                 ],
               ),
@@ -360,9 +360,9 @@ class _GotItButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: const Text(
-          'הבנתי, תודה',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+        child: Text(
+          AppLocalizations.of(context)!.verificationInfoSheetEe9c82fc,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sphere_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,9 @@ void main() {
   testWidgets('sphere capture renders demo mode with no camera/sensors',
       (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
+      locale: Locale('he'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(
         textDirection: TextDirection.rtl,
         child: PanoramaSphereCaptureScreen(),

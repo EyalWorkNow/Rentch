@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/broker_exclusivity.dart';
 import 'package:dating_app/data/repositories/broker_exclusivity_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// בלעדיות — exclusivity-mandate tracker.
@@ -65,13 +66,14 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
     if (when.isBefore(now.add(const Duration(minutes: 1)))) {
       when = DateTime(now.year, now.month, now.day + 1, 9);
     }
+    final l10n = AppLocalizations.of(context)!;
     final what = m.propertyTitle.trim().isEmpty
-        ? 'הבלעדיות'
-        : 'הבלעדיות על ${m.propertyTitle.trim()}';
+        ? l10n.brokerExclusivityScreen3c0b6cc3
+        : l10n.brokerExclusivityScreen8706412d(m.propertyTitle.trim());
     await _notifications.scheduleReminder(
       id: id,
-      title: 'חידוש בלעדיות',
-      body: '$what מסתיימת ב-${_date(m.endDate)}. כדאי לחדש לפני שתפוג.',
+      title: l10n.brokerExclusivityScreen4b882a37,
+      body: l10n.brokerExclusivityScreen7c5814c0(what, _date(m.endDate)),
       when: when,
     );
   }
@@ -90,23 +92,24 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
   }
 
   Future<void> _delete(BrokerExclusivity m) async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('למחוק את הבלעדיות?'),
+          title: Text(l10n.brokerExclusivityScreenCff70eb7),
           content: Text(m.propertyTitle.trim().isEmpty
-              ? 'הרשומה תימחק לצמיתות.'
-              : '"${m.propertyTitle.trim()}" תימחק לצמיתות.'),
+              ? l10n.brokerExclusivityScreen88ad6f14
+              : l10n.brokerExclusivityScreen50999a4f(m.propertyTitle.trim())),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('ביטול')),
+                child: Text(l10n.brokerExclusivityScreenA7c55a8d)),
             FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('מחק')),
+                child: Text(l10n.brokerExclusivityScreen09b6bcca)),
           ],
         ),
       ),
@@ -119,13 +122,14 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('בלעדיות'),
+          title: Text(l10n.brokerExclusivityScreen48eff0e3),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -136,19 +140,19 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
           foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),
-          label: const Text('בלעדיות חדשה',
-              style: TextStyle(fontWeight: FontWeight.w700)),
+          label: Text(l10n.brokerExclusivityScreen3280ed69,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _mandates.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(32),
                       child: Text(
-                        'אין בלעדיות פעילה.\nהוסף בלעדיות כדי לעקוב אחר תאריך הסיום.',
+                        l10n.brokerExclusivityScreenD408aab3,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 18, color: AppColors.textSecondary),
                       ),
                     ),
@@ -163,6 +167,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
   }
 
   Widget _card(BrokerExclusivity m, DateTime now) {
+    final l10n = AppLocalizations.of(context)!;
     final days = m.daysUntilEnd(now);
     final expired = m.isExpired(now);
     final soon = m.isExpiringSoon(now);
@@ -170,13 +175,13 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
     String banner;
     Color bannerColor;
     if (expired) {
-      banner = 'הבלעדיות פגה לפני ${-days} ימים';
+      banner = l10n.brokerExclusivityScreen17b73df9(-days);
       bannerColor = AppColors.error;
     } else if (soon) {
-      banner = 'בלעדיות מסתיימת בעוד $days ימים';
+      banner = l10n.brokerExclusivityScreen95962fc0(days);
       bannerColor = AppColors.warning;
     } else {
-      banner = 'בתוקף · עוד $days ימים';
+      banner = l10n.brokerExclusivityScreen99135f8c(days);
       bannerColor = AppColors.success;
     }
 
@@ -232,7 +237,10 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(m.propertyTitle.isEmpty ? 'נכס ללא שם' : m.propertyTitle,
+                Text(
+                    m.propertyTitle.isEmpty
+                        ? l10n.brokerExclusivityScreen43b54956
+                        : m.propertyTitle,
                     style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
@@ -247,7 +255,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
                 ),
                 if (m.commissionPct > 0)
                   _line(Icons.percent_outlined,
-                      'עמלה: ${_pct(m.commissionPct)}%'),
+                      l10n.brokerExclusivityScreenAe97df84(_pct(m.commissionPct))),
                 if (m.notes.trim().isNotEmpty)
                   _line(Icons.notes_outlined, m.notes),
                 const SizedBox(height: 8),
@@ -257,14 +265,14 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
                     TextButton.icon(
                       onPressed: () => _openEditor(m),
                       icon: const Icon(Icons.edit_outlined, size: 20),
-                      label: const Text('עריכה'),
+                      label: Text(l10n.brokerExclusivityScreen39fe2593),
                       style: TextButton.styleFrom(
                           foregroundColor: AppColors.primaryDark),
                     ),
                     TextButton.icon(
                       onPressed: () => _delete(m),
                       icon: const Icon(Icons.delete_outline, size: 20),
-                      label: const Text('מחיקה'),
+                      label: Text(l10n.brokerExclusivityScreen7c8173fa),
                       style:
                           TextButton.styleFrom(foregroundColor: AppColors.error),
                     ),
@@ -369,6 +377,7 @@ class _ExclusivityEditorState extends State<_ExclusivityEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -395,29 +404,35 @@ class _ExclusivityEditorState extends State<_ExclusivityEditor> {
               ),
               const SizedBox(height: 16),
               Text(
-                widget.existing == null ? 'בלעדיות חדשה' : 'עריכת בלעדיות',
+                widget.existing == null
+                    ? l10n.brokerExclusivityScreen3280ed69
+                    : l10n.brokerExclusivityScreenFaaeacbe,
                 style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: AppColors.textPrimary),
               ),
               const SizedBox(height: 16),
-              _field(_title, 'כתובת / שם הנכס'),
-              _field(_owner, 'שם בעל הנכס'),
-              _field(_phone, 'טלפון בעל הנכס',
+              _field(_title, l10n.brokerExclusivityScreenBa9fc140),
+              _field(_owner, l10n.brokerExclusivityScreen1d306e9d),
+              _field(_phone, l10n.brokerExclusivityScreenB8f119f3,
                   keyboardType: TextInputType.phone),
-              _field(_commission, 'אחוז עמלה (%)',
+              _field(_commission, l10n.brokerExclusivityScreen7ac184b0,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true)),
               Row(
                 children: [
-                  Expanded(child: _dateTile('תחילת בלעדיות', _start, true)),
+                  Expanded(
+                      child: _dateTile(
+                          l10n.brokerExclusivityScreen2920ef89, _start, true)),
                   const SizedBox(width: 12),
-                  Expanded(child: _dateTile('סיום בלעדיות', _end, false)),
+                  Expanded(
+                      child: _dateTile(
+                          l10n.brokerExclusivityScreen27dd66e7, _end, false)),
                 ],
               ),
               const SizedBox(height: 12),
-              _field(_notes, 'הערות', maxLines: 2),
+              _field(_notes, l10n.brokerExclusivityScreen92b0d682, maxLines: 2),
               const SizedBox(height: 20),
               SizedBox(
                 height: 54,
@@ -429,8 +444,8 @@ class _ExclusivityEditorState extends State<_ExclusivityEditor> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('שמירה',
-                      style: TextStyle(
+                  child: Text(l10n.brokerExclusivityScreenE6932339,
+                      style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.w800)),
                 ),
               ),

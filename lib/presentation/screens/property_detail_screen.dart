@@ -3600,6 +3600,17 @@ class _AffordabilityStrip extends StatelessWidget {
     };
   }
 
+  static String _lineItemLabel(AppLocalizations l10n, CostLineKind kind) {
+    switch (kind) {
+      case CostLineKind.firstMonthRent:
+        return l10n.affordability5e721167;
+      case CostLineKind.deposit:
+        return l10n.affordability26a740b7;
+      case CostLineKind.brokerFee:
+        return l10n.affordabilityFc095a4e;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -3650,7 +3661,7 @@ class _AffordabilityStrip extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      item.label,
+                      _lineItemLabel(l10n, item.kind),
                       style: const TextStyle(
                         color: AppColors.slate600,
                         fontSize: 12.5,

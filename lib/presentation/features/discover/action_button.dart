@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -14,10 +15,10 @@ class ActionButtons extends StatelessWidget {
     required this.onSwipeRight,
     required this.onVirtualTour,
     this.middleIcon = Icons.view_in_ar_rounded,
-    this.middleLabel = '3D',
-    this.middleTooltip = 'פתח סיור תלת־ממדי',
-    this.likeTooltip = 'אהבתי דירה',
-    this.passTooltip = 'דלג על דירה',
+    this.middleLabel,
+    this.middleTooltip,
+    this.likeTooltip,
+    this.passTooltip,
   });
 
   final VoidCallback onSwipeLeft;
@@ -29,13 +30,18 @@ class ActionButtons extends StatelessWidget {
   /// Centre button appearance — customised so the landlord candidate deck can
   /// reuse the exact same button set with an "info" middle instead of 3D.
   final IconData middleIcon;
-  final String middleLabel;
-  final String middleTooltip;
-  final String likeTooltip;
-  final String passTooltip;
+  final String? middleLabel;
+  final String? middleTooltip;
+  final String? likeTooltip;
+  final String? passTooltip;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final middleLabel = this.middleLabel ?? '3D';
+    final middleTooltip = this.middleTooltip ?? l10n.actionButton197aa0f3;
+    final likeTooltip = this.likeTooltip ?? l10n.actionButtonC1272587;
+    final passTooltip = this.passTooltip ?? l10n.actionButton4031e827;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 56),
       child: Row(

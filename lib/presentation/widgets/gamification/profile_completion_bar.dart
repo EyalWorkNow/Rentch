@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class ProfileCompletionBar extends StatelessWidget {
@@ -44,7 +45,8 @@ class ProfileCompletionBar extends StatelessWidget {
                     size: 18, color: AppColors.primary),
                 const SizedBox(width: 6),
                 Text(
-                  'השלמת הפרופיל — $percent%',
+                  AppLocalizations.of(context)!
+                      .profileCompletionBar809182d3(percent),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -111,7 +113,7 @@ class _CompleteBanner extends StatelessWidget {
               color: AppColors.success, size: 20),
           const SizedBox(width: 8),
           Text(
-            'הפרופיל מושלם — בעלי דירות רואים אותך ראשון',
+            AppLocalizations.of(context)!.profileCompletionBarE215150d,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,

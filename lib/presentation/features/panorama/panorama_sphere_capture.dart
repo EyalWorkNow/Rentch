@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -377,7 +378,7 @@ class _PanoramaSphereCaptureScreenState
   Future<void> _finish() async {
     // Simulator/demo: nothing to stitch — celebrate and close.
     if (!_hasCamera || _shotPaths.isEmpty) {
-      _toast('הכדור הושלם ✓ — במכשיר אמיתי זה נבנה עכשיו ל-360° מלא.');
+      _toast(AppLocalizations.of(context)!.panoramaSphereCapture40cd556b);
       await Future<void>.delayed(const Duration(milliseconds: 900));
       if (mounted) Navigator.of(context).pop();
       return;
@@ -386,10 +387,11 @@ class _PanoramaSphereCaptureScreenState
   }
 
   Future<void> _build() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _building = true;
       _buildError = null;
-      _buildMsg = 'מתחילים לבנות את הסיור...';
+      _buildMsg = l10n.panoramaSphereCapture97f6b247;
     });
 
     final hfov = _hfovDeg, vfov = _vfovDeg;
@@ -412,11 +414,11 @@ class _PanoramaSphereCaptureScreenState
         poses: poses,
       );
       if (job == null || job.uploadUrls.length < _shotPaths.length) {
-        _failBuild('לא הצלחנו להתחיל את העיבוד. בדקו את החיבור לאינטרנט.');
+        _failBuild(l10n.panoramaSphereCapture127d1554);
         return;
       }
       if (!mounted) return;
-      setState(() => _buildMsg = 'מעלים את התמונות...');
+      setState(() => _buildMsg = l10n.panoramaSphereCaptureE39b6aae);
       for (var i = 0; i < _shotPaths.length; i++) {
         // Retry a transient blip so one flaky frame doesn't discard the capture.
         var ok = false;
@@ -428,15 +430,15 @@ class _PanoramaSphereCaptureScreenState
               .uploadToPresignedUrl(job.uploadUrls[i], _shotPaths[i]);
         }
         if (!ok) {
-          _failBuild('ההעלאה נכשלה. בדקו את החיבור ונסו שוב.');
+          _failBuild(l10n.panoramaSphereCaptureBbb9c298);
           return;
         }
         if (!mounted) return;
-        setState(() =>
-            _buildMsg = 'מעלים את התמונות... (${i + 1}/${_shotPaths.length})');
+        setState(() => _buildMsg = l10n.panoramaSphereCapture1b311f3a(
+            i + 1, _shotPaths.length));
       }
       if (!mounted) return;
-      setState(() => _buildMsg = 'בונים את הסיור...');
+      setState(() => _buildMsg = l10n.panoramaSphereCapture8844cc68);
       await AwsApiClient.instance.startPanoramaStitch(job.jobId);
 
       const maxPolls = 90;
@@ -456,14 +458,14 @@ class _PanoramaSphereCaptureScreenState
           return;
         }
         if (status.status == 'failed') {
-          _failBuild('העיבוד נכשל. נסו לצלם שוב, לאט ובאור טוב.');
+          _failBuild(l10n.panoramaSphereCaptureA9e373df);
           return;
         }
       }
-      _failBuild('העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.');
+      _failBuild(l10n.panoramaSphereCaptureAb4f63ba);
     } catch (e) {
       debugPrint('sphere build failed: $e');
-      _failBuild('משהו השתבש. בדקו את החיבור ונסו שוב.');
+      _failBuild(l10n.panoramaSphereCapture19c26543);
     }
   }
 
@@ -624,14 +626,16 @@ class _PanoramaSphereCaptureScreenState
   }
 
   Widget _hud() {
+    final l10n = AppLocalizations.of(context)!;
     final done = _capturedCount >= _targets.length;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _coachPill(
           done
-              ? 'הכדור הושלם ✓'
-              : 'צולמו $_capturedCount מתוך ${_targets.length}',
+              ? l10n.panoramaSphereCapture70b265d7
+              : l10n.panoramaSphereCapture84b777d5(
+                  _capturedCount, _targets.length),
           bg: done
               ? Colors.green.withValues(alpha: 0.85)
               : Colors.black.withValues(alpha: 0.6),
@@ -650,6 +654,7 @@ class _PanoramaSphereCaptureScreenState
   }
 
   Widget _coachLine() {
+    final l10n = AppLocalizations.of(context)!;
     String text;
     final done = _capturedCount >= _targets.length;
     // Direction to the nearest uncaptured target, to guide the turn.
@@ -664,24 +669,24 @@ class _PanoramaSphereCaptureScreenState
       }
     }
     if (done) {
-      text = 'מצוין! בונים את הסיור...';
+      text = l10n.panoramaSphereCaptureE97ca842;
     } else if (_spinRate > _maxSpinForCapture) {
-      text = 'האטו — החזיקו יציב על הנקודה';
+      text = l10n.panoramaSphereCaptureFaa5a7cd;
     } else if (best < _lockDeg) {
-      text = 'החזיקו רגע... ננעל ומצלם 📸';
+      text = l10n.panoramaSphereCaptureCbe90974;
     } else if (next != null) {
       final dyaw = _wrap180(next.yaw - _dispHeading);
       final dpitch = next.pitch - _dispPitch;
       final dir = dpitch > 20
-          ? 'הרימו את הטלפון למעלה ☝️'
+          ? l10n.panoramaSphereCapture329e59af
           : dpitch < -20
-              ? 'הטו את הטלפון למטה 👇'
+              ? l10n.panoramaSphereCapture3802a2f9
               : dyaw > 0
-                  ? 'סובבו ימינה ➡️'
-                  : 'סובבו שמאלה ⬅️';
-      text = 'כוונו את הנקודה למרכז — $dir';
+                  ? l10n.panoramaSphereCaptureCc0c751f
+                  : l10n.panoramaSphereCapture39ad314d;
+      text = l10n.panoramaSphereCapture1502911e(dir);
     } else {
-      text = 'כוונו את הנקודה הזוהרת אל המרכז';
+      text = l10n.panoramaSphereCaptureF1c50330;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -702,6 +707,7 @@ class _PanoramaSphereCaptureScreenState
   // Backup: if the phone can't quite lock (or the user wants control), tap to
   // capture the nearest target manually.
   Widget _manualCaptureHint() {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: _capturing
           ? null
@@ -719,7 +725,7 @@ class _PanoramaSphereCaptureScreenState
               if (near != null) {
                 _captureTarget(near);
               } else {
-                _toast('כוונו קרוב יותר לנקודה לא-מצולמת');
+                _toast(l10n.panoramaSphereCapture1c86586d);
               }
             },
       child: Container(
@@ -729,13 +735,13 @@ class _PanoramaSphereCaptureScreenState
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white54),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(IconsaxPlusLinear.camera, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Text('צלמו את הנקודה שבמרכז',
-                style: TextStyle(
+            const Icon(IconsaxPlusLinear.camera, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(l10n.panoramaSphereCaptureC1c39e62,
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w800)),
@@ -746,6 +752,7 @@ class _PanoramaSphereCaptureScreenState
   }
 
   Widget _buildOverlay() {
+    final l10n = AppLocalizations.of(context)!;
     final hasError = _buildError != null;
     return Positioned.fill(
       child: Container(
@@ -765,7 +772,9 @@ class _PanoramaSphereCaptureScreenState
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  hasError ? 'לא הצלחנו לבנות את הסיור' : 'בונים את הסיור...',
+                  hasError
+                      ? l10n.panoramaSphereCapture1dc38c15
+                      : l10n.panoramaSphereCapture8844cc68,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white,
@@ -776,7 +785,7 @@ class _PanoramaSphereCaptureScreenState
                 Text(
                   hasError
                       ? _buildError!
-                      : '$_buildMsg\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.',
+                      : l10n.panoramaSphereCapture5a8e3f2d(_buildMsg),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white70, fontSize: 17, height: 1.5),
@@ -792,16 +801,17 @@ class _PanoramaSphereCaptureScreenState
                       ),
                       onPressed: _retryFromError,
                       icon: const Icon(IconsaxPlusBold.refresh),
-                      label: const Text('צלם מחדש',
-                          style: TextStyle(
+                      label: Text(l10n.panoramaSphereCapture3b32c520,
+                          style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 18)),
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('סגור',
-                        style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    child: Text(l10n.panoramaSphereCapture55247199,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 16)),
                   ),
                 ] else
                   const CircularProgressIndicator(color: Colors.white),
@@ -828,32 +838,38 @@ class _PanoramaSphereCaptureScreenState
                 fontWeight: FontWeight.w900)),
       );
 
-  Widget _zoomToggle() => GestureDetector(
-        onTap: _toggleUltraWide,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_ultraWide ? '0.5×' : '1×',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900)),
-              const SizedBox(width: 8),
-              Text(_ultraWide ? 'רחב' : 'רגיל',
-                  style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700)),
-            ],
-          ),
+  Widget _zoomToggle() {
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
+      onTap: _toggleUltraWide,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(24),
         ),
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_ultraWide ? '0.5×' : '1×',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900)),
+            const SizedBox(width: 8),
+            Text(
+                _ultraWide
+                    ? l10n.panoramaSphereCaptureA9e4f107
+                    : l10n.panoramaSphereCapture3e20e30e,
+                style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _circle(IconData icon) => Container(
         width: 44,
@@ -904,10 +920,12 @@ class _DemoBackdrop extends StatelessWidget {
           colors: [AppColors.inkSoft, AppColors.ink],
         ),
       ),
-      child: const Center(
-        child: Text('מצב הדגמה (סימולטור)\nגררו כדי לכוון',
+      child: Center(
+        child: Text(
+            AppLocalizations.of(context)!.panoramaSphereCapture8fc9dc18,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white24, fontSize: 14, height: 1.5)),
+            style: const TextStyle(
+                color: Colors.white24, fontSize: 14, height: 1.5)),
       ),
     );
   }

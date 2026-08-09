@@ -2,6 +2,7 @@ import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -37,26 +38,28 @@ class OwnerListingsScreen extends StatelessWidget {
     return '${AppConfig.publicShareBaseUrl}/p/$id';
   }
 
-  String _shareMessage() =>
-      'הדירות של $ownerName ב-Rently 🏠\n${_shareLink()}';
+  String _shareMessage(AppLocalizations l10n) =>
+      l10n.ownerListingsScreenA082ba0e(ownerName, _shareLink());
 
   Future<void> _share(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final wa = Uri.parse(
-        'https://wa.me/?text=${Uri.encodeComponent(_shareMessage())}');
+        'https://wa.me/?text=${Uri.encodeComponent(_shareMessage(l10n))}');
     if (await canLaunchUrl(wa)) {
       await launchUrl(wa, mode: LaunchMode.externalApplication);
       return;
     }
-    await Clipboard.setData(ClipboardData(text: _shareMessage()));
+    await Clipboard.setData(ClipboardData(text: _shareMessage(l10n)));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      duration: Duration(milliseconds: 2500),
-      content: Text('הקישור לדירות שלך הועתק — אפשר לשלוח לכל אחד'),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 2500),
+      content: Text(l10n.ownerListingsScreen5617dde0),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Consumer<DatingProvider>(
@@ -75,7 +78,9 @@ class OwnerListingsScreen extends StatelessWidget {
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               title: Text(
-                isSelf ? 'הדירות שלי' : 'הדירות של $ownerName',
+                isSelf
+                    ? l10n.ownerListingsScreen2c577068
+                    : l10n.ownerListingsScreen8704f6e2(ownerName),
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -85,7 +90,7 @@ class OwnerListingsScreen extends StatelessWidget {
               iconTheme: const IconThemeData(color: AppColors.textPrimary),
               actions: [
                 IconButton(
-                  tooltip: 'שתף את דף הדירות',
+                  tooltip: l10n.ownerListingsScreen6005f6dd,
                   onPressed: () => _share(context),
                   icon: const RentlyIcon(IconsaxPlusLinear.export_2,
                       color: AppColors.textPrimary, size: 22),
@@ -110,13 +115,13 @@ class OwnerListingsScreen extends StatelessWidget {
                     ),
                   ),
                   if (listings.isEmpty)
-                    const SliverToBoxAdapter(
+                    SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.only(top: 60),
+                        padding: const EdgeInsets.only(top: 60),
                         child: Center(
                           child: Text(
-                            'אין דירות פעילות כרגע',
-                            style: TextStyle(
+                            l10n.ownerListingsScreenCc258a95,
+                            style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -179,6 +184,7 @@ class _OwnerHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return Container(
       padding: const EdgeInsets.all(18),
@@ -228,7 +234,10 @@ class _OwnerHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${isAgency ? 'מתווך נדל״ן' : 'בעל נכס פרטי'} · $count דירות',
+                  (isAgency
+                          ? l10n.ownerListingsScreenAgencyLabel
+                          : l10n.ownerListingsScreenPrivateLabel) +
+                      l10n.ownerListingsScreen57ed6e46(count),
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -258,6 +267,7 @@ class _OwnerListingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -313,7 +323,8 @@ class _OwnerListingCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        '${property.roomsLabel} חד׳ · ${property.sizeM2} מ״ר',
+                        l10n.ownerListingsScreen2b748fae(
+                            property.roomsLabel, property.sizeM2),
                         style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 12,

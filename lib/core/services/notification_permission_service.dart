@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// ─── FIRST-LAUNCH NOTIFICATION PERMISSION ────────────────────────────────────
 ///
@@ -58,6 +59,7 @@ class _RationaleDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: AlertDialog(
@@ -69,30 +71,30 @@ class _RationaleDialog extends StatelessWidget {
             Icon(Icons.notifications_active_rounded,
                 color: AppColors.primary, size: 28),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
-                'נשארים מעודכנים',
-                style: TextStyle(
+                l10n.notificationPermissionService95b74d9c,
+                style: const TextStyle(
                     fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               ),
             ),
           ],
         ),
-        content: const Text(
-          'נשמח לעדכן אתכם על התאמות חדשות, הודעות מבעלי דירות ושוכרים, '
-          'ועדכונים חשובים בזמן אמת. אפשר לכבות בכל רגע מההגדרות.',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+        content: Text(
+          '${l10n.notificationPermissionServiceC4d3318f}'
+          '${l10n.notificationPermissionService18ca271e}',
+          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('לא עכשיו',
-                style: TextStyle(color: AppColors.textDisabled)),
+            child: Text(l10n.notificationPermissionService98c8a5b8,
+                style: const TextStyle(color: AppColors.textDisabled)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('אפשר התראות'),
+            child: Text(l10n.notificationPermissionService1540caea),
           ),
         ],
       ),

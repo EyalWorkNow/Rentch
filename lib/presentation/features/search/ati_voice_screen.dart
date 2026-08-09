@@ -11,6 +11,7 @@ import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen voice conversation with אתי — styled after Google Gemini's live
@@ -76,7 +77,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       ? AtiVoiceState.listening
       : AtiVoiceState.idle;
   String _transcript = '';
-  String _reply = 'שלום, אני אתי 👋\nספרו לי מה אתם מחפשים.';
+  String _reply = '';
+  bool _l10nInited = false;
   double _level = 0; // smoothed mic level 0..1
   late List<String> _criteria = List.of(widget.criteria);
   late int _resultCount = widget.resultCount;
@@ -92,12 +94,29 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   void initState() {
     super.initState();
     if (widget.demoMode) {
-      _transcript = 'אני מחפשת 3 חדרים בתל אביב, קרוב לים, עם מרפסת…';
-      _criteria = const ['תל אביב', '3 חדרים', 'עד 8,000 ₪', 'מרפסת', 'ליד הים'];
       _resultCount = 7;
       _level = 0.6;
     }
     // Push-to-talk: nothing starts on its own — the user HOLDS the orb to record.
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_l10nInited) return;
+    _l10nInited = true;
+    final l10n = AppLocalizations.of(context)!;
+    _reply = l10n.atiVoiceScreenF0dad564;
+    if (widget.demoMode) {
+      _transcript = l10n.atiVoiceScreenF90c23d4;
+      _criteria = [
+        l10n.atiVoiceScreen2c1f2bbd,
+        l10n.atiVoiceScreen535bb0c7,
+        l10n.atiVoiceScreen2ac25940,
+        l10n.atiVoiceScreen86425fcf,
+        l10n.atiVoiceScreen46602c9d,
+      ];
+    }
   }
 
   // Press-and-HOLD the orb → record with the `record` plugin (NO native
@@ -120,12 +139,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     });
     if (!ok && mounted) {
       final err = widget.service.lastRecordError;
+      final l10n = AppLocalizations.of(context)!;
       setState(() {
         _recording = false;
         _state = AtiVoiceState.idle;
         _reply = err == 'permission'
-            ? 'צריך הרשאת מיקרופון — אשרו בהגדרות המכשיר 🎙️'
-            : 'לא הצלחתי להתחיל הקלטה 🙈\n${err ?? ''}';
+            ? l10n.atiVoiceScreen115e4778
+            : '${l10n.atiVoiceScreen32371f9e}${err ?? ''}';
       });
     }
   }
@@ -149,10 +169,11 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       if (!mounted) return;
       if (text.trim().isEmpty) {
         final err = widget.service.lastRecordError;
+        final l10n = AppLocalizations.of(context)!;
         setState(() {
           _state = AtiVoiceState.idle;
-          _reply = 'לא שמעתי אותך 🙈 החזק/י את הכדור ודבר/י'
-              '${err != null ? '\n($err)' : ''}';
+          _reply = l10n.atiVoiceScreen77515f7a +
+              (err != null ? '\n($err)' : '');
         });
         return;
       }
@@ -165,10 +186,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   Future<void> _respond(String text) async {
     try {
+      final timeoutReply = AppLocalizations.of(context)!.atiVoiceScreenCcaa1ca0;
       final result = await widget.onUtterance(text).timeout(
         const Duration(seconds: 25),
-        onTimeout: () => const VoiceTurn(
-            reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לנסות שוב?'),
+        onTimeout: () => VoiceTurn(reply: timeoutReply),
       );
       await _applyTurn(result);
     } catch (_) {
@@ -274,15 +295,16 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   // ── copy ───────────────────────────────────────────────────────────────────
   String get _statusLabel {
+    final l10n = AppLocalizations.of(context)!;
     switch (_state) {
       case AtiVoiceState.listening:
-        return 'מקשיבה… שחרר/י כדי לשלוח';
+        return l10n.atiVoiceScreenF9ff4f53;
       case AtiVoiceState.thinking:
-        return 'רגע, חושבת…';
+        return l10n.atiVoiceScreenA6de1c7e;
       case AtiVoiceState.speaking:
-        return 'אתי מדברת · החזק/י כדי לענות';
+        return l10n.atiVoiceScreen374487f8;
       case AtiVoiceState.idle:
-        return 'החזק/י את הכדור כדי לדבר 🎙️';
+        return l10n.atiVoiceScreen69a4351d;
     }
   }
 
@@ -411,22 +433,22 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('אתי',
-                      style: TextStyle(
+                children: [
+                  Text(AppLocalizations.of(context)!.atiVoiceScreen8e4d1523,
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.3)),
-                  Text('העוזרת החכמה שלך',
-                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(AppLocalizations.of(context)!.atiVoiceScreen5ddb8c89,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ],
           ),
           const Spacer(),
           IconButton(
-            tooltip: 'שיחה חדשה',
+            tooltip: AppLocalizations.of(context)!.atiVoiceScreen82c40bcf,
             icon: const Icon(IconsaxPlusLinear.edit_2,
                 color: Colors.white70, size: 28),
             onPressed: _newConversation,
@@ -440,8 +462,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   void _newConversation() {
     widget.onNewConversation?.call();
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
-      _reply = 'שיחה חדשה 👋 מה נחפש עכשיו?';
+      _reply = l10n.atiVoiceScreenE3d4bb2b;
       _transcript = '';
       _results = const [];
       _resultCount = 0;
@@ -607,7 +630,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text('מצאתי ${_results.length} דירות שמתאימות לך 👇',
+            child: Text(
+                AppLocalizations.of(context)!
+                    .atiVoiceScreen38f0b537(_results.length),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: AppColors.primary,
@@ -677,14 +702,16 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               Icon(IconsaxPlusBold.home_2, color: AppColors.primary, size: 22),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('מצאתי $_resultCount דירות שמתאימות לך',
+                child: Text(
+                    AppLocalizations.of(context)!
+                        .atiVoiceScreen9a60c4a8(_resultCount),
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w700)),
               ),
-              const Text('הצג',
-                  style: TextStyle(
+              Text(AppLocalizations.of(context)!.atiVoiceScreen193535e0,
+                  style: const TextStyle(
                       color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
               const Icon(IconsaxPlusLinear.arrow_left_2, color: Colors.white70),
             ],
@@ -800,13 +827,13 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
                 colors: [AppColors.tealBrand, Color(0xFF6675FF)]),
             borderRadius: BorderRadius.circular(30),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(IconsaxPlusLinear.gps, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Text('שיתוף המיקום שלי',
-                  style: TextStyle(
+              const Icon(IconsaxPlusLinear.gps, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(AppLocalizations.of(context)!.atiVoiceScreen7ddcbdea,
+                  style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w800)),

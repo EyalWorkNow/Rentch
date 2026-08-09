@@ -1230,7 +1230,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         backgroundColor: AppColors.navy,
         content: Text(AppLocalizations.of(context)!.addPropertyScreenf5842882(
           score,
-          ListingScore.label(score),
+          ListingScore.label(score, AppLocalizations.of(context)!),
         )),
       ));
       Navigator.of(context).pop();

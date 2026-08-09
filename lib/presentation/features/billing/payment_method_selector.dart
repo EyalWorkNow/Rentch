@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// Grow "Digital Payments" method groups. The chosen code is sent to the server
 /// as `group`; the hosted Grow page then opens directly on that method.
@@ -43,7 +44,8 @@ const bool _walletsEnabled = false;
 
 /// The methods available on this platform. Card + Bit render inside the hosted
 /// Grow page; wallets are gated off (see [_walletsEnabled]).
-List<_Method> _availableMethods() {
+List<_Method> _availableMethods(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
   final isIOS = !kIsWeb && Platform.isIOS;
   final isAndroid = !kIsWeb && Platform.isAndroid;
   return [
@@ -52,8 +54,8 @@ List<_Method> _availableMethods() {
           accent: Colors.black),
     if (_walletsEnabled && isAndroid)
       const _Method(PaymentGroup.googlePay, 'Google Pay', IconsaxPlusBold.wallet_money),
-    const _Method(PaymentGroup.bit, 'ביט', IconsaxPlusBold.mobile),
-    const _Method(PaymentGroup.card, 'כרטיס אשראי', IconsaxPlusBold.card),
+    _Method(PaymentGroup.bit, l10n.paymentMethodSelector68e0442a, IconsaxPlusBold.mobile),
+    _Method(PaymentGroup.card, l10n.paymentMethodSelectorC5a87fbf, IconsaxPlusBold.card),
   ];
 }
 
@@ -63,7 +65,7 @@ List<_Method> _availableMethods() {
 Future<int?> showPaymentMethodSheet(
   BuildContext context, {
   required String amountLabel,
-  String title = 'בחירת אמצעי תשלום',
+  String? title,
   String? subtitle,
 }) {
   return showModalBottomSheet<int>(
@@ -72,7 +74,7 @@ Future<int?> showPaymentMethodSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => _PaymentMethodSheet(
       amountLabel: amountLabel,
-      title: title,
+      title: title ?? AppLocalizations.of(context)!.paymentMethodSelectorEdd25759,
       subtitle: subtitle,
     ),
   );
@@ -91,7 +93,7 @@ class _PaymentMethodSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final methods = _availableMethods();
+    final methods = _availableMethods(context);
     return Directionality(
       textDirection: Directionality.of(context),
       child: Container(
@@ -175,7 +177,7 @@ class _PaymentMethodSheet extends StatelessWidget {
                 const Icon(IconsaxPlusBold.lock_1,
                     size: 14, color: AppColors.textSecondary),
                 const SizedBox(width: 6),
-                Text('תשלום מאובטח · Grow · Morning',
+                Text(AppLocalizations.of(context)!.paymentMethodSelectorE7d7f19a,
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

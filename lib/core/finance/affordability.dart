@@ -38,12 +38,17 @@ enum RentBand {
   unknown,
 }
 
+/// Which up-front move-in cost a [CostLineItem] represents. The display label
+/// is localized at the UI layer (this file is pure Dart, no Flutter/l10n
+/// imports) — see property_detail_screen.dart's `_lineItemLabel`.
+enum CostLineKind { firstMonthRent, deposit, brokerFee }
+
 /// One labelled component of the up-front move-in total.
 class CostLineItem {
-  const CostLineItem({required this.label, required this.amount});
+  const CostLineItem({required this.kind, required this.amount});
 
-  /// Plain-Hebrew label, e.g. 'פיקדון (מוגבל בחוק)'.
-  final String label;
+  /// Which cost this line item represents.
+  final CostLineKind kind;
 
   /// Amount in ₪ (rounded to whole shekels).
   final int amount;
@@ -140,10 +145,10 @@ class Affordability {
         tenantPaysBroker ? (rent * kBrokerFeeMultiplier).round() : 0;
 
     final items = <CostLineItem>[
-      CostLineItem(label: 'שכר דירה לחודש הראשון', amount: rent),
-      CostLineItem(label: 'פיקדון/בטוחות (מוגבל בחוק)', amount: depositCap),
+      CostLineItem(kind: CostLineKind.firstMonthRent, amount: rent),
+      CostLineItem(kind: CostLineKind.deposit, amount: depositCap),
       if (tenantPaysBroker)
-        CostLineItem(label: 'דמי תיווך (חודש + מע״מ 18%)', amount: brokerFee),
+        CostLineItem(kind: CostLineKind.brokerFee, amount: brokerFee),
     ];
     final total = items.fold<int>(0, (sum, i) => sum + i.amount);
 

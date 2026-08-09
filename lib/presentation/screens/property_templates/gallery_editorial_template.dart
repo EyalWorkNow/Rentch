@@ -49,43 +49,47 @@ class _GalleryEditorialTemplate extends StatelessWidget {
 
   /// The editorial kicker: `type · neighborhood` (or city) in small caps. Falls
   /// back gracefully so it always reads as a real, complete label.
-  String get _kicker {
+  String _kicker(AppLocalizations l10n) {
     final type = property.propertyType.trim();
     final place = property.neighborhood.trim().isNotEmpty
         ? property.neighborhood.trim()
         : property.city.trim();
     if (type.isNotEmpty && place.isNotEmpty) return '$type · $place';
     if (type.isNotEmpty) return type;
-    return place.isNotEmpty ? place : 'נכס נבחר';
+    return place.isNotEmpty ? place : l10n.galleryEditorialTemplate4771acf8;
   }
 
   /// The display title — the headline of the feature.
-  String get _displayTitle {
+  String _displayTitle(AppLocalizations l10n) {
     if (property.street.trim().isNotEmpty) {
       final number = property.streetNumber > 0 ? ' ${property.streetNumber}' : '';
-      return '${property.propertyType} ב${property.street}$number';
+      return l10n.galleryEditorialTemplate17773b7f(
+          property.propertyType, property.street, number);
     }
     return property.address;
   }
 
   /// A factual lede paragraph composed strictly from REAL listing data — no
   /// invented prose. Reads like an editorial standfirst introducing the home.
-  String get _lede {
+  String _lede(AppLocalizations l10n) {
     final parts = <String>[];
-    parts.add('${property.roomsLabel} חדרים');
-    if (property.sizeM2 > 0) parts.add('${property.sizeM2} מ״ר');
+    parts.add(l10n.galleryEditorialTemplateD886d07f(property.roomsLabel));
+    if (property.sizeM2 > 0) {
+      parts.add(l10n.galleryEditorialTemplateFdb4eac7(property.sizeM2));
+    }
     if (property.floor.trim().isNotEmpty) {
       final total = property.totalFloors.trim();
       parts.add(total.isNotEmpty
-          ? 'קומה ${property.floor} מתוך $total'
-          : 'קומה ${property.floor}');
+          ? l10n.galleryEditorialTemplateCa554bb0(property.floor, total)
+          : l10n.galleryEditorialTemplateD068bb57(property.floor));
     }
     if (property.condition.trim().isNotEmpty) parts.add(property.condition.trim());
     final spec = parts.join(' · ');
     final place = property.neighborhood.trim().isNotEmpty
         ? '${property.neighborhood.trim()}, ${property.city}'
         : property.city;
-    return '${property.propertyType} ב$place. $spec.';
+    return l10n.galleryEditorialTemplate19aad790(
+        property.propertyType, place, spec);
   }
 
   @override
@@ -132,6 +136,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
 
   // ── Hero ────────────────────────────────────────────────────────────────
   Widget _buildHero(BuildContext context, double topInset) {
+    final l10n = AppLocalizations.of(context)!;
     return SizedBox(
       height: _heroHeight,
       child: Stack(
@@ -197,8 +202,8 @@ class _GalleryEditorialTemplate extends StatelessWidget {
                   Flexible(
                     child: Text(
                       property.transactionType == PropertyTransactionType.sale
-                          ? 'נכס למכירה'
-                          : 'נכס להשכרה',
+                          ? l10n.galleryEditorialTemplateA765f2f3
+                          : l10n.galleryEditorialTemplate900c3a51,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -221,6 +226,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
 
   // ── Masthead (editorial text block) ───────────────────────────────────────
   Widget _buildMasthead(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
       child: Column(
@@ -228,7 +234,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
         children: [
           // Kicker rule — small caps over a hairline, magazine section label.
           Text(
-            _kicker.toUpperCase(),
+            _kicker(l10n).toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -245,7 +251,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
 
           // Display headline.
           Text(
-            _displayTitle,
+            _displayTitle(l10n),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -283,7 +289,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
 
           // Editorial lede — a factual standfirst built from real data.
           Text(
-            _lede,
+            _lede(l10n),
             style: TextStyle(
               color: branding.secondaryColor.withValues(alpha: 0.78),
               fontSize: 16,
@@ -294,7 +300,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Editorial price line — large price + suffix + price-per-m² caption.
-          _buildPriceBlock(),
+          _buildPriceBlock(l10n),
           const SizedBox(height: 24),
 
           // Magazine "spec ledger": stat columns split by vertical hairlines.
@@ -310,7 +316,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceBlock() {
+  Widget _buildPriceBlock(AppLocalizations l10n) {
     final ppm = property.pricePerSquareMeter;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,7 +351,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
         if (ppm != null) ...[
           const SizedBox(height: 6),
           Text(
-            '₪${_editorialNumber(ppm)} למ״ר',
+            l10n.galleryEditorialTemplateE5340f86(_editorialNumber(ppm)),
             style: TextStyle(
               color: _inkMuted,
               fontSize: 13.5,
@@ -379,13 +385,15 @@ class _SpecLedger extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final entries = <_SpecEntry>[
-      _SpecEntry(property.roomsLabel, 'חדרים'),
-      if (property.sizeM2 > 0) _SpecEntry('${property.sizeM2}', 'מ״ר'),
+      _SpecEntry(property.roomsLabel, l10n.galleryEditorialTemplateB50b3974),
+      if (property.sizeM2 > 0)
+        _SpecEntry('${property.sizeM2}', l10n.galleryEditorialTemplateD3b9013b),
       if (property.floor.trim().isNotEmpty)
-        _SpecEntry(property.floor, 'קומה'),
+        _SpecEntry(property.floor, l10n.galleryEditorialTemplate047e630b),
       if (property.totalFloors.trim().isNotEmpty)
-        _SpecEntry(property.totalFloors, 'קומות'),
+        _SpecEntry(property.totalFloors, l10n.galleryEditorialTemplate71c5f6b5),
     ];
 
     final columns = <Widget>[];

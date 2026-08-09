@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -11,7 +12,7 @@ Future<void> showPropertyShareSheet(
   BuildContext context,
   RentalProperty property,
 ) async {
-  final message = _shareMessage(property);
+  final message = _shareMessage(context, property);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -28,16 +29,17 @@ Future<void> showPropertyShareSheet(
   );
 }
 
-String _shareMessage(RentalProperty property) {
+String _shareMessage(BuildContext context, RentalProperty property) {
+  final l10n = AppLocalizations.of(context)!;
   // The Rently share link renders a rich banner (photo + price) in WhatsApp via
   // the backend OpenGraph page (GET /p/:id).
   final shareLink = '${AppConfig.publicShareBaseUrl}/p/${property.id}';
   final details = <String>[
-    'מצאתי נכס מעניין ב-Rently',
+    l10n.propertyShareSheetF15bfc25,
     property.address,
     '${property.priceLabel} ${property.priceSuffixLabel}',
-    '${property.roomsLabel} חדרים',
-    '${property.sizeM2} מ"ר',
+    l10n.propertyShareSheetD886d07f(property.roomsLabel),
+    l10n.propertyShareSheet5d29dec4(property.sizeM2),
     shareLink,
   ];
   return details.join('\n');
@@ -94,6 +96,7 @@ class _PropertyShareSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Container(
@@ -135,7 +138,7 @@ class _PropertyShareSheet extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'שלח את הנכס מהר דרך האפליקציה שנוחה לך, או העתק את הפרטים לשיתוף ידני.',
+                l10n.propertyShareSheetEd00d602,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                   height: 1.45,
@@ -156,7 +159,7 @@ class _PropertyShareSheet extends StatelessWidget {
                           _ShareActionCard(
                             icon: IconsaxPlusLinear.message_text,
                             label: 'WhatsApp',
-                            subtitle: 'שליחה ישירה',
+                            subtitle: l10n.propertyShareSheet827cec4d,
                             onTap: () async {
                               Navigator.of(context).pop();
                               // whatsapp:// opens the WhatsApp APP directly (no
@@ -169,7 +172,7 @@ class _PropertyShareSheet extends StatelessWidget {
                               await _shareViaUri(
                                 context,
                                 wa,
-                                'לא ניתן לפתוח את WhatsApp כרגע',
+                                l10n.propertyShareSheetC23278cd,
                                 fallback: web,
                               );
                             },
@@ -177,7 +180,7 @@ class _PropertyShareSheet extends StatelessWidget {
                           _ShareActionCard(
                             icon: IconsaxPlusLinear.sms,
                             label: 'SMS',
-                            subtitle: 'הודעת טקסט',
+                            subtitle: l10n.propertyShareSheet5abda5bb,
                             onTap: () async {
                               Navigator.of(context).pop();
                               await _shareViaUri(
@@ -188,14 +191,14 @@ class _PropertyShareSheet extends StatelessWidget {
                                     'body': message,
                                   },
                                 ),
-                                'לא ניתן לפתוח SMS כרגע',
+                                l10n.propertyShareSheet12d7a7d4,
                               );
                             },
                           ),
                           _ShareActionCard(
                             icon: IconsaxPlusLinear.sms_edit,
                             label: 'Email',
-                            subtitle: 'שליחה במייל',
+                            subtitle: l10n.propertyShareSheetC57dda61,
                             onTap: () async {
                               Navigator.of(context).pop();
                               await _shareViaUri(
@@ -203,24 +206,24 @@ class _PropertyShareSheet extends StatelessWidget {
                                 Uri(
                                   scheme: 'mailto',
                                   queryParameters: <String, String>{
-                                    'subject': 'נכס שיכול להתאים לך',
+                                    'subject': l10n.propertyShareSheet88f45e7e,
                                     'body': message,
                                   },
                                 ),
-                                'לא ניתן לפתוח אימייל כרגע',
+                                l10n.propertyShareSheet600502fd,
                               );
                             },
                           ),
                           _ShareActionCard(
                             icon: IconsaxPlusLinear.copy,
-                            label: 'העתק פרטים',
-                            subtitle: 'טקסט מלא לשיתוף',
+                            label: l10n.propertyShareSheetB26acdf0,
+                            subtitle: l10n.propertyShareSheet3a798b8a,
                             onTap: () async {
                               Navigator.of(context).pop();
                               await _copyToClipboard(
                                 context,
                                 message,
-                                'פרטי הנכס הועתקו',
+                                l10n.propertyShareSheet79a0ff65,
                               );
                             },
                           ),
@@ -237,7 +240,7 @@ class _PropertyShareSheet extends StatelessWidget {
                           await _copyToClipboard(
                             context,
                             '${AppConfig.publicShareBaseUrl}/p/${property.id}',
-                            'הקישור הועתק',
+                            l10n.propertyShareSheet4aa70f6f,
                           );
                         },
                       ),
@@ -260,6 +263,7 @@ class _PropertyPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -301,8 +305,8 @@ class _PropertyPreviewCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _PropertyMetaPill(label: '${property.roomsLabel} חדרים'),
-                    _PropertyMetaPill(label: '${property.sizeM2} מ"ר'),
+                    _PropertyMetaPill(label: l10n.propertyShareSheetD886d07f(property.roomsLabel)),
+                    _PropertyMetaPill(label: l10n.propertyShareSheet5d29dec4(property.sizeM2)),
                     _PropertyMetaPill(label: property.city),
                   ],
                 ),
@@ -431,7 +435,7 @@ class _ShareLinkButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: onTap,
         icon: const RentlyIcon(IconsaxPlusLinear.link_1, size: 18),
-        label: const Text('העתק קישור לשיתוף'),
+        label: Text(AppLocalizations.of(context)!.propertyShareSheet3589781c),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navy,
           side: BorderSide(

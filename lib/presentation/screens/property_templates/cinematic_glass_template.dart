@@ -391,19 +391,19 @@ class _GlassStatsRail extends StatelessWidget {
       _StatItem(
         icon: IconsaxPlusLinear.home_2,
         value: property.roomsLabel,
-        label: 'חדרים',
+        label: AppLocalizations.of(context)!.cinematicGlassTemplateB50b3974,
       ),
       if (property.sizeM2 > 0)
         _StatItem(
           icon: IconsaxPlusLinear.maximize_3,
           value: '${property.sizeM2}',
-          label: 'מ״ר',
+          label: AppLocalizations.of(context)!.cinematicGlassTemplateD3b9013b,
         ),
       if (property.floor.trim().isNotEmpty)
         _StatItem(
           icon: IconsaxPlusLinear.building_4,
           value: property.floor.trim(),
-          label: 'קומה',
+          label: AppLocalizations.of(context)!.cinematicGlassTemplate047e630b,
         ),
     ];
 

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:flutter/material.dart';
@@ -183,7 +184,8 @@ class _SegmentToggleState extends State<_SegmentToggle> {
                               child: _segment(
                                 index: 0,
                                 icon: IconsaxPlusLinear.profile_2user,
-                                label: 'מועמדים',
+                                label: AppLocalizations.of(context)!
+                                    .leadsInboxScreenEb3c6f60,
                                 badge: widget.candidatesBadge,
                                 isSelected: widget.selected == 0,
                               ),
@@ -193,7 +195,8 @@ class _SegmentToggleState extends State<_SegmentToggle> {
                               child: _segment(
                                 index: 1,
                                 icon: IconsaxPlusLinear.message,
-                                label: 'הודעות',
+                                label: AppLocalizations.of(context)!
+                                    .leadsInboxScreen1956aee8,
                                 badge: widget.messagesBadge,
                                 isSelected: widget.selected == 1,
                               ),

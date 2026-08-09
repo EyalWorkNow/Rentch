@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -164,27 +165,28 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('ניתוח שוק ותמחור'),
+          title: Text(AppLocalizations.of(context)!.brokerCmaScreen9c3d866e),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
         ),
         body: mine.isEmpty
-            ? _emptyState('אין לך נכסים פעילים לניתוח עדיין.')
+            ? _emptyState(AppLocalizations.of(context)!.brokerCmaScreenC5a0f18d)
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
-                  _picker(mine, subject),
+                  _picker(context, mine, subject),
                   const SizedBox(height: 16),
-                  if (subject != null) _subjectSection(subject),
+                  if (subject != null) _subjectSection(context, subject),
                 ],
               ),
       ),
     );
   }
 
-  Widget _picker(List<RentalProperty> mine, RentalProperty? subject) {
+  Widget _picker(BuildContext context, List<RentalProperty> mine, RentalProperty? subject) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -196,14 +198,14 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
         child: DropdownButton<String>(
           isExpanded: true,
           value: subject?.id,
-          hint: const Text('בחר נכס לניתוח',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          hint: Text(l10n.brokerCmaScreen522d75ea,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           items: [
             for (final p in mine)
               DropdownMenuItem(
                 value: p.id,
                 child: Text(
-                  '${p.address} · ${p.roomsLabel} חד׳',
+                  l10n.brokerCmaScreen07694aa8(p.address, p.roomsLabel),
                   style: const TextStyle(fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -215,7 +217,7 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
     );
   }
 
-  Widget _subjectSection(RentalProperty subject) {
+  Widget _subjectSection(BuildContext context, RentalProperty subject) {
     // Kick off the city-market fetch for this subject (once) after the frame.
     if (_loadedForSubjectId != subject.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadCompsFor(subject));
@@ -227,51 +229,53 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
       );
     }
     final comps = _comparablesFor(subject, _cityMarket!);
-    return _analysis(subject, comps);
+    return _analysis(context, subject, comps);
   }
 
-  Widget _analysis(RentalProperty subject, List<RentalProperty> comps) {
+  Widget _analysis(BuildContext context, RentalProperty subject, List<RentalProperty> comps) {
+    final l10n = AppLocalizations.of(context)!;
     final range = cmaRange(comps.map((p) => p.price).toList());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _subjectCard(subject, range),
+        _subjectCard(context, subject, range),
         const SizedBox(height: 20),
         Text(
-          'נכסים להשוואה (${comps.length})',
+          l10n.brokerCmaScreen0f726673(comps.length),
           style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'אותה עיר · עד חדר הפרש · אותו סוג עסקה',
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        Text(
+          l10n.brokerCmaScreen6fe1b49e,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 12),
         if (comps.isEmpty)
-          _emptyInline('לא נמצאו נכסים דומים בשוק להשוואה.')
+          _emptyInline(l10n.brokerCmaScreenBc3ff8c5)
         else
-          for (final c in comps) _compRow(c, subject),
+          for (final c in comps) _compRow(context, c, subject),
       ],
     );
   }
 
-  Widget _subjectCard(RentalProperty subject, CmaPriceRange? range) {
+  Widget _subjectCard(BuildContext context, RentalProperty subject, CmaPriceRange? range) {
+    final l10n = AppLocalizations.of(context)!;
     final price = subject.price;
     String position = '';
     Color positionColor = AppColors.textSecondary;
     if (range != null && price > 0) {
       if (price < range.p25) {
-        position = 'מתחת לטווח המומלץ — אפשר אולי להעלות מחיר';
+        position = l10n.brokerCmaScreenBdb3f99c;
         positionColor = AppColors.success;
       } else if (price > range.p75) {
-        position = 'מעל הטווח המומלץ — קשה יותר להצדיק מול הקונה';
+        position = l10n.brokerCmaScreenEbc33063;
         positionColor = AppColors.warning;
       } else {
-        position = 'בתוך הטווח המומלץ — תמחור תואם שוק';
+        position = l10n.brokerCmaScreen8d3fc214;
         positionColor = AppColors.primaryDark;
       }
     }
@@ -296,28 +300,28 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                   color: AppColors.textPrimary)),
           const SizedBox(height: 4),
           Text(
-            '${subject.roomsLabel} חד׳ · ${subject.sizeM2} מ״ר · ${subject.transactionLabel}',
+            l10n.brokerCmaScreen71fb17fd(subject.roomsLabel, subject.sizeM2, subject.transactionLabel),
             style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
-          Text('המחיר הנוכחי: ${subject.priceLabel}',
+          Text(l10n.brokerCmaScreen50d090d2(subject.priceLabel),
               style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary)),
           const SizedBox(height: 16),
-          _cbsAnchor(subject),
+          _cbsAnchor(context, subject),
           if (range == null)
             Text(
               subject.priceBadge?.hasData == true
-                  ? 'מעט נכסים דומים בשוק — ההערכה מבוססת על מדד CBS לאזור.'
-                  : 'אין מספיק נתוני שוק לחישוב טווח מומלץ.',
+                  ? l10n.brokerCmaScreen130275e8
+                  : l10n.brokerCmaScreenC0d229c4,
               style: const TextStyle(
                   fontSize: 15, color: AppColors.textSecondary),
             )
           else ...[
-            const Text('טווח מחיר מומלץ (25–75 אחוזון)',
-                style: TextStyle(
+            Text(l10n.brokerCmaScreen0c53e27e,
+                style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
             const SizedBox(height: 6),
             Text(
@@ -328,7 +332,7 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                   color: AppColors.primaryDark),
             ),
             const SizedBox(height: 4),
-            Text('חציון השוק: ${_money(range.median)}',
+            Text(l10n.brokerCmaScreen6818b5d6(_money(range.median)),
                 style: const TextStyle(
                     fontSize: 15, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
@@ -352,7 +356,8 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
 
   // Real CBS/nadlan market anchor (₪/m² median for the area + implied fair
   // price + above/below-market badge). Renders nothing when unavailable.
-  Widget _cbsAnchor(RentalProperty subject) {
+  Widget _cbsAnchor(BuildContext context, RentalProperty subject) {
+    final l10n = AppLocalizations.of(context)!;
     final badge = subject.priceBadge;
     if (badge == null || !badge.hasData) return const SizedBox.shrink();
     final ppm = badge.medianPpm!;
@@ -377,20 +382,20 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('מדד שוק (CBS · נדל"ן)',
-              style: TextStyle(
+          Text(l10n.brokerCmaScreen4d538821,
+              style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textSecondary)),
           const SizedBox(height: 6),
-          Text('${_money(ppm.toDouble())} למ״ר · חציון האזור',
+          Text(l10n.brokerCmaScreen320820a2(_money(ppm.toDouble())),
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary)),
           if (fair > 0) ...[
             const SizedBox(height: 2),
-            Text('מחיר הוגן משוער לנכס: ${_money(fair.toDouble())}',
+            Text(l10n.brokerCmaScreen2b9269cd(_money(fair.toDouble())),
                 style: const TextStyle(
                     fontSize: 14, color: AppColors.textSecondary)),
           ],
@@ -417,7 +422,8 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
     );
   }
 
-  Widget _compRow(RentalProperty comp, RentalProperty subject) {
+  Widget _compRow(BuildContext context, RentalProperty comp, RentalProperty subject) {
+    final l10n = AppLocalizations.of(context)!;
     final perM2 = comp.pricePerSquareMeter;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -441,8 +447,8 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  '${comp.roomsLabel} חד׳ · ${comp.sizeM2} מ״ר'
-                  '${perM2 != null ? ' · ${_money(perM2.toDouble())}/מ״ר' : ''}',
+                  l10n.brokerCmaScreenE17f3334(comp.roomsLabel, comp.sizeM2) +
+                      (perM2 != null ? ' · ${_money(perM2.toDouble())}/מ״ר' : ''),
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.textSecondary),
                 ),

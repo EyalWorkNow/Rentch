@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -35,11 +36,14 @@ extension _PanoRowWire on _PanoRow {
         _PanoRow.top => 'top',
         _PanoRow.bottom => 'bottom',
       };
-  String get label => switch (this) {
-        _PanoRow.horizontal => 'אופקי',
-        _PanoRow.top => 'תקרה',
-        _PanoRow.bottom => 'רצפה',
-      };
+  String label(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (this) {
+      _PanoRow.horizontal => l10n.panoramaAlignScreen88220aef,
+      _PanoRow.top => l10n.panoramaAlignScreenE4c00e1b,
+      _PanoRow.bottom => l10n.panoramaAlignScreenDbb59c32,
+    };
+  }
 }
 
 /// One imported pano placed on the track.
@@ -172,15 +176,16 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
   // ── Finish: upload + arrange + stitch ───────────────────────────────────────
 
   Future<void> _finish() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_bands.length < 2) {
-      _toast('הוסיפו לפחות שתי פנורמות כדי להרכיב סיבוב מלא.');
+      _toast(l10n.panoramaAlignScreenD798b826);
       return;
     }
     setState(() {
       _busy = true;
       _stitching = true;
       _stitchError = null;
-      _stitchMsg = 'מתחילים להרכיב את ה-360°...';
+      _stitchMsg = l10n.panoramaAlignScreenB2dac83d;
     });
 
     final panos = _bands
@@ -202,24 +207,25 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
       final job = await AwsApiClient.instance
           .createArrangedPanoramaJob(propertyId: groupId, panos: panos);
       if (job == null || job.uploadUrls.length < _bands.length) {
-        _failStitch('לא הצלחנו להתחיל את ההרכבה. בדקו את החיבור לאינטרנט.');
+        _failStitch(l10n.panoramaAlignScreen62c97e13);
         return;
       }
 
       // Upload each pano to its presigned URL, in the SAME order as panos.
       for (var i = 0; i < _bands.length; i++) {
         if (!mounted) return;
-        setState(() => _stitchMsg = 'מעלים פנורמות... ${i + 1}/${_bands.length}');
+        setState(() => _stitchMsg =
+            l10n.panoramaAlignScreen47b1e23d(i + 1, _bands.length));
         final ok = await AwsApiClient.instance
             .uploadToPresignedUrl(job.uploadUrls[i], _bands[i].path);
         if (!ok) {
-          _failStitch('ההעלאה נכשלה באמצע. בדקו את החיבור ונסו שוב.');
+          _failStitch(l10n.panoramaAlignScreenF18b60a5);
           return;
         }
       }
 
       if (!mounted) return;
-      setState(() => _stitchMsg = 'מחברים את הפנורמות לסיבוב מלא...');
+      setState(() => _stitchMsg = l10n.panoramaAlignScreenD2a25e0e);
       await AwsApiClient.instance.startPanoramaStitch(job.jobId);
 
       const maxPolls = 60; // ~2 min at 2 s
@@ -238,14 +244,14 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
           return;
         }
         if (status.status == 'failed') {
-          _failStitch('ההרכבה נכשלה. נסו לסדר מחדש שתתקבל חפיפה ברורה בין הפנורמות.');
+          _failStitch(l10n.panoramaAlignScreenBc47a202);
           return;
         }
-        setState(() => _stitchMsg = 'מחברים את הפנורמות לסיבוב מלא...');
+        setState(() => _stitchMsg = l10n.panoramaAlignScreenD2a25e0e);
       }
-      _failStitch('ההרכבה לוקחת יותר מדי זמן. נסו שוב מאוחר יותר.');
+      _failStitch(l10n.panoramaAlignScreen4a2e8e0f);
     } catch (e) {
-      _failStitch('משהו השתבש. בדקו את החיבור ונסו שוב.');
+      _failStitch(l10n.panoramaAlignScreen19c26543);
     }
   }
 
@@ -277,13 +283,14 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Stack(
       children: [
         Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
             backgroundColor: AppColors.background,
-            title: const Text('הרכבת 360° מכמה פנורמות'),
+            title: Text(l10n.panoramaAlignScreenFd743c18),
           ),
           body: Column(
             children: [
@@ -298,8 +305,7 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
                           children: [
                             _PreviewStrip(bands: _bands),
                             const SizedBox(height: 14),
-                            _SectionLabel(
-                                'גררו כדי לסדר על הסיבוב (0° → 360°)'),
+                            _SectionLabel(l10n.panoramaAlignScreenCa889149),
                             const SizedBox(height: 8),
                             _Track(
                               bands: _bands,
@@ -308,7 +314,7 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
                               onDragEnd: _dragEndEdge,
                             ),
                             const SizedBox(height: 16),
-                            _SectionLabel('הפנורמות שלכם'),
+                            _SectionLabel(l10n.panoramaAlignScreenFde6013b),
                             const SizedBox(height: 8),
                             ReorderableListView.builder(
                               shrinkWrap: true,
@@ -344,8 +350,8 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
                         ),
                         onPressed: _busy ? null : _addPano,
                         icon: const Icon(IconsaxPlusLinear.gallery_add, size: 22),
-                        label: const Text('הוסף פנורמה',
-                            style: TextStyle(
+                        label: Text(l10n.panoramaAlignScreenD58171d2,
+                            style: const TextStyle(
                                 fontWeight: FontWeight.w800, fontSize: 17)),
                       ),
                     ),
@@ -365,8 +371,8 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
                       onPressed:
                           (_busy || _bands.length < 2) ? null : _finish,
                       icon: const Icon(IconsaxPlusBold.tick_circle, size: 22),
-                      label: const Text('סיים והרכב 360°',
-                          style: TextStyle(
+                      label: Text(l10n.panoramaAlignScreenE0627abd,
+                          style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 18)),
                     ),
                   ),
@@ -394,6 +400,7 @@ class _Guidance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       padding: const EdgeInsets.all(14),
@@ -406,11 +413,10 @@ class _Guidance extends StatelessWidget {
         children: [
           Icon(IconsaxPlusBold.info_circle, color: AppColors.primary),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'צלמו פנורמה אחת בטלפון, ואז עוד אחת מהצד השני. הוסיפו אותן כאן וגררו '
-              'כדי שיתחברו לסיבוב מלא — אנחנו נחבר אותן ל-360° חלק.',
-              style: TextStyle(
+              '${l10n.panoramaAlignScreenAbe1f3b1}${l10n.panoramaAlignScreenE0274901}',
+              style: const TextStyle(
                   color: AppColors.navy, fontSize: 15, height: 1.5),
             ),
           ),
@@ -426,6 +432,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -443,16 +450,16 @@ class _EmptyState extends StatelessWidget {
                   size: 44, color: AppColors.primary),
             ),
             const SizedBox(height: 18),
-            const Text('הוסיפו את הפנורמות שצילמתם',
+            Text(l10n.panoramaAlignScreen8e131b97,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
                     color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text('כל פנורמה מכסה חלק מהסיבוב. הוסיפו שתיים או יותר.',
+            Text(l10n.panoramaAlignScreen6b5a2c3f,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 15, color: AppColors.textSecondary, height: 1.4)),
             const SizedBox(height: 22),
             SizedBox(
@@ -464,9 +471,9 @@ class _EmptyState extends StatelessWidget {
                 ),
                 onPressed: onAdd,
                 icon: const Icon(IconsaxPlusBold.gallery_add, size: 22),
-                label: const Text('הוסף פנורמה',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                label: Text(l10n.panoramaAlignScreenD58171d2,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 18)),
               ),
             ),
           ],
@@ -498,10 +505,11 @@ class _PreviewStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionLabel('כך נראה ה-360° שלכם'),
+        _SectionLabel(l10n.panoramaAlignScreenDc8906c4),
         const SizedBox(height: 8),
         LayoutBuilder(builder: (context, c) {
           final w = c.maxWidth;
@@ -595,15 +603,15 @@ class _Track extends StatelessWidget {
             ),
             // Bands.
             for (var i = 0; i < bands.length; i++)
-              ..._buildBand(i, bands[i], w, pxToDeg, trackH, edgeW),
+              ..._buildBand(context, i, bands[i], w, pxToDeg, trackH, edgeW),
           ],
         ),
       );
     });
   }
 
-  List<Widget> _buildBand(int i, _PanoBand band, double w,
-      double Function(double) pxToDeg, double trackH, double edgeW) {
+  List<Widget> _buildBand(BuildContext context, int i, _PanoBand band,
+      double w, double Function(double) pxToDeg, double trackH, double edgeW) {
     final color = _bandColors[i % _bandColors.length];
     final left = (band.startDeg / 360) * w;
     final bandW = (band.widthDeg / 360) * w;
@@ -632,7 +640,7 @@ class _Track extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           fontSize: 12)),
-                  Text(band.row.label,
+                  Text(band.row.label(context),
                       style: const TextStyle(
                           color: Colors.white, fontSize: 11)),
                 ],
@@ -691,6 +699,7 @@ class _BandTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -722,18 +731,23 @@ class _BandTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('פנורמה ${index + 1}',
+                    Text(l10n.panoramaAlignScreen4d6407f1(index + 1),
                         style: const TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 15)),
                     const SizedBox(height: 2),
                     Text(
-                        '${band.startDeg.round()}° → ${(band.startDeg + band.widthDeg).round() % 360}° · רוחב ${band.widthDeg.round()}°',
+                        l10n.panoramaAlignScreen49cc29de(
+                            band.startDeg.round(),
+                            (band.startDeg + band.widthDeg).round() % 360,
+                            band.widthDeg.round()),
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 12)),
                     if (band.cropLeft > 0.001 || band.cropRight > 0.001) ...[
                       const SizedBox(height: 2),
                       Text(
-                          '✂ נחתך ${(band.cropLeft * 100).round()}% משמאל · ${(band.cropRight * 100).round()}% מימין',
+                          l10n.panoramaAlignScreenF877ef0d(
+                              (band.cropLeft * 100).round(),
+                              (band.cropRight * 100).round()),
                           style: TextStyle(
                               color: AppColors.primary,
                               fontSize: 11,
@@ -746,13 +760,13 @@ class _BandTile extends StatelessWidget {
                 icon: Icon(IconsaxPlusLinear.crop,
                     color: AppColors.primary, size: 22),
                 onPressed: onCrop,
-                tooltip: 'חתוך התאמה',
+                tooltip: l10n.panoramaAlignScreenC32b2bbf,
               ),
               IconButton(
                 icon: const Icon(IconsaxPlusLinear.trash,
                     color: AppColors.coral, size: 22),
                 onPressed: onRemove,
-                tooltip: 'מחק',
+                tooltip: l10n.panoramaAlignScreen09b6bcca,
               ),
               ReorderableDragStartListener(
                 index: index,
@@ -773,7 +787,7 @@ class _BandTile extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: _RowChip(
-                      label: r.label,
+                      label: r.label(context),
                       selected: band.row == r,
                       onTap: () => onRow(r),
                     ),
@@ -833,6 +847,7 @@ class _StitchOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isError = error != null;
     return Positioned.fill(
       child: Container(
@@ -870,16 +885,16 @@ class _StitchOverlay extends StatelessWidget {
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14)),
                     onPressed: onRetry,
-                    child: const Text('חזרה לסידור',
-                        style: TextStyle(
+                    child: Text(l10n.panoramaAlignScreenFc5d14c7,
+                        style: const TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 16)),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: onClose,
-                  child: const Text('סגור',
-                      style: TextStyle(color: Colors.white70)),
+                  child: Text(l10n.panoramaAlignScreen55247199,
+                      style: const TextStyle(color: Colors.white70)),
                 ),
               ],
             ],
@@ -911,6 +926,7 @@ class _CropEditorState extends State<_CropEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       top: false,
       child: Container(
@@ -927,14 +943,14 @@ class _CropEditorState extends State<_CropEditor> {
                   color: AppColors.borderLight,
                   borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 14),
-          const Text('חתכו את הקצוות כדי שיתאים לפנורמה הסמוכה',
+          Text(l10n.panoramaAlignScreen9b77263e,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.navy)),
           const SizedBox(height: 4),
-          const Text('גררו את הידיות פנימה כדי להסיר חפיפה או קצה לא טוב.',
+          Text(l10n.panoramaAlignScreen16d13bac,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 16),
           LayoutBuilder(builder: (context, c) {
             final w = c.maxWidth;
@@ -981,8 +997,8 @@ class _CropEditorState extends State<_CropEditor> {
               }),
               icon: Icon(IconsaxPlusLinear.refresh_2,
                   size: 18, color: AppColors.textSecondary),
-              label: const Text('איפוס',
-                  style: TextStyle(color: AppColors.textSecondary)),
+              label: Text(l10n.panoramaAlignScreen40226151,
+                  style: const TextStyle(color: AppColors.textSecondary)),
             ),
             const Spacer(),
             FilledButton(
@@ -990,8 +1006,8 @@ class _CropEditorState extends State<_CropEditor> {
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12)),
               onPressed: () => Navigator.of(context).pop((_l, 1 - _r)),
-              child: const Text('החל חיתוך',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              child: Text(l10n.panoramaAlignScreen2e0134d2,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
             ),
           ]),
         ]),

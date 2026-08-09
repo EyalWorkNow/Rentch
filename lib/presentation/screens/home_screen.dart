@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/gamification/profile_completion_sheet.dart';
 import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
@@ -170,7 +171,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ProfileScreen()
               ];
 
-        final items = isLandlord ? _landlordItems : _tenantItems;
+        final l10n = AppLocalizations.of(context)!;
+        final items =
+            isLandlord ? _landlordItems(l10n) : _tenantItems(l10n);
         final safeIndex = provider.currentTabIndex.clamp(0, screens.length - 1);
         // The merged "לקוחות" tab (landlord, index 1) reflects BOTH pending
         // candidates and unread conversations; the tenant "התאמות" tab (also
@@ -416,52 +419,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-const _tenantItems = [
-  _NavItem(
-    label: 'חיפוש דירה',
-    icon: IconsaxPlusLinear.search_normal,
-    activeIcon: IconsaxPlusLinear.search_normal,
-  ),
-  _NavItem(
-    label: 'התאמות',
-    icon: IconsaxPlusLinear.message,
-    activeIcon: IconsaxPlusLinear.message,
-  ),
-  _NavItem(
-    label: 'דבר עם אתי',
-    icon: IconsaxPlusLinear.magic_star,
-    activeIcon: IconsaxPlusBold.magic_star,
-    isAssistant: true,
-  ),
-  _NavItem(
-    label: 'פרופיל',
-    icon: IconsaxPlusLinear.profile_circle,
-    activeIcon: IconsaxPlusLinear.profile_circle,
-  ),
-];
+List<_NavItem> _tenantItems(AppLocalizations l10n) => [
+      _NavItem(
+        label: l10n.homeScreenFfcf1893,
+        icon: IconsaxPlusLinear.search_normal,
+        activeIcon: IconsaxPlusLinear.search_normal,
+      ),
+      _NavItem(
+        label: l10n.homeScreen61f6102d,
+        icon: IconsaxPlusLinear.message,
+        activeIcon: IconsaxPlusLinear.message,
+      ),
+      _NavItem(
+        label: l10n.homeScreenB2367383,
+        icon: IconsaxPlusLinear.magic_star,
+        activeIcon: IconsaxPlusBold.magic_star,
+        isAssistant: true,
+      ),
+      _NavItem(
+        label: l10n.homeScreenE1ea2811,
+        icon: IconsaxPlusLinear.profile_circle,
+        activeIcon: IconsaxPlusLinear.profile_circle,
+      ),
+    ];
 
-const _landlordItems = [
-  _NavItem(
-    label: 'דשבורד',
-    icon: IconsaxPlusLinear.category,
-    activeIcon: IconsaxPlusLinear.category,
-  ),
-  _NavItem(
-    label: 'לקוחות',
-    icon: IconsaxPlusLinear.profile_2user,
-    activeIcon: IconsaxPlusLinear.profile_2user,
-  ),
-  _NavItem(
-    label: 'הדירות שלי',
-    icon: IconsaxPlusLinear.buildings_2,
-    activeIcon: IconsaxPlusLinear.buildings_2,
-  ),
-  _NavItem(
-    label: 'פרופיל',
-    icon: IconsaxPlusLinear.profile_circle,
-    activeIcon: IconsaxPlusLinear.profile_circle,
-  ),
-];
+List<_NavItem> _landlordItems(AppLocalizations l10n) => [
+      _NavItem(
+        label: l10n.homeScreen143fe31f,
+        icon: IconsaxPlusLinear.category,
+        activeIcon: IconsaxPlusLinear.category,
+      ),
+      _NavItem(
+        label: l10n.homeScreen1881898b,
+        icon: IconsaxPlusLinear.profile_2user,
+        activeIcon: IconsaxPlusLinear.profile_2user,
+      ),
+      _NavItem(
+        label: l10n.homeScreen2c577068,
+        icon: IconsaxPlusLinear.buildings_2,
+        activeIcon: IconsaxPlusLinear.buildings_2,
+      ),
+      _NavItem(
+        label: l10n.homeScreenE1ea2811,
+        icon: IconsaxPlusLinear.profile_circle,
+        activeIcon: IconsaxPlusLinear.profile_circle,
+      ),
+    ];
 
 class _NavItem {
   const _NavItem({

@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// ─── ADMIN BROADCAST CONSOLE ────────────────────────────────────────────────
@@ -40,47 +41,57 @@ class _Template {
   final bool bold; // bold-color / emoji-celebration emphasis
 }
 
-const List<_Template> _templates = [
-  _Template(
-    id: 'big-image',
-    label: 'תמונה גדולה',
-    emoji: '🖼️',
-    accent: Color(0xFF1CB0F6),
-    showBigImage: true,
-    bold: false,
-  ),
-  _Template(
-    id: 'bold-color',
-    label: 'צבע נועז',
-    emoji: '🔥',
-    accent: AppColors.red,
-    showBigImage: false,
-    bold: true,
-  ),
-  _Template(
-    id: 'emoji-celebration',
-    label: 'חגיגת אימוג׳י',
-    emoji: '🎉',
-    accent: Color(0xFF58CC02),
-    showBigImage: false,
-    bold: true,
-  ),
-  _Template(
-    id: 'minimal',
-    label: 'מינימלי',
-    emoji: '✨',
-    accent: AppColors.slate700,
-    showBigImage: false,
-    bold: false,
-  ),
+const List<String> _templateIds = [
+  'big-image',
+  'bold-color',
+  'emoji-celebration',
+  'minimal',
 ];
+
+/// Builds the template presets with localized labels. Needs [context] because
+/// the labels are user-facing strings (`AppLocalizations`), so this can't be a
+/// top-level `const` anymore.
+List<_Template> _templates(AppLocalizations l10n) => [
+      _Template(
+        id: 'big-image',
+        label: l10n.notifConsoleScreen8d5f5869,
+        emoji: '🖼️',
+        accent: const Color(0xFF1CB0F6),
+        showBigImage: true,
+        bold: false,
+      ),
+      _Template(
+        id: 'bold-color',
+        label: l10n.notifConsoleScreen61993e0f,
+        emoji: '🔥',
+        accent: AppColors.red,
+        showBigImage: false,
+        bold: true,
+      ),
+      _Template(
+        id: 'emoji-celebration',
+        label: l10n.notifConsoleScreen3649be51,
+        emoji: '🎉',
+        accent: const Color(0xFF58CC02),
+        showBigImage: false,
+        bold: true,
+      ),
+      _Template(
+        id: 'minimal',
+        label: l10n.notifConsoleScreen55b43250,
+        emoji: '✨',
+        accent: AppColors.slate700,
+        showBigImage: false,
+        bold: false,
+      ),
+    ];
 
 class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
   final _titleCtrl = TextEditingController();
   final _bodyCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
 
-  _Template _selected = _templates.first;
+  String _selectedId = _templateIds.first;
   bool _sending = false;
   bool _loadingHistory = true;
   List<BroadcastRecord> _history = const [];
@@ -121,7 +132,8 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
       if (!mounted) return;
       setState(() {
         _loadingHistory = false;
-        _historyError = 'טעינת ההיסטוריה נכשלה';
+        _historyError =
+            AppLocalizations.of(context)!.notifConsoleScreenE47df89f;
       });
     }
   }
@@ -133,22 +145,22 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
 
   Future<void> _send() async {
     if (!_canSend) return;
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('לשלוח לכל המשתמשים?'),
-          content: const Text(
-              'ההתראה תישלח לכל משתמשי האפליקציה. הפעולה אינה ניתנת לביטול.'),
+          title: Text(l10n.notifConsoleScreenB5cb1ebd),
+          content: Text(l10n.notifConsoleScreen4d875ef7),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('ביטול'),
+              child: Text(l10n.notifConsoleScreenA7c55a8d),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('שליחה'),
+              child: Text(l10n.notifConsoleScreen5239bffa),
             ),
           ],
         ),
@@ -162,15 +174,15 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
         title: _titleCtrl.text.trim(),
         body: _bodyCtrl.text.trim(),
         imageUrl: _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
-        template: _selected.id,
-        data: {'source': 'admin_console', 'template': _selected.id},
+        template: _selectedId,
+        data: {'source': 'admin_console', 'template': _selectedId},
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.success,
           content: Text(
-              'נשלח בהצלחה • הצליחו ${result.sent} • נכשלו ${result.failed}'),
+              l10n.notifConsoleScreenFf800e24(result.sent, result.failed)),
         ),
       );
       _titleCtrl.clear();
@@ -182,7 +194,7 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.error,
-          content: const Text('השליחה נכשלה. נסו שוב.'),
+          content: Text(l10n.notifConsoleScreenEe5a07f1),
         ),
       );
     } finally {
@@ -192,6 +204,10 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final templates = _templates(l10n);
+    final selected =
+        templates.firstWhere((t) => t.id == _selectedId, orElse: () => templates.first);
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -199,9 +215,9 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
-          title: const Text(
-            'קונסולת התראות',
-            style: TextStyle(
+          title: Text(
+            l10n.notifConsoleScreen18ec902a,
+            style: const TextStyle(
                 color: AppColors.textPrimary, fontWeight: FontWeight.w800),
           ),
           iconTheme: const IconThemeData(color: AppColors.textPrimary),
@@ -209,41 +225,41 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            _audienceBanner(),
+            _audienceBanner(l10n),
             const SizedBox(height: 20),
-            _sectionLabel('עיצוב ההתראה'),
+            _sectionLabel(l10n.notifConsoleScreen689c3cf5),
             const SizedBox(height: 10),
-            _templatePicker(),
+            _templatePicker(templates),
             const SizedBox(height: 20),
-            _sectionLabel('תוכן'),
+            _sectionLabel(l10n.notifConsoleScreenB135a00a),
             const SizedBox(height: 10),
-            _field(_titleCtrl, 'כותרת', maxLines: 1),
+            _field(_titleCtrl, l10n.notifConsoleScreenA21f5710, maxLines: 1),
             const SizedBox(height: 12),
-            _field(_bodyCtrl, 'תוכן ההתראה', maxLines: 3),
+            _field(_bodyCtrl, l10n.notifConsoleScreenF1475bfa, maxLines: 3),
             const SizedBox(height: 12),
-            _field(_imageCtrl, 'כתובת תמונה (אופציונלי)', maxLines: 1),
+            _field(_imageCtrl, l10n.notifConsoleScreenC837e5e6, maxLines: 1),
             const SizedBox(height: 24),
-            _sectionLabel('תצוגה מקדימה'),
+            _sectionLabel(l10n.notifConsoleScreenE95c9328),
             const SizedBox(height: 10),
             _PreviewCard(
-              template: _selected,
+              template: selected,
               title: _titleCtrl.text.trim(),
               body: _bodyCtrl.text.trim(),
               imageUrl: _imageCtrl.text.trim(),
             ),
             const SizedBox(height: 24),
-            _sendButton(),
+            _sendButton(l10n, selected),
             const SizedBox(height: 32),
-            _sectionLabel('היסטוריית שליחות'),
+            _sectionLabel(l10n.notifConsoleScreen13e7d29e),
             const SizedBox(height: 10),
-            _historyList(),
+            _historyList(l10n),
           ],
         ),
       ),
     );
   }
 
-  Widget _audienceBanner() {
+  Widget _audienceBanner(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -254,10 +270,10 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
         children: [
           Icon(Icons.campaign_rounded, color: AppColors.primaryDark),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'קהל יעד: כל המשתמשים',
-              style: TextStyle(
+              l10n.notifConsoleScreen0264cdd3,
+              style: const TextStyle(
                   color: AppColors.textPrimary, fontWeight: FontWeight.w700),
             ),
           ),
@@ -275,14 +291,14 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
         ),
       );
 
-  Widget _templatePicker() {
+  Widget _templatePicker(List<_Template> templates) {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: _templates.map((t) {
-        final selected = t.id == _selected.id;
+      children: templates.map((t) {
+        final selected = t.id == _selectedId;
         return GestureDetector(
-          onTap: () => setState(() => _selected = t),
+          onTap: () => setState(() => _selectedId = t.id),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -338,13 +354,13 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
     );
   }
 
-  Widget _sendButton() {
+  Widget _sendButton(AppLocalizations l10n, _Template selected) {
     return SizedBox(
       height: 54,
       child: FilledButton(
         onPressed: _canSend ? _send : null,
         style: FilledButton.styleFrom(
-          backgroundColor: _selected.accent,
+          backgroundColor: selected.accent,
           disabledBackgroundColor: AppColors.textDisabled,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -357,9 +373,9 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
                 child: CircularProgressIndicator(
                     strokeWidth: 2.5, color: Colors.white),
               )
-            : const Text(
-                'שליחה לכל המשתמשים',
-                style: TextStyle(
+            : Text(
+                l10n.notifConsoleScreen9a1364b4,
+                style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Colors.white),
@@ -368,7 +384,7 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
     );
   }
 
-  Widget _historyList() {
+  Widget _historyList(AppLocalizations l10n) {
     if (_loadingHistory) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -380,14 +396,14 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
       return _emptyState(_historyError!);
     }
     if (_history.isEmpty) {
-      return _emptyState('עדיין לא נשלחו התראות');
+      return _emptyState(l10n.notifConsoleScreenB4c5133d);
     }
     return Column(
-      children: _history.map(_historyTile).toList(),
+      children: _history.map((r) => _historyTile(r, l10n)).toList(),
     );
   }
 
-  Widget _historyTile(BroadcastRecord r) {
+  Widget _historyTile(BroadcastRecord r, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -435,7 +451,7 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'הצליחו ${r.sent} • נכשלו ${r.failed} • ${_fmtDate(r.createdAt)}',
+            l10n.notifConsoleScreenAbaa0cd6(r.sent, r.failed, _fmtDate(r.createdAt)),
             style: const TextStyle(
                 color: AppColors.textDisabled,
                 fontSize: 12,
@@ -479,9 +495,10 @@ class _PreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final hasImage = imageUrl.trim().isNotEmpty;
-    final shownTitle = title.isEmpty ? 'כותרת ההתראה' : title;
-    final shownBody = body.isEmpty ? 'תוכן ההתראה יופיע כאן…' : body;
+    final shownTitle = title.isEmpty ? l10n.notifConsoleScreen4fa84be8 : title;
+    final shownBody = body.isEmpty ? l10n.notifConsoleScreen8d2574fe : body;
 
     return Container(
       decoration: BoxDecoration(

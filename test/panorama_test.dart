@@ -1,4 +1,5 @@
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_web_tour.dart';
@@ -21,6 +22,9 @@ PropertyPanoramaTour _twoNodeTour() => const PropertyPanoramaTour(nodes: [
     ]);
 
 Widget _wrap(Widget child) => MaterialApp(
+      locale: const Locale('he'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(textDirection: TextDirection.rtl, child: child),
     );
 

@@ -3,6 +3,7 @@ import 'package:dating_app/core/services/assistant_live_service.dart' show LiveS
 import 'package:dating_app/core/services/openai_realtime_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -28,7 +29,7 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
   final OpenAiRealtimeService _live = OpenAiRealtimeService(mode: 'landlord');
   LiveStatus _status = LiveStatus.connecting;
   String _userText = '';
-  String _erikText = 'מתחבר…';
+  String _erikText = ''; // empty until the first real chunk arrives
   bool _published = false;
   bool _failed = false;
 
@@ -45,7 +46,7 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
       ..onErikText = (t) {
         if (mounted) {
           setState(() {
-            _erikText = _status == LiveStatus.speaking && _erikText != 'מתחבר…'
+            _erikText = _status == LiveStatus.speaking && _erikText.isNotEmpty
                 ? '$_erikText$t'
                 : t;
           });
@@ -68,7 +69,9 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
         } catch (_) {/* עזרא still confirms by voice; user can retry */}
       }
       ..onSearchListings = ((args) async {
-        return 'אפשר לראות את הדירות הקיימות במסך "הדירות שלי".';
+        return mounted
+            ? AppLocalizations.of(context)!.erikLiveVoiceScreen4ec210b3
+            : '';
       })
       ..onError = (msg) {
         if (_failed) return;
@@ -88,18 +91,19 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
   }
 
   String get _statusLabel {
+    final l10n = AppLocalizations.of(context)!;
     switch (_status) {
       case LiveStatus.connecting:
-        return 'מתחבר…';
+        return l10n.erikLiveVoiceScreenD5fa2760;
       case LiveStatus.listening:
-        return 'מקשיב — פשוט דבר 🎙️';
+        return l10n.erikLiveVoiceScreen15ec4d84;
       case LiveStatus.speaking:
-        return 'עזרא מדבר';
+        return l10n.erikLiveVoiceScreenC4ad4681;
       case LiveStatus.error:
-        return 'תקלה בחיבור';
+        return l10n.erikLiveVoiceScreenAa5a9e29;
       case LiveStatus.idle:
       case LiveStatus.closed:
-        return 'השיחה הסתיימה';
+        return l10n.erikLiveVoiceScreenC21710c8;
     }
   }
 
@@ -116,7 +120,10 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final caption = _userText.isNotEmpty ? _userText : _erikText;
+    final l10n = AppLocalizations.of(context)!;
+    final erikDisplay =
+        _erikText.isNotEmpty ? _erikText : l10n.erikLiveVoiceScreenD5fa2760;
+    final caption = _userText.isNotEmpty ? _userText : erikDisplay;
     final isUser = _userText.isNotEmpty;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -186,10 +193,11 @@ class _ErikLiveVoiceScreenState extends State<ErikLiveVoiceScreen> {
                           Icon(IconsaxPlusBold.tick_circle,
                               color: AppColors.success, size: 22),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                                'הדירה פורסמה! אפשר להוסיף תמונות במסך "הדירות שלי".',
-                                style: TextStyle(
+                                AppLocalizations.of(context)!
+                                    .erikLiveVoiceScreen01302f08,
+                                style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w700)),

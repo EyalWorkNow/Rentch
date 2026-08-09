@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -67,7 +68,10 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
       }
       setState(() => _cam = ctrl);
     } catch (_) {
-      if (mounted) setState(() => _error = 'לא ניתן לפתוח את המצלמה');
+      if (mounted) {
+        setState(() => _error =
+            AppLocalizations.of(context)!.panoramaPoleCaptureE779f1ba);
+      }
     }
   }
 
@@ -118,11 +122,19 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
 
   bool get _isFloor => _step == _Step.floor;
 
-  String get _title => _isFloor ? 'צלם את הרצפה' : 'צלם את התקרה';
+  String get _title {
+    final l10n = AppLocalizations.of(context)!;
+    return _isFloor
+        ? l10n.panoramaPoleCapture4c3842b7
+        : l10n.panoramaPoleCapture66a0b2bb;
+  }
 
-  String get _hint => _isFloor
-      ? 'כוון את הטלפון כלפי מטה אל הרצפה ועמוד במקום שבו צילמת את הפנורמה'
-      : 'כוון את הטלפון כלפי מעלה אל התקרה, מאותה נקודה בדיוק';
+  String get _hint {
+    final l10n = AppLocalizations.of(context)!;
+    return _isFloor
+        ? l10n.panoramaPoleCapture033fdc7f
+        : l10n.panoramaPoleCapture1ca815b5;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +184,11 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _isFloor ? 'שלב 1 מתוך 2 · רצפה' : 'שלב 2 מתוך 2 · תקרה',
+                        _isFloor
+                            ? AppLocalizations.of(context)!
+                                .panoramaPoleCapture4658faad
+                            : AppLocalizations.of(context)!
+                                .panoramaPoleCapture4af99b9d,
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -232,8 +248,10 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
                         children: [
                           TextButton(
                             onPressed: _shooting ? null : _skipStep,
-                            child: const Text('דלג',
-                                style: TextStyle(
+                            child: Text(
+                                AppLocalizations.of(context)!
+                                    .panoramaPoleCapture80a413c5,
+                                style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700)),
                           ),
@@ -298,13 +316,16 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
             const Icon(IconsaxPlusLinear.camera_slash,
                 color: Colors.white54, size: 48),
             const SizedBox(height: 12),
-            Text(_error ?? 'שגיאת מצלמה',
+            Text(
+                _error ??
+                    AppLocalizations.of(context)!.panoramaPoleCapture4c53a96e,
                 style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.of(context).pop(const PolePhotos()),
-              child: const Text('סגור'),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaPoleCapture55247199),
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/broker_deal.dart';
 import 'package:dating_app/data/repositories/broker_deal_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// עמלות ופייפליין כספי — commission pipeline dashboard.
@@ -108,23 +109,24 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
   }
 
   Future<void> _delete(BrokerDeal d) async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('למחוק את העסקה?'),
+          title: Text(l10n.brokerCommissionScreen6d8d1136),
           content: Text(d.propertyTitle.trim().isEmpty
-              ? 'הרשומה תימחק לצמיתות.'
-              : '"${d.propertyTitle.trim()}" תימחק לצמיתות.'),
+              ? l10n.brokerCommissionScreen88ad6f14
+              : l10n.brokerCommissionScreen5c5ec48f(d.propertyTitle.trim())),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('ביטול')),
+                child: Text(l10n.brokerCommissionScreenA7c55a8d)),
             FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('מחק')),
+                child: Text(l10n.brokerCommissionScreen09b6bcca)),
           ],
         ),
       ),
@@ -136,13 +138,14 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final totals = commissionTotals(_deals, DateTime.now());
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('עמלות ופייפליין'),
+          title: Text(l10n.brokerCommissionScreenA8ea0bb8),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -153,8 +156,8 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
           foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),
-          label: const Text('עסקה חדשה',
-              style: TextStyle(fontWeight: FontWeight.w700)),
+          label: Text(l10n.brokerCommissionScreen77289a23,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -165,41 +168,41 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
                     children: [
                       Expanded(
                         child: _statCard(
-                          'צפי בצנרת',
+                          l10n.brokerCommissionScreen7d9ee511,
                           _money(totals.expectedPipeline),
-                          '${totals.openCount} עסקאות פתוחות',
+                          l10n.brokerCommissionScreen8b24239f(totals.openCount),
                           AppColors.primary,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _statCard(
-                          'נסגר החודש',
+                          l10n.brokerCommissionScreenA848f824,
                           _money(totals.wonThisMonth),
-                          'עמלה שהתקבלה',
+                          l10n.brokerCommissionScreenD5a65055,
                           AppColors.success,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 22),
-                  const Text('כל העסקאות',
-                      style: TextStyle(
+                  Text(l10n.brokerCommissionScreenDd3b0aad,
+                      style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary)),
                   const SizedBox(height: 12),
                   if (_deals.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Text(
-                        'אין עדיין עסקאות. הוסף עסקה כדי לעקוב אחר העמלות.',
-                        style: TextStyle(
+                        l10n.brokerCommissionScreenC9ef0566,
+                        style: const TextStyle(
                             fontSize: 16, color: AppColors.textSecondary),
                       ),
                     )
                   else
-                    for (final d in _deals) _dealCard(d),
+                    for (final d in _deals) _dealCard(d, l10n),
                 ],
               ),
       ),
@@ -235,7 +238,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
     );
   }
 
-  Widget _dealCard(BrokerDeal d) {
+  Widget _dealCard(BrokerDeal d, AppLocalizations l10n) {
     final stageColor = d.isWon
         ? AppColors.success
         : d.isOpen
@@ -259,7 +262,9 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
             children: [
               Expanded(
                 child: Text(
-                  d.propertyTitle.isEmpty ? 'עסקה ללא שם' : d.propertyTitle,
+                  d.propertyTitle.isEmpty
+                      ? l10n.brokerCommissionScreen6cecfe2c
+                      : d.propertyTitle,
                   style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -283,7 +288,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
           ),
           if (d.clientName.trim().isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('לקוח: ${d.clientName}',
+            Text(l10n.brokerCommissionScreenD629d4dc(d.clientName),
                 style: const TextStyle(
                     fontSize: 14, color: AppColors.textSecondary)),
           ],
@@ -291,10 +296,12 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
           Row(
             children: [
               Expanded(
-                child: _miniStat('שווי עסקה', _money(d.dealAmount)),
+                child: _miniStat(
+                    l10n.brokerCommissionScreen84540fa4, _money(d.dealAmount)),
               ),
               Expanded(
-                child: _miniStat('עמלה (${_pct(d.commissionPct)}%)',
+                child: _miniStat(
+                    l10n.brokerCommissionScreenC3eaf8a1(_pct(d.commissionPct)),
                     _money(d.commissionAmount)),
               ),
             ],
@@ -306,14 +313,14 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
               TextButton.icon(
                 onPressed: () => _openEditor(d),
                 icon: const Icon(Icons.edit_outlined, size: 20),
-                label: const Text('עריכה'),
+                label: Text(l10n.brokerCommissionScreen39fe2593),
                 style:
                     TextButton.styleFrom(foregroundColor: AppColors.primaryDark),
               ),
               TextButton.icon(
                 onPressed: () => _delete(d),
                 icon: const Icon(Icons.delete_outline, size: 20),
-                label: const Text('מחיקה'),
+                label: Text(l10n.brokerCommissionScreen7c8173fa),
                 style: TextButton.styleFrom(foregroundColor: AppColors.error),
               ),
             ],
@@ -398,6 +405,7 @@ class _DealEditorState extends State<_DealEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final livePct = double.tryParse(_pctCtrl.text.trim()) ?? 0;
     final liveAmount = double.tryParse(_amount.text.trim()) ?? 0;
@@ -429,26 +437,29 @@ class _DealEditorState extends State<_DealEditor> {
               ),
               const SizedBox(height: 16),
               Text(
-                widget.existing == null ? 'עסקה חדשה' : 'עריכת עסקה',
+                widget.existing == null
+                    ? l10n.brokerCommissionScreen77289a23
+                    : l10n.brokerCommissionScreen50b6fe45,
                 style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: AppColors.textPrimary),
               ),
               const SizedBox(height: 16),
-              _field(_title, 'כתובת / שם הנכס'),
-              _field(_client, 'שם הלקוח'),
-              _field(_amount, 'שווי עסקה (₪)',
+              _field(_title, l10n.brokerCommissionScreenBa9fc140),
+              _field(_client, l10n.brokerCommissionScreenC416d614),
+              _field(_amount, l10n.brokerCommissionScreen8b26fe13,
                   keyboardType: TextInputType.number,
                   onChanged: (_) => setState(() {})),
-              _field(_pctCtrl, 'אחוז עמלה (%)',
+              _field(_pctCtrl, l10n.brokerCommissionScreen7ac184b0,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setState(() {})),
               if (liveCommission > 0)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: Text('עמלה צפויה: ${_money(liveCommission)}',
+                  child: Text(
+                      l10n.brokerCommissionScreen4e41a655(_money(liveCommission)),
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -484,8 +495,8 @@ class _DealEditorState extends State<_DealEditor> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('שמירה',
-                      style: TextStyle(
+                  child: Text(l10n.brokerCommissionScreenE6932339,
+                      style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.w800)),
                 ),
               ),

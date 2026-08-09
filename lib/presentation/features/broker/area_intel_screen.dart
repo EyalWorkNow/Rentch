@@ -471,7 +471,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
               color: on ? AppColors.primary : AppColors.borderLight),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('${f.persona.emoji} ${f.persona.label}',
+          Text('${f.persona.emoji} ${f.persona.label(AppLocalizations.of(context)!)}',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -503,7 +503,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text('${f.persona.emoji} ${f.persona.label}',
+          Text('${f.persona.emoji} ${f.persona.label(l10n)}',
               style: const TextStyle(
                   fontSize: 17, fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary)),

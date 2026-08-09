@@ -1,5 +1,6 @@
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 
@@ -62,7 +63,9 @@ class ProfileHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'תקציב עד ${_formatCurrency(profile.budgetMax)} • ${profile.desiredRooms} חדרים',
+                      AppLocalizations.of(context)!.profileHeader31a7e3af(
+                          _formatCurrency(profile.budgetMax),
+                          profile.desiredRooms),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontWeight: FontWeight.w700,

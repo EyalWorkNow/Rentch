@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -55,20 +56,21 @@ class _PanoramaMapPlacementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final placedNodes =
         widget.existing.where((n) => n.hasPosition).toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
-        title: const Text('מיקום הנקודה'),
+        title: Text(l10n.panoramaMapPlacement89efe952),
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Text(
-              'הקש על המפה היכן צילמת את «${widget.label}» בבית.',
+              l10n.panoramaMapPlacement9b8a163d(widget.label),
               textAlign: TextAlign.center,
               style: const TextStyle(
                   color: AppColors.navy,
@@ -76,12 +78,13 @@ class _PanoramaMapPlacementScreenState
                   fontWeight: FontWeight.w700),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'זה בונה מפה קטנה שתעזור לעבור בין החדרים בסיור.',
+              l10n.panoramaMapPlacementE8290949,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12.5),
             ),
           ),
           Padding(
@@ -91,7 +94,9 @@ class _PanoramaMapPlacementScreenState
               child: TextButton.icon(
                 onPressed: _pickFloorPlan,
                 icon: const Icon(IconsaxPlusLinear.gallery_add, size: 18),
-                label: Text(_floor == null ? 'העלה תוכנית דירה' : 'החלף תוכנית'),
+                label: Text(_floor == null
+                    ? l10n.panoramaMapPlacement167194cf
+                    : l10n.panoramaMapPlacement17cdf785),
               ),
             ),
           ),
@@ -167,7 +172,7 @@ class _PanoramaMapPlacementScreenState
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('דלג'),
+                      child: Text(l10n.panoramaMapPlacement80a413c5),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -182,8 +187,8 @@ class _PanoramaMapPlacementScreenState
                           ? null
                           : () => Navigator.of(context).pop(_placed),
                       icon: const Icon(IconsaxPlusLinear.tick_circle),
-                      label: const Text('אישור מיקום',
-                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      label: Text(l10n.panoramaMapPlacement1bc95f85,
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   ),
                 ],

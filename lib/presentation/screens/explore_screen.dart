@@ -1931,7 +1931,8 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         runSpacing: 8,
                         children: [
                           for (final entry
-                              in CandidateFilters.lifeStageLabels.entries)
+                              in CandidateFilters.lifeStageLabelsFor(l10n)
+                                  .entries)
                             _QuickChip(
                               label: entry.value,
                               selected: _draft.lifeStage.contains(entry.key),
@@ -2034,7 +2035,8 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                           for (final token
                               in CandidateFilters.moveInWindowTokens)
                             _QuickChip(
-                              label: CandidateFilters.moveInWindowLabel(token),
+                              label: CandidateFilters.moveInWindowLabel(
+                                  l10n, token),
                               selected: _draft.moveInWindow == token,
                               onTap: () => setState(() {
                                 _draft = _draft.moveInWindow == token

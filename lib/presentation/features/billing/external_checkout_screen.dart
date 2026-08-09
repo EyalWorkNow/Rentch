@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/deep_link_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -76,6 +77,7 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -118,8 +120,8 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
                 const SizedBox(height: 20),
                 Text(
                   _launchFailed
-                      ? 'לא הצלחנו לפתוח את הדפדפן'
-                      : 'התשלום נפתח בדפדפן',
+                      ? l10n.externalCheckoutScreenEd6f8b3f
+                      : l10n.externalCheckoutScreenFed753f2,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: AppColors.slate900,
@@ -129,9 +131,9 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
                 const SizedBox(height: 10),
                 Text(
                   _launchFailed
-                      ? 'נסו לפתוח שוב, או חזרו ובחרו אמצעי תשלום אחר.'
-                      : 'השלימו את התשלום בדפדפן (Apple Pay / Google Pay), '
-                          'ואז חזרו לכאן ולחצו "שילמתי — המשך".',
+                      ? l10n.externalCheckoutScreenC8dbc943
+                      : l10n.externalCheckoutScreen62ff1866 +
+                          l10n.externalCheckoutScreen0a561779,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: AppColors.textSecondary,
@@ -167,8 +169,8 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
                             borderRadius: BorderRadius.circular(28)),
                       ),
                       onPressed: _done,
-                      child: const Text('שילמתי — המשך',
-                          style: TextStyle(
+                      child: Text(l10n.externalCheckoutScreen67490ed7,
+                          style: const TextStyle(
                               fontSize: 16.5, fontWeight: FontWeight.w900)),
                     ),
                   ),
@@ -185,7 +187,9 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
                     ),
                     onPressed: () => _launch(),
                     child: Text(
-                        _launchFailed ? 'פתחו שוב' : 'פתחו שוב את דף התשלום',
+                        _launchFailed
+                            ? l10n.externalCheckoutScreenC4455ef4
+                            : l10n.externalCheckoutScreen81b0db62,
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w800)),
                   ),
@@ -193,8 +197,8 @@ class _ExternalCheckoutScreenState extends State<ExternalCheckoutScreen> {
                 const SizedBox(height: 4),
                 TextButton(
                   onPressed: _cancel,
-                  child: const Text('ביטול',
-                      style: TextStyle(
+                  child: Text(l10n.externalCheckoutScreenA7c55a8d,
+                      style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700)),
                 ),

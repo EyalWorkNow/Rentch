@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Detailed, data-grounded "why I picked this for you" — the personal customization
@@ -43,7 +44,9 @@ class _WhyDetailsState extends State<WhyDetails> {
             child: Row(children: [
               Icon(Icons.auto_awesome, size: 16, color: _accent),
               const SizedBox(width: 6),
-              Text('למה בחרתי לך את זו? · $fitPct% התאמה',
+              Text(
+                  AppLocalizations.of(context)!
+                      .whyDetailsAa1ccf6a(fitPct),
                   style: TextStyle(
                       color: _accent, fontSize: 13, fontWeight: FontWeight.w800)),
               const Spacer(),
@@ -57,7 +60,7 @@ class _WhyDetailsState extends State<WhyDetails> {
         ),
         AnimatedCrossFade(
           firstChild: const SizedBox(width: double.infinity),
-          secondChild: _body(sc, tags),
+          secondChild: _body(context, sc, tags),
           crossFadeState:
               _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 220),
@@ -66,7 +69,7 @@ class _WhyDetailsState extends State<WhyDetails> {
     );
   }
 
-  Widget _body(sc, List<String> tags) {
+  Widget _body(BuildContext context, sc, List<String> tags) {
     final children = <Widget>[];
 
     // Personal reasons (why it fits THIS user).
@@ -132,7 +135,7 @@ class _WhyDetailsState extends State<WhyDetails> {
 
     if (children.isEmpty) {
       children.add(_line(Icons.check_circle_rounded, _accent,
-          'מתאימה למה שחיפשת — אזור, תקציב וגודל'));
+          AppLocalizations.of(context)!.whyDetails80b99f5e));
     }
 
     return Padding(

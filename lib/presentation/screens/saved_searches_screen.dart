@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/saved_search.dart';
 import 'package:dating_app/data/repositories/saved_search_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// "החיפושים שלי" — the tenant's saved searches.
@@ -21,6 +22,7 @@ class SavedSearchesScreen extends StatefulWidget {
   /// values the tenant is currently browsing — see the file header for the call
   /// shape. Returns the saved search (so callers can confirm to the user).
   static Future<SavedSearch> saveCurrent({
+    required BuildContext context,
     required String name,
     String? city,
     int? minBudget,
@@ -33,9 +35,10 @@ class SavedSearchesScreen extends StatefulWidget {
     SavedSearchRepository? repository,
   }) async {
     final repo = repository ?? SavedSearchRepository();
+    final l10n = AppLocalizations.of(context)!;
     final search = SavedSearch(
       id: 'ss_${DateTime.now().microsecondsSinceEpoch}',
-      name: name.trim().isEmpty ? 'החיפוש שלי' : name.trim(),
+      name: name.trim().isEmpty ? l10n.savedSearchesScreenC7d46456 : name.trim(),
       city: city,
       minBudget: minBudget,
       maxBudget: maxBudget,
@@ -91,6 +94,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -99,9 +103,9 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
           backgroundColor: AppColors.background,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
-          title: const Text(
-            'החיפושים שלי',
-            style: TextStyle(
+          title: Text(
+            l10n.savedSearchesScreenAce44591,
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
@@ -135,30 +139,33 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
     await NotificationService.instance.requestPermissions();
     await NotificationService.instance.testFireSavedSearch();
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('שלחנו לך התראה לדוגמה')),
+      SnackBar(content: Text(l10n.savedSearchesScreenDe24f588)),
     );
   }
 
   Future<void> _confirmDelete(SavedSearch search) async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('למחוק את החיפוש?'),
+          title: Text(l10n.savedSearchesScreenA6ccd3f5),
           content: Text(
-            'לא נודיע לך יותר על דירות חדשות מתאימות ל"${search.name}".',
+            l10n.savedSearchesScreenCa9c8510(search.name),
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('ביטול'),
+              child: Text(l10n.savedSearchesScreenA7c55a8d),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('מחק', style: TextStyle(color: AppColors.error)),
+              child: Text(l10n.savedSearchesScreen09b6bcca,
+                  style: const TextStyle(color: AppColors.error)),
             ),
           ],
         ),
@@ -181,6 +188,8 @@ class _SavedSearchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final summary = _summary(l10n);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -207,14 +216,14 @@ class _SavedSearchCard extends StatelessWidget {
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline,
                     color: AppColors.textSecondary),
-                tooltip: 'מחק',
+                tooltip: l10n.savedSearchesScreen09b6bcca,
               ),
             ],
           ),
-          if (_summary.isNotEmpty) ...[
+          if (summary.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              _summary,
+              summary,
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -235,8 +244,8 @@ class _SavedSearchCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   search.alertsOn
-                      ? 'נודיע לך על דירות חדשות'
-                      : 'ההתראות כבויות',
+                      ? l10n.savedSearchesScreen932eb7ab
+                      : l10n.savedSearchesScreen0d57719f,
                   style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textPrimary,
@@ -255,25 +264,26 @@ class _SavedSearchCard extends StatelessWidget {
     );
   }
 
-  String get _summary {
+  String _summary(AppLocalizations l10n) {
     final parts = <String>[];
     final city = search.city?.trim();
     if (city != null && city.isNotEmpty) parts.add(city);
 
     if (search.minRooms != null || search.maxRooms != null) {
-      parts.add('${_rooms(search.minRooms, search.maxRooms)} חדרים');
+      parts.add(l10n.savedSearchesScreen0133e3ff(
+          _rooms(search.minRooms, search.maxRooms, l10n)));
     }
 
     if (search.minBudget != null || search.maxBudget != null) {
-      parts.add('${_budget(search.minBudget, search.maxBudget)} ₪');
+      parts.add('${_budget(search.minBudget, search.maxBudget, l10n)} ₪');
     }
 
     switch (search.transactionType) {
       case 'rent':
-        parts.add('להשכרה');
+        parts.add(l10n.savedSearchesScreenB336259f);
         break;
       case 'sale':
-        parts.add('למכירה');
+        parts.add(l10n.savedSearchesScreen609fac18);
         break;
     }
 
@@ -283,19 +293,19 @@ class _SavedSearchCard extends StatelessWidget {
     return parts.join(' · ');
   }
 
-  String _rooms(double? min, double? max) {
+  String _rooms(double? min, double? max, AppLocalizations l10n) {
     String fmt(double v) => v == v.roundToDouble() ? v.round().toString() : '$v';
     if (min != null && max != null) {
       return min == max ? fmt(min) : '${fmt(min)}–${fmt(max)}';
     }
-    if (min != null) return 'מ-${fmt(min)}';
-    return 'עד ${fmt(max!)}';
+    if (min != null) return l10n.savedSearchesScreenFe06d013(fmt(min));
+    return l10n.savedSearchesScreen36f2a6b9(fmt(max!));
   }
 
-  String _budget(int? min, int? max) {
+  String _budget(int? min, int? max, AppLocalizations l10n) {
     if (min != null && max != null) return '$min–$max';
-    if (min != null) return 'מ-$min';
-    return 'עד $max';
+    if (min != null) return l10n.savedSearchesScreenA02655ab(min);
+    return l10n.savedSearchesScreen09a44457(max!);
   }
 }
 
@@ -306,6 +316,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -314,9 +325,9 @@ class _EmptyState extends StatelessWidget {
           children: [
             Icon(Icons.search_off, size: 72, color: AppColors.primaryLight),
             const SizedBox(height: 20),
-            const Text(
-              'עדיין לא שמרת חיפוש',
-              style: TextStyle(
+            Text(
+              l10n.savedSearchesScreenC0e45e79,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -324,10 +335,10 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'שמור חיפוש כדי שנודיע לך כשתעלה דירה שמתאימה.\n'
-              'דירות טובות נחטפות תוך ימים — שווה להיות הראשונים.',
-              style: TextStyle(
+            Text(
+              '${l10n.savedSearchesScreen93343d42}'
+              '${l10n.savedSearchesScreen962807e9}',
+              style: const TextStyle(
                 fontSize: 18,
                 color: AppColors.textSecondary,
                 height: 1.5,
@@ -337,9 +348,9 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 28),
             TextButton(
               onPressed: onTestAlert,
-              child: const Text(
-                'שלחו לי התראה לדוגמה',
-                style: TextStyle(fontSize: 16),
+              child: Text(
+                l10n.savedSearchesScreen023a3173,
+                style: const TextStyle(fontSize: 16),
               ),
             ),
           ],

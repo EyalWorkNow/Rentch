@@ -15,6 +15,7 @@
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
@@ -24,16 +25,17 @@ class NeighborhoodScoreCard extends StatelessWidget {
   /// Raw enrichment map; may be null/partial/absent. Never assumed well-formed.
   final Map<String, dynamic>? enrichment;
 
-  /// Hebrew labels for the known sub-scores, in canonical display order.
-  static const Map<String, String> _subLabels = {
-    'safety': 'בטיחות',
-    'walkability': 'הליכתיות',
-    'schools': 'בתי״ס',
-    'kindergarten': 'גני ילדים',
-    'transit': 'תחבורה',
-    'green': 'ירוק',
-    'quiet': 'שקט',
-  };
+  /// Labels for the known sub-scores, in canonical display order. Localized —
+  /// keyed by the SAME server-side keys the enrichment map uses.
+  static Map<String, String> _subLabels(AppLocalizations l10n) => {
+        'safety': l10n.neighborhoodScoreCardE642cece,
+        'walkability': l10n.neighborhoodScoreCard0fff92d0,
+        'schools': l10n.neighborhoodScoreCard5a567748,
+        'kindergarten': l10n.neighborhoodScoreCard00a5eaf2,
+        'transit': l10n.neighborhoodScoreCard8cf2e63d,
+        'green': l10n.neighborhoodScoreCard08d4f99e,
+        'quiet': l10n.neighborhoodScoreCard40d07087,
+      };
 
   /// Each sub-score → its honest data source, so the breakdown can show WHERE the
   /// figure came from. Reuses the shared GovSources registry where a matching
@@ -74,6 +76,8 @@ class NeighborhoodScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final subLabels = _subLabels(l10n);
     final map = _scoreMap(enrichment);
     if (map == null) return const SizedBox.shrink();
 
@@ -84,14 +88,14 @@ class NeighborhoodScoreCard extends StatelessWidget {
     final subRaw = map['sub'];
     final subs = <MapEntry<String, int>>[];
     if (subRaw is Map) {
-      for (final key in _subLabels.keys) {
+      for (final key in subLabels.keys) {
         final v = _toDouble(subRaw[key]);
         if (v != null && v > 0) subs.add(MapEntry(key, v.round().clamp(0, 100)));
       }
       // Tolerate unknown sub-keys the backend may add later.
       for (final entry in subRaw.entries) {
         final k = entry.key.toString();
-        if (_subLabels.containsKey(k)) continue;
+        if (subLabels.containsKey(k)) continue;
         final v = _toDouble(entry.value);
         if (v != null && v > 0) subs.add(MapEntry(k, v.round().clamp(0, 100)));
       }
@@ -109,7 +113,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _showBreakdown(context, headlineInt, topSubs),
+          onTap: () => _showBreakdown(context, headlineInt, topSubs, subLabels),
           borderRadius: BorderRadius.circular(20),
           child: Ink(
             padding: const EdgeInsets.all(16),
@@ -133,9 +137,9 @@ class NeighborhoodScoreCard extends StatelessWidget {
                     Icon(IconsaxPlusLinear.location,
                         size: 20, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    const Text(
-                      'ציון השכונה',
-                      style: TextStyle(
+                    Text(
+                      l10n.neighborhoodScoreCard2de2ff3f,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                         color: AppColors.ink,
@@ -153,7 +157,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
                     children: [
                       for (final c in chips)
                         _SubScoreChip(
-                          label: _subLabels[c.key] ?? c.key,
+                          label: subLabels[c.key] ?? c.key,
                           value: c.value,
                         ),
                     ],
@@ -166,7 +170,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
                         size: 14, color: AppColors.primary),
                     const SizedBox(width: 5),
                     Text(
-                      'הצג פירוט ומקורות',
+                      l10n.neighborhoodScoreCard542929e1,
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -186,8 +190,8 @@ class NeighborhoodScoreCard extends StatelessWidget {
     );
   }
 
-  void _showBreakdown(
-      BuildContext context, int? headline, List<MapEntry<String, int>> subs) {
+  void _showBreakdown(BuildContext context, int? headline,
+      List<MapEntry<String, int>> subs, Map<String, String> labels) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -198,7 +202,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
       builder: (_) => _NeighborhoodBreakdownSheet(
         headline: headline,
         subs: subs,
-        labels: _subLabels,
+        labels: labels,
         sourceFor: _sourceFor,
       ),
     );
@@ -229,6 +233,7 @@ class _NeighborhoodBreakdownSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Sources actually cited (deduped by label) for the footer.
     final sources = <String>[];
     for (final s in subs) {
@@ -262,8 +267,8 @@ class _NeighborhoodBreakdownSheet extends StatelessWidget {
                     Icon(IconsaxPlusLinear.location,
                         size: 22, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    const Text('ציון השכונה',
-                        style: TextStyle(
+                    Text(l10n.neighborhoodScoreCard2de2ff3f,
+                        style: const TextStyle(
                             fontSize: 19, fontWeight: FontWeight.w900)),
                     const Spacer(),
                     if (headline != null) _HeadlineBadge(score: headline!),
@@ -271,13 +276,13 @@ class _NeighborhoodBreakdownSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'הציון הכולל הוא ממוצע משוקלל של הפרמטרים הבאים, המחושבים מנתונים ציבוריים ונקודות עניין באזור.',
+                  l10n.neighborhoodScoreCard63eefa9b,
                   style: TextStyle(
                       color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 18),
                 if (subs.isEmpty)
-                  Text('אין עדיין פירוט זמין לאזור זה.',
+                  Text(l10n.neighborhoodScoreCard4c69a81b,
                       style: TextStyle(color: AppColors.textSecondary))
                 else
                   for (final s in subs) ...[
@@ -298,8 +303,8 @@ class _NeighborhoodBreakdownSheet extends StatelessWidget {
                       Icon(IconsaxPlusLinear.document_text,
                           size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 6),
-                      const Text('מקורות הנתונים',
-                          style: TextStyle(
+                      Text(l10n.neighborhoodScoreCard5d1b29db,
+                          style: const TextStyle(
                               fontSize: 13.5, fontWeight: FontWeight.w800)),
                     ],
                   ),

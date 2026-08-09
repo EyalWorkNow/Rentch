@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:flutter/material.dart';
 import 'package:dating_app/core/config/media_cdn.dart';
@@ -33,7 +34,7 @@ class PanoramaPsvTourView extends StatefulWidget {
   const PanoramaPsvTourView({
     super.key,
     required this.tour,
-    this.title = 'סיור 360°',
+    this.title = '',
   });
 
   final PropertyPanoramaTour tour;
@@ -42,7 +43,7 @@ class PanoramaPsvTourView extends StatefulWidget {
   static Future<void> open(
     BuildContext context,
     PropertyPanoramaTour tour, {
-    String title = 'סיור 360°',
+    String title = '',
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
@@ -113,7 +114,9 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
           images[key] = bytes;
           vlist.add({
             'src': '/img/${Uri.encodeComponent(key)}',
-            'source': v.source.isNotEmpty ? v.source : 'גרסה ${vi + 1}',
+            'source': v.source.isNotEmpty
+                ? v.source
+                : AppLocalizations.of(context)!.panoramaPsvTour4968e76c(vi + 1),
             'haov': v.haov,
             'vaov': v.vaov,
             'def': isDefault,
@@ -564,7 +567,10 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        widget.title,
+                        widget.title.trim().isNotEmpty
+                            ? widget.title
+                            : AppLocalizations.of(context)!
+                                .panoramaPsvTourCa52b1de,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

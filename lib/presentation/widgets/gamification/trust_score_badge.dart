@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class TrustScoreBadge extends StatelessWidget {
@@ -54,7 +55,7 @@ class TrustScoreBadge extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'ציון דייר',
+                AppLocalizations.of(context)!.trustScoreBadge65bb303d,
                 style: TextStyle(
                   fontSize: 11,
                   color: AppColors.textSecondary,

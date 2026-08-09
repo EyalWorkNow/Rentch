@@ -61,6 +61,7 @@ class _MarketBoardTemplate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final signals = property.marketSignals;
     // Watch so live view / like counts refresh the board as they arrive.
     context.watch<DatingProvider>();
@@ -124,7 +125,7 @@ class _MarketBoardTemplate extends StatelessWidget {
                           Expanded(
                             child: _MarketMetricCard(
                               icon: IconsaxPlusLinear.eye,
-                              label: 'צפיות',
+                              label: l10n.marketBoardTemplate48227f9c,
                               value: _compactNumber(totalViews),
                               accent: accent,
                             ),
@@ -133,7 +134,7 @@ class _MarketBoardTemplate extends StatelessWidget {
                           Expanded(
                             child: _MarketMetricCard(
                               icon: IconsaxPlusLinear.archive_book,
-                              label: 'שמירות',
+                              label: l10n.marketBoardTemplate066de4f8,
                               value: _compactNumber(signals.saves),
                               accent: accent,
                             ),
@@ -146,7 +147,7 @@ class _MarketBoardTemplate extends StatelessWidget {
                           Expanded(
                             child: _MarketMetricCard(
                               icon: IconsaxPlusLinear.heart,
-                              label: 'לייקים',
+                              label: l10n.marketBoardTemplate07433e11,
                               value: _compactNumber(signals.likes),
                               accent: accent,
                             ),
@@ -155,7 +156,7 @@ class _MarketBoardTemplate extends StatelessWidget {
                           Expanded(
                             child: _MarketMetricCard(
                               icon: IconsaxPlusLinear.message_2,
-                              label: 'פניות',
+                              label: l10n.marketBoardTemplate23785eb4,
                               value: _compactNumber(signals.contactRequests),
                               accent: accent,
                             ),
@@ -168,7 +169,7 @@ class _MarketBoardTemplate extends StatelessWidget {
                       // Secondary read-out — real derived signals.
                       _MarketReadoutTile(
                         icon: IconsaxPlusLinear.ruler,
-                        label: 'מחיר למ״ר',
+                        label: l10n.marketBoardTemplate60c1e500,
                         value: property.pricePerSquareMeter != null
                             ? '₪${_compactNumber(property.pricePerSquareMeter!)}'
                             : '—',
@@ -177,10 +178,10 @@ class _MarketBoardTemplate extends StatelessWidget {
                       const _MarketReadoutDivider(),
                       _MarketReadoutTile(
                         icon: IconsaxPlusLinear.calendar_1,
-                        label: 'ימים בשוק',
+                        label: l10n.marketBoardTemplate13f110df,
                         value: _daysOnMarket != null
                             ? (_daysOnMarket == 0
-                                ? 'היום'
+                                ? l10n.marketBoardTemplate95d86d7f
                                 : '$_daysOnMarket')
                             : '—',
                         accent: accent,
@@ -188,16 +189,16 @@ class _MarketBoardTemplate extends StatelessWidget {
                       const _MarketReadoutDivider(),
                       _MarketReadoutTile(
                         icon: IconsaxPlusLinear.timer_1,
-                        label: 'זמן צפייה ממוצע',
+                        label: l10n.marketBoardTemplateD51f71fc,
                         value: signals.avgDetailStaySeconds > 0
-                            ? _compactDuration(signals.avgDetailStaySeconds)
+                            ? _compactDuration(signals.avgDetailStaySeconds, l10n)
                             : '—',
                         accent: accent,
                       ),
                       const _MarketReadoutDivider(),
                       _MarketReadoutTile(
                         icon: IconsaxPlusLinear.gallery,
-                        label: 'החלקות בגלריה',
+                        label: l10n.marketBoardTemplate261cf748,
                         value: signals.gallerySwipes > 0
                             ? _compactNumber(signals.gallerySwipes)
                             : '—',
@@ -402,19 +403,24 @@ class _MarketBoardHeader extends StatelessWidget {
   final int liveViewers;
   final DateTime? lastViewedAt;
 
-  String? get _lastSeenLabel {
+  String? _lastSeenLabel(AppLocalizations l10n) {
     final at = lastViewedAt;
     if (at == null) return null;
     final diff = DateTime.now().difference(at);
     if (diff.isNegative) return null;
-    if (diff.inMinutes < 1) return 'נצפה ממש עכשיו';
-    if (diff.inMinutes < 60) return 'נצפה לפני ${diff.inMinutes} דק׳';
-    if (diff.inHours < 24) return 'נצפה לפני ${diff.inHours} שע׳';
-    return 'נצפה לפני ${diff.inDays} ימים';
+    if (diff.inMinutes < 1) return l10n.marketBoardTemplate2c925bfb;
+    if (diff.inMinutes < 60) {
+      return l10n.marketBoardTemplateC88d38fc(diff.inMinutes);
+    }
+    if (diff.inHours < 24) {
+      return l10n.marketBoardTemplate5787aec5(diff.inHours);
+    }
+    return l10n.marketBoardTemplate0a58ff05(diff.inDays);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final live = liveViewers > 0;
     return Row(
       children: [
@@ -432,9 +438,9 @@ class _MarketBoardHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'לוח שוק',
-                style: TextStyle(
+              Text(
+                l10n.marketBoardTemplate3af8a1a1,
+                style: const TextStyle(
                   color: _MarketBoardTemplate._ink,
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
@@ -443,7 +449,7 @@ class _MarketBoardHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                _lastSeenLabel ?? 'נתוני ביקוש בזמן אמת',
+                _lastSeenLabel(l10n) ?? l10n.marketBoardTemplate818d00f3,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -480,7 +486,9 @@ class _MarketBoardHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 7),
                 Text(
-                  liveViewers == 1 ? 'צופה עכשיו' : '$liveViewers צופים',
+                  liveViewers == 1
+                      ? l10n.marketBoardTemplate636e854d
+                      : l10n.marketBoardTemplate9b8e10c5(liveViewers),
                   style: const TextStyle(
                     color: _MarketBoardTemplate._up,
                     fontSize: 12.5,
@@ -638,6 +646,7 @@ class _MarketSparkline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final sorted = [...history]..sort((a, b) => a.date.compareTo(b.date));
     final prices = sorted.map((p) => p.price).toList();
     final first = prices.first;
@@ -663,8 +672,8 @@ class _MarketSparkline extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'מגמת מחיר',
+              Text(
+                l10n.marketBoardTemplateAd039ab0,
                 style: TextStyle(
                   color: _MarketBoardTemplate._ink,
                   fontSize: 14.5,
@@ -853,10 +862,10 @@ String _compactNumber(int value) {
 }
 
 /// Compact dwell-time read-out: seconds → "Ns" / "Nm" / "Nh".
-String _compactDuration(int seconds) {
-  if (seconds < 60) return '$seconds שנ׳';
+String _compactDuration(int seconds, AppLocalizations l10n) {
+  if (seconds < 60) return l10n.marketBoardTemplate2166e531(seconds);
   final minutes = seconds ~/ 60;
-  if (minutes < 60) return '$minutes דק׳';
+  if (minutes < 60) return l10n.marketBoardTemplate80126da3(minutes);
   final hours = minutes ~/ 60;
-  return '$hours שע׳';
+  return l10n.marketBoardTemplateAa8238e7(hours);
 }

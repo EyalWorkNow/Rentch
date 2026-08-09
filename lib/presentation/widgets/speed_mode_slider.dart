@@ -3,6 +3,7 @@ import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -136,7 +137,8 @@ class SpeedModeSlider extends StatelessWidget {
                         Expanded(
                           child: _seg(
                             icon: IconsaxPlusBold.magicpen,
-                            label: 'מותאם אישית',
+                            label: AppLocalizations.of(context)!
+                                .speedModeSliderE8be715a,
                             selected: !immediate,
                             onTap: () => onChanged(false),
                             darkGlass: darkGlass,
@@ -145,7 +147,8 @@ class SpeedModeSlider extends StatelessWidget {
                         Expanded(
                           child: _seg(
                             icon: IconsaxPlusBold.flash,
-                            label: 'מהיר',
+                            label: AppLocalizations.of(context)!
+                                .speedModeSlider0a97f110,
                             selected: immediate,
                             onTap: () => onChanged(true),
                             darkGlass: darkGlass,

@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -237,10 +238,13 @@ class LiveViewersPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return CollapsibleFomoBadge(
       icon: const AnimatedEyeIcon(),
       text: Text(
-        count == 1 ? 'מסתכל עכשיו' : '$count מסתכלים עכשיו',
+        count == 1
+            ? l10n.fomoWidgets67fb588b
+            : l10n.fomoWidgets5fc943b9(count),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 10.5,
@@ -264,7 +268,7 @@ class HotPropertyBadge extends StatelessWidget {
     return CollapsibleFomoBadge(
       icon: const HeartbeatIcon(),
       text: Text(
-        '$likesCount אהבו היום',
+        AppLocalizations.of(context)!.fomoWidgets668ee081(likesCount),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 10.5,
@@ -293,9 +297,9 @@ class NewPropertyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return CollapsibleFomoBadge(
       icon: const SparkleIcon(),
-      text: const Text(
-        'דירה הועלתה לאחרונה',
-        style: TextStyle(
+      text: Text(
+        AppLocalizations.of(context)!.fomoWidgetsD5424d20,
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
@@ -362,7 +366,9 @@ class _MatchExpiryTimerState extends State<MatchExpiryTimer> {
         ),
         const SizedBox(width: 3),
         Text(
-          expiringSoon ? '⚠ פג תוקף בעוד $label' : 'פג תוקף בעוד $label',
+          expiringSoon
+              ? AppLocalizations.of(context)!.fomoWidgetsC646d563(label)
+              : AppLocalizations.of(context)!.fomoWidgetsF3d9f53a(label),
           style: TextStyle(
             fontSize: 11,
             fontWeight: expiringSoon ? FontWeight.w700 : FontWeight.w500,

@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -23,12 +24,12 @@ class SwipeToConfirmSheet extends StatefulWidget {
     super.key,
     required this.title,
     this.message,
-    this.confirmLabel = 'גרור לאישור',
+    this.confirmLabel,
   });
 
   final String title;
   final String? message;
-  final String confirmLabel;
+  final String? confirmLabel;
 
   /// Presents the sheet and resolves to `true` if the user slides to confirm,
   /// `false` if they cancel or dismiss.
@@ -36,7 +37,7 @@ class SwipeToConfirmSheet extends StatefulWidget {
     BuildContext context, {
     required String title,
     String? message,
-    String confirmLabel = 'גרור לאישור',
+    String? confirmLabel,
   }) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -180,8 +181,8 @@ class _SwipeToConfirmSheetState extends State<SwipeToConfirmSheet>
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text(
-                'ביטול',
+              child: Text(
+                AppLocalizations.of(context)!.swipeToConfirmA7c55a8d,
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 15,
@@ -235,7 +236,8 @@ class _SwipeToConfirmSheetState extends State<SwipeToConfirmSheet>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      widget.confirmLabel,
+                      widget.confirmLabel ??
+                          AppLocalizations.of(context)!.swipeToConfirm55ebef41,
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 16,

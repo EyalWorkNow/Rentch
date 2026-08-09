@@ -1,3 +1,5 @@
+import 'package:dating_app/l10n/app_localizations.dart';
+
 /// Filters the landlord applies to their candidates deck (מועמדים).
 ///
 /// Design notes (important — read before extending):
@@ -163,32 +165,34 @@ class CandidateFilters {
     '3-6',
   ];
 
-  /// Hebrew label for a move-in bucket token (RTL UI).
-  static String moveInWindowLabel(String token) {
+  /// Localized label for a move-in bucket token (RTL-aware UI).
+  static String moveInWindowLabel(AppLocalizations l10n, String token) {
     switch (token) {
       case 'immediate':
-        return 'פנוי מיידית';
+        return l10n.candidateFilters4754dba1;
       case 'month':
-        return 'תוך חודש';
+        return l10n.candidateFiltersE5b327f6;
       case '1-3':
-        return '1-3 חודשים';
+        return l10n.candidateFilters36c73aae;
       case '3-6':
-        return '3-6 חודשים';
+        return l10n.candidateFilters81175383;
       default:
         return token;
     }
   }
 
   /// Canonical life-stage tokens (locked to the eligibility gate's allowlist —
-  /// note the hyphen in 'young-professional') and their Hebrew labels (RTL UI).
-  static const Map<String, String> lifeStageLabels = <String, String>{
-    'student': 'סטודנט/ית',
-    'young-professional': 'צעיר/ה מקצועי/ת',
-    'family': 'משפחה',
-    'senior': 'גיל הזהב',
-  };
+  /// note the hyphen in 'young-professional') and their localized labels.
+  static Map<String, String> lifeStageLabelsFor(AppLocalizations l10n) =>
+      <String, String>{
+        'student': l10n.candidateFilters42ed7e8d,
+        'young-professional': l10n.candidateFiltersD663155d,
+        'family': l10n.candidateFilters926c043f,
+        'senior': l10n.candidateFilters0aa42aa1,
+      };
 
-  static String lifeStageLabel(String token) => lifeStageLabels[token] ?? token;
+  static String lifeStageLabel(AppLocalizations l10n, String token) =>
+      lifeStageLabelsFor(l10n)[token] ?? token;
 
   bool get isEmpty => activeCount == 0;
   bool get isNotEmpty => !isEmpty;

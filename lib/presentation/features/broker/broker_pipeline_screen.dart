@@ -6,6 +6,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/broker_deal_repository.dart';
 import 'package:dating_app/data/repositories/broker_lead_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -33,6 +34,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   /// offers to create a matching deal in the commission tracker, pre-filled from
   /// the lead, so the broker doesn't re-type the same client/property.
   Future<void> _onStageSelected(BrokerLead lead, LeadStage stage) async {
+    final l10n = AppLocalizations.of(context)!;
     final wasWon = lead.stage == LeadStage.closedWon;
     await _save(lead.copyWith(stage: stage));
     if (stage != LeadStage.closedWon || wasWon || !mounted) return;
@@ -41,15 +43,15 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       builder: (ctx) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('ליד נסגר בהצלחה 🎉'),
-          content: const Text('ליצור עסקה במעקב העמלות מהליד הזה?'),
+          title: Text(l10n.brokerPipelineScreenBb0a46bb),
+          content: Text(l10n.brokerPipelineScreen5f575001),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('לא עכשיו')),
+                child: Text(l10n.brokerPipelineScreen98c8a5b8)),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('צור עסקה')),
+                child: Text(l10n.brokerPipelineScreenA250d66b)),
           ],
         ),
       ),
@@ -76,8 +78,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(dealAmount > 0
-            ? 'נוצרה עסקה במעקב העמלות — בדוק את הסכום והוסף אחוז עמלה'
-            : 'נוצרה עסקה במעקב העמלות — השלם שם את הסכום'),
+            ? l10n.brokerPipelineScreenBf7fa86c
+            : l10n.brokerPipelineScreenCdec8cf6),
       ));
     }
   }
@@ -118,13 +120,16 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       await _notifications.cancel(id);
       return;
     }
-    final who = lead.clientName.trim().isEmpty ? 'הליד' : lead.clientName.trim();
+    final l10n = AppLocalizations.of(context)!;
+    final who = lead.clientName.trim().isEmpty
+        ? l10n.brokerPipelineScreenD3e8fbc2
+        : lead.clientName.trim();
     final what =
         lead.propertyTitle.trim().isEmpty ? '' : ' — ${lead.propertyTitle.trim()}';
     await _notifications.scheduleReminder(
       id: id,
-      title: 'פולואפ ליד',
-      body: 'הגיע הזמן לחזור ל$who$what',
+      title: l10n.brokerPipelineScreen02e8a635,
+      body: l10n.brokerPipelineScreenEef25736(who, what),
       when: when,
     );
   }
@@ -145,6 +150,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final overdue = _leads.where((l) => l.isOverdue(now)).toList()
       ..sort((a, b) => a.nextFollowUp!.compareTo(b.nextFollowUp!));
@@ -154,7 +160,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          title: const Text('פייפליין לידים'),
+          title: Text(l10n.brokerPipelineScreen0a1cdb54),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -165,9 +171,9 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
           foregroundColor: Colors.white,
           onPressed: _openAddLead,
           icon: const Icon(Icons.person_add_alt_1),
-          label: const Text(
-            'ליד חדש',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          label: Text(
+            l10n.brokerPipelineScreenEd8d552e,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
           ),
         ),
         body: _loading
@@ -187,6 +193,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   }
 
   Widget _emptyState() {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -196,15 +203,15 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
             Icon(Icons.groups_outlined,
                 size: 72, color: AppColors.primary.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
-            const Text(
-              'אין עדיין לידים',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              l10n.brokerPipelineScreen3dd4edb0,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הוסיפו לקוח מתעניין כדי לעקוב אחריו עד לסגירה',
+            Text(
+              l10n.brokerPipelineScreen54c02219,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 17, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 17, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -213,6 +220,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   }
 
   Widget _overdueBanner(List<BrokerLead> overdue) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -230,7 +238,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                   color: AppColors.coral, size: 26),
               const SizedBox(width: 8),
               Text(
-                'פולואפ באיחור (${overdue.length})',
+                l10n.brokerPipelineScreen1e8e9994(overdue.length),
                 style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.bold,
@@ -311,6 +319,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   }
 
   Widget _leadCard(BrokerLead lead) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final overdue = lead.isOverdue(now);
     return Card(
@@ -390,7 +399,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                         color: overdue ? AppColors.coral : AppColors.primary),
                     const SizedBox(width: 4),
                     Text(
-                      'פולואפ: ${_dateLabel(lead.nextFollowUp!)}',
+                      l10n.brokerPipelineScreen1aadec4d(
+                          _dateLabel(lead.nextFollowUp!)),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -410,6 +420,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _openLeadActions(BrokerLead lead) async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -432,8 +443,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                         fontSize: 21, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  const Text('העברה לשלב:',
-                      style: TextStyle(
+                  Text(l10n.brokerPipelineScreen313f6a17,
+                      style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
@@ -457,8 +468,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.event, color: AppColors.primary),
-                    title: const Text('קביעת פולואפ',
-                        style: TextStyle(fontSize: 17)),
+                    title: Text(l10n.brokerPipelineScreenD0f162f9,
+                        style: const TextStyle(fontSize: 17)),
                     subtitle: lead.nextFollowUp == null
                         ? null
                         : Text(_dateLabel(lead.nextFollowUp!)),
@@ -472,8 +483,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.event_busy,
                           color: AppColors.textSecondary),
-                      title: const Text('הסרת פולואפ',
-                          style: TextStyle(fontSize: 17)),
+                      title: Text(l10n.brokerPipelineScreen470fd4ec,
+                          style: const TextStyle(fontSize: 17)),
                       onTap: () {
                         Navigator.pop(sheetContext);
                         _save(lead.copyWith(clearFollowUp: true));
@@ -483,8 +494,8 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.delete_outline,
                         color: AppColors.coral),
-                    title: const Text('מחיקת ליד',
-                        style: TextStyle(
+                    title: Text(l10n.brokerPipelineScreenB00960b9,
+                        style: const TextStyle(
                             fontSize: 17, color: AppColors.coral)),
                     onTap: () {
                       Navigator.pop(sheetContext);
@@ -578,7 +589,9 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
     final name = _name.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('יש להזין שם לקוח')),
+        SnackBar(
+            content:
+                Text(AppLocalizations.of(context)!.brokerPipelineScreen18d43ef8)),
       );
       return;
     }
@@ -598,6 +611,7 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -612,18 +626,18 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Center(
-                child: Text('ליד חדש',
-                    style: TextStyle(
+              Center(
+                child: Text(l10n.brokerPipelineScreenEd8d552e,
+                    style: const TextStyle(
                         fontSize: 22, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 20),
-              _field(_name, 'שם הלקוח *', TextInputType.name),
+              _field(_name, l10n.brokerPipelineScreen83c5428d, TextInputType.name),
               const SizedBox(height: 12),
-              _field(_phone, 'טלפון', TextInputType.phone),
+              _field(_phone, l10n.brokerPipelineScreen737232c2, TextInputType.phone),
               const SizedBox(height: 16),
-              const Text('מקור הליד:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(l10n.brokerPipelineScreen350eef65,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -639,8 +653,8 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('נכס מקושר:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(l10n.brokerPipelineScreenE9adf7ad,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               DropdownButtonFormField<RentalProperty?>(
                 initialValue: _property,
@@ -652,11 +666,11 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                hint: const Text('בחר נכס (לא חובה)'),
+                hint: Text(l10n.brokerPipelineScreenEdf6c5ad),
                 items: [
-                  const DropdownMenuItem<RentalProperty?>(
+                  DropdownMenuItem<RentalProperty?>(
                     value: null,
-                    child: Text('ללא נכס'),
+                    child: Text(l10n.brokerPipelineScreenBf7d92b1),
                   ),
                   for (final p in widget.properties)
                     DropdownMenuItem<RentalProperty?>(
@@ -668,7 +682,8 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                 onChanged: (p) => setState(() => _property = p),
               ),
               const SizedBox(height: 12),
-              _field(_notes, 'הערות', TextInputType.multiline, maxLines: 2),
+              _field(_notes, l10n.brokerPipelineScreen92b0d682,
+                  TextInputType.multiline, maxLines: 2),
               const SizedBox(height: 20),
               SizedBox(
                 height: 52,
@@ -680,8 +695,8 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                         borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: _submit,
-                  child: const Text('שמירה',
-                      style: TextStyle(
+                  child: Text(l10n.brokerPipelineScreenE6932339,
+                      style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),

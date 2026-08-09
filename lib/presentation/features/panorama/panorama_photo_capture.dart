@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -126,7 +127,8 @@ class _PanoramaPhotoCaptureScreenState
         debugPrint('panorama photo dispose after init-fail: $e2');
       }
       if (mounted) {
-        setState(() => _error = 'לא ניתן לפתוח את המצלמה. בדקו הרשאות מצלמה.');
+        setState(() => _error =
+            AppLocalizations.of(context)!.panoramaPhotoCapture443184c1);
       }
     }
   }
@@ -269,7 +271,7 @@ class _PanoramaPhotoCaptureScreenState
       debugPrint('panorama photo takePicture failed: $e');
       if (mounted) {
         setState(() => _capturing = false);
-        _toast('הצילום נכשל. נסו שוב.');
+        _toast(AppLocalizations.of(context)!.panoramaPhotoCapture79c27a2a);
       }
     }
   }
@@ -295,10 +297,11 @@ class _PanoramaPhotoCaptureScreenState
   // and honest about the covered arc (a full ring → 360). Poll until ready, then
   // pop a finished [PanoramaSweepResult].
   Future<void> _build() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _building = true;
       _buildError = null;
-      _buildMsg = 'מתחילים לבנות את הסיור...';
+      _buildMsg = l10n.panoramaPhotoCapture97f6b247;
     });
 
     final hfov = _hfovDeg;
@@ -323,26 +326,26 @@ class _PanoramaPhotoCaptureScreenState
         poses: poses,
       );
       if (job == null) {
-        _failBuild('לא הצלחנו להתחיל את העיבוד. בדקו את החיבור לאינטרנט.');
+        _failBuild(l10n.panoramaPhotoCapture127d1554);
         return;
       }
 
       if (!mounted) return;
-      setState(() => _buildMsg = 'מעלים את התמונות...');
+      setState(() => _buildMsg = l10n.panoramaPhotoCaptureE39b6aae);
       for (var i = 0; i < _shotPaths.length; i++) {
         final ok = await AwsApiClient.instance
             .uploadToPresignedUrl(job.uploadUrls[i], _shotPaths[i]);
         if (!ok) {
-          _failBuild('ההעלאה נכשלה. בדקו את החיבור ונסו שוב.');
+          _failBuild(l10n.panoramaPhotoCaptureBbb9c298);
           return;
         }
         if (!mounted) return;
-        setState(() => _buildMsg =
-            'מעלים את התמונות... (${i + 1}/${_shotPaths.length})');
+        setState(() => _buildMsg = l10n.panoramaPhotoCapture1b311f3a(
+            i + 1, _shotPaths.length));
       }
 
       if (!mounted) return;
-      setState(() => _buildMsg = 'בונים את הסיור...');
+      setState(() => _buildMsg = l10n.panoramaPhotoCapture8844cc68);
       await AwsApiClient.instance.startPanoramaStitch(job.jobId);
 
       const maxPolls = 90; // ~3 min at 2 s
@@ -362,14 +365,14 @@ class _PanoramaPhotoCaptureScreenState
           return;
         }
         if (status.status == 'failed') {
-          _failBuild('העיבוד נכשל. נסו לצלם שוב, לאט ובאור טוב.');
+          _failBuild(l10n.panoramaPhotoCaptureA9e373df);
           return;
         }
       }
-      _failBuild('העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.');
+      _failBuild(l10n.panoramaPhotoCaptureAb4f63ba);
     } catch (e) {
       debugPrint('panorama photo build failed: $e');
-      _failBuild('משהו השתבש. בדקו את החיבור ונסו שוב.');
+      _failBuild(l10n.panoramaPhotoCapture19c26543);
     }
   }
 
@@ -504,13 +507,16 @@ class _PanoramaPhotoCaptureScreenState
   }
 
   Widget _guide() {
+    final l10n = AppLocalizations.of(context)!;
     final taken = _positions;
     final done = taken >= _shotCount;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _coachPill(
-          done ? 'כל הצילומים הושלמו ✓' : 'צילום $taken מתוך $_shotCount',
+          done
+              ? l10n.panoramaPhotoCaptureEe690500
+              : l10n.panoramaPhotoCaptureE295aedd(taken, _shotCount),
           bg: done
               ? Colors.green.withValues(alpha: 0.85)
               : Colors.black.withValues(alpha: 0.6),
@@ -529,19 +535,20 @@ class _PanoramaPhotoCaptureScreenState
   }
 
   Widget _qualityLine() {
+    final l10n = AppLocalizations.of(context)!;
     String text;
     final tooFast = _spinRate > 30;
     final remaining = _degToNextShot;
     if (_positions == 0) {
-      text = 'עמדו במרכז, החזיקו ישר וצלמו את התמונה הראשונה.';
+      text = l10n.panoramaPhotoCaptureDf208dbe;
     } else if (_positions >= _shotCount) {
-      text = 'מצוין! בונים את הסיור...';
+      text = l10n.panoramaPhotoCaptureE97ca842;
     } else if (tooFast) {
-      text = 'החזיקו את הטלפון יציב 🤳 ואז צלמו';
+      text = l10n.panoramaPhotoCapture96988ada;
     } else if (remaining > 8) {
-      text = 'סובבו ~${remaining.round()}° ימינה — שמרו חפיפה עם הקודם';
+      text = l10n.panoramaPhotoCapture25092fb6(remaining.round());
     } else {
-      text = 'מצוין — צלמו עכשיו 📸';
+      text = l10n.panoramaPhotoCaptureE0f98881;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -638,6 +645,7 @@ class _PanoramaPhotoCaptureScreenState
   }
 
   Widget _buildOverlay() {
+    final l10n = AppLocalizations.of(context)!;
     final hasError = _buildError != null;
     return Positioned.fill(
       child: Container(
@@ -657,7 +665,9 @@ class _PanoramaPhotoCaptureScreenState
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  hasError ? 'לא הצלחנו לבנות את הסיור' : 'בונים את הסיור...',
+                  hasError
+                      ? l10n.panoramaPhotoCapture1dc38c15
+                      : l10n.panoramaPhotoCapture8844cc68,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white,
@@ -668,7 +678,7 @@ class _PanoramaPhotoCaptureScreenState
                 Text(
                   hasError
                       ? _buildError!
-                      : '$_buildMsg\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.',
+                      : l10n.panoramaPhotoCapture5a8e3f2d(_buildMsg),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white70, fontSize: 17, height: 1.5),
@@ -684,16 +694,16 @@ class _PanoramaPhotoCaptureScreenState
                       ),
                       onPressed: _retryFromError,
                       icon: const Icon(IconsaxPlusBold.refresh),
-                      label: const Text('צלם מחדש',
-                          style: TextStyle(
+                      label: Text(l10n.panoramaPhotoCapture3b32c520,
+                          style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 18)),
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('סגור',
-                        style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    child: Text(l10n.panoramaPhotoCapture55247199,
+                        style: const TextStyle(color: Colors.white70, fontSize: 16)),
                   ),
                 ] else
                   const CircularProgressIndicator(color: Colors.white),
@@ -743,7 +753,9 @@ class _PanoramaPhotoCaptureScreenState
             ),
             const SizedBox(width: 8),
             Text(
-              _ultraWide ? 'רחב' : 'רגיל',
+              _ultraWide
+                  ? AppLocalizations.of(context)!.panoramaPhotoCaptureA9e4f107
+                  : AppLocalizations.of(context)!.panoramaPhotoCapture3e20e30e,
               style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 15,
@@ -790,14 +802,14 @@ class _PanoramaPhotoCaptureScreenState
             const Icon(IconsaxPlusLinear.camera_slash,
                 color: Colors.white54, size: 48),
             const SizedBox(height: 12),
-            Text(_error ?? 'שגיאת מצלמה',
+            Text(_error ?? AppLocalizations.of(context)!.panoramaPhotoCapture4c53a96e,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70, fontSize: 16)),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('סגור'),
+              child: Text(AppLocalizations.of(context)!.panoramaPhotoCapture55247199),
             ),
           ],
         ),

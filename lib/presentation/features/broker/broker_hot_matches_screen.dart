@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/broker_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/broker_client_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -132,12 +133,13 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('התאמות חמות'),
+          title: Text(l10n.brokerHotMatchesScreenEda2e484),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -146,8 +148,8 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
             if (_hot.isNotEmpty)
               TextButton(
                 onPressed: _dismissAll,
-                child: const Text('סמן הכל כנקרא',
-                    style: TextStyle(color: Colors.white)),
+                child: Text(l10n.brokerHotMatchesScreenFc4def53,
+                    style: const TextStyle(color: Colors.white)),
               ),
           ],
         ),
@@ -186,6 +188,7 @@ class _HotMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final p = hot.match.property;
     return Material(
       color: AppColors.surface,
@@ -209,7 +212,7 @@ class _HotMatchCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'התאמה ל${hot.client.name}',
+                      l10n.brokerHotMatchesScreen86958d86(hot.client.name),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -221,7 +224,7 @@ class _HotMatchCard extends StatelessWidget {
                     icon: const Icon(Icons.close, size: 20),
                     color: AppColors.textSecondary,
                     onPressed: onDismiss,
-                    tooltip: 'סמן כנקרא',
+                    tooltip: l10n.brokerHotMatchesScreenB32088a8,
                   ),
                 ],
               ),
@@ -233,8 +236,9 @@ class _HotMatchCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${p.priceLabel} ${p.priceSuffixLabel} · ${p.roomsLabel} חדרים · '
-                'התאמה ${hot.match.score}%',
+                l10n.brokerHotMatchesScreenDcef2a46(
+                        p.priceLabel, p.priceSuffixLabel, p.roomsLabel) +
+                    l10n.brokerHotMatchesScreen3b25d447(hot.match.score),
                 style: const TextStyle(
                     fontSize: 15, color: AppColors.textSecondary),
               ),
@@ -272,6 +276,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -281,15 +286,17 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.local_fire_department_outlined,
                 size: 72, color: AppColors.primaryLight),
             const SizedBox(height: 16),
-            const Text(
-              'אין התאמות חדשות כרגע',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              l10n.brokerHotMatchesScreenC7283ce9,
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'כשתעלה נכס חדש שמתאים לאחד מהלקוחות בפנקס — נראה לך אותו כאן.',
+            Text(
+              l10n.brokerHotMatchesScreen78ea80be,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: const TextStyle(
+                  fontSize: 16, color: AppColors.textSecondary),
             ),
           ],
         ),

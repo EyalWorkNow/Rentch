@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/billing/checkout_launcher.dart';
 import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -23,6 +24,7 @@ Future<void> showBoostFlow(BuildContext context, RentalProperty p) async {
     ));
   }
 
+  final l10n = AppLocalizations.of(context)!;
   final sub = provider.subscription;
   final hasQuota = sub?.canBoost ?? false;
   final choice = await showModalBottomSheet<_BoostChoice>(
@@ -46,19 +48,20 @@ Future<void> showBoostFlow(BuildContext context, RentalProperty p) async {
           product: 'boost_regular',
           amountAgorot: 1000,
           tier: PropertyBoostTier.regular,
-          label: 'הקפצה רגילה');
+          label: l10n.boostFlowE384d773);
     case _BoostChoice.ultraPaid:
       await _runPaidBoost(context, p, provider, snack,
           product: 'boost_ultra',
           amountAgorot: 5000,
           tier: PropertyBoostTier.ultra,
-          label: 'הקפצת Ultra');
+          label: l10n.boostFlow648bee95);
   }
 }
 
 // Free quota boost (regular tier) via the subscription.
 Future<void> _runQuotaBoost(BuildContext context, RentalProperty p,
     DatingProvider provider, void Function(String, {bool ok}) snack) async {
+  final l10n = AppLocalizations.of(context)!;
   final r = await AwsApiClient.instance.boostProperty(p.id);
   if (!context.mounted) return;
   if (r.ok) {
@@ -68,14 +71,14 @@ Future<void> _runQuotaBoost(BuildContext context, RentalProperty p,
     await provider.refreshSubscription();
     snack(
       r.unlimited
-          ? 'המודעה הוקפצה לראש הפיד! 🚀'
-          : 'המודעה הוקפצה! נותרו ${r.remaining ?? 0} הקפצות החודש.',
+          ? l10n.boostFlowD39058af
+          : l10n.boostFlow51c32033(r.remaining ?? 0),
       ok: true,
     );
   } else if (r.error == 'quota_exceeded') {
-    snack('ניצלת את מכסת ההקפצות החודשית.');
+    snack(l10n.boostFlow172c92b5);
   } else {
-    snack('לא הצלחנו להקפיץ כרגע. נסו שוב.');
+    snack(l10n.boostFlowDabea174);
   }
 }
 
@@ -91,6 +94,7 @@ Future<void> _runPaidBoost(
   required PropertyBoostTier tier,
   required String label,
 }) async {
+  final l10n = AppLocalizations.of(context)!;
   final amountLabel = '₪${amountAgorot ~/ 100}';
   final group = await showPaymentMethodSheet(context,
       amountLabel: amountLabel, subtitle: label);
@@ -112,7 +116,7 @@ Future<void> _runPaidBoost(
   if (!context.mounted) return;
   final checkoutUrl = url;
   if (checkoutUrl == null) {
-    snack('פתיחת התשלום נכשלה. נסו שוב.');
+    snack(l10n.boostFlowEdb0335e);
     return;
   }
   final paid = await openHostedCheckout(
@@ -131,7 +135,7 @@ Future<void> _runPaidBoost(
   // if the server confirm is still catching up.
   provider.applyLocalBoost(p.id, until, tier: tier);
   await provider.refreshSubscription();
-  snack('$label בוצעה! המודעה עלתה לראש הפיד 🚀', ok: true);
+  snack(l10n.boostFlow9ec81271(label), ok: true);
 }
 
 /// What the landlord chose in the boost sheet.
@@ -155,6 +159,7 @@ class _BoostOptionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Container(
@@ -181,10 +186,10 @@ class _BoostOptionsSheet extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               hasQuota
-                  ? 'הקפצת המודעה'
+                  ? l10n.boostFlowB43318dd
                   : (isSubscriber
-                      ? 'נגמרו ההקפצות שלך החודש'
-                      : 'הקפיצו את המודעה'),
+                      ? l10n.boostFlow9a4075d7
+                      : l10n.boostFlow382ea104),
               style: const TextStyle(
                   fontSize: 21,
                   fontWeight: FontWeight.w900,
@@ -193,10 +198,10 @@ class _BoostOptionsSheet extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               hasQuota
-                  ? 'קפיצה לראש הפיד = יותר צופים, מהר יותר.'
+                  ? l10n.boostFlow6497b9da
                   : (isSubscriber
-                      ? 'רוצה שהדירה תמשיך לבלוט? הקפיצו אותה עכשיו.'
-                      : 'תמורת ₪10 הדירה תעלה לראש הפיד ותגיע לכפול שוכרים היום.'),
+                      ? l10n.boostFlow3635a9db
+                      : l10n.boostFlowD9ad80b8),
               style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -207,10 +212,10 @@ class _BoostOptionsSheet extends StatelessWidget {
             _BoostOptionCard(
               icon: IconsaxPlusBold.flash_1,
               accent: const Color(0xFF256BFD), // Vibrant blue instead of dynamic primary which might be black
-              title: 'הקפצה רגילה',
-              subtitle: '×2 חשיפה · ראש הפיד · 7 ימים',
+              title: l10n.boostFlowE384d773,
+              subtitle: l10n.boostFlow4d1b0704,
               trailing: hasQuota
-                  ? (unlimited ? 'כלול' : 'נותרו $remaining')
+                  ? (unlimited ? l10n.boostFlow58bc394e : l10n.boostFlowFaea170c(remaining))
                   : '₪10',
               trailingIsPrice: !hasQuota,
               onTap: () => Navigator.of(context).pop(
@@ -222,8 +227,8 @@ class _BoostOptionsSheet extends StatelessWidget {
               icon: IconsaxPlusBold.crown_1,
               accent: AppColors.amber,
               gold: true,
-              title: 'הקפצת Ultra',
-              subtitle: '×5 חשיפה · מסגרת זהב · קדימות על הקפצות רגילות · 7 ימים',
+              title: l10n.boostFlow648bee95,
+              subtitle: l10n.boostFlow58d8e569,
               trailing: '₪50',
               trailingIsPrice: true,
               onTap: () => Navigator.of(context).pop(_BoostChoice.ultraPaid),

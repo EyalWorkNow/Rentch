@@ -2407,6 +2407,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       TransactionTypeFilter.any => null,
     };
     await SavedSearchesScreen.saveCurrent(
+      context: context,
       name: name,
       city: f.city.trim().isEmpty ? null : f.city.trim(),
       minBudget: f.minBudget > 600 ? f.minBudget : null,

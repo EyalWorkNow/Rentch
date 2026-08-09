@@ -1,5 +1,6 @@
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:flutter/material.dart';
@@ -37,7 +38,12 @@ class FakeAssistant extends AssistantService {
 void main() {
   Widget host(FakeAssistant svc,
           Future<VoiceTurn> Function(String) onUtterance) =>
-      MaterialApp(home: AtiVoiceScreen(service: svc, onUtterance: onUtterance));
+      MaterialApp(
+        locale: const Locale('he'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: AtiVoiceScreen(service: svc, onUtterance: onUtterance),
+      );
 
   // Hold the orb, then release — the push-to-talk gesture.
   Future<void> holdAndRelease(WidgetTester tester) async {
@@ -119,6 +125,9 @@ void main() {
     }
 
     await tester.pumpWidget(MaterialApp(
+        locale: const Locale('he'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: AtiVoiceScreen(
             service: svc, onUtterance: onU, onShareLocation: onShare)));
     await tester.pump();

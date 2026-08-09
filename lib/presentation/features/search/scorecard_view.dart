@@ -18,6 +18,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -90,7 +91,7 @@ class _ScorecardViewState extends State<ScorecardView> {
         child: Row(children: [
           Icon(IconsaxPlusBold.chart_2, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('למה זו?',
+          Text(AppLocalizations.of(context)!.scorecardViewBd0267a3,
               style: TextStyle(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w800,
@@ -117,7 +118,8 @@ class _ScorecardViewState extends State<ScorecardView> {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(99),
       ),
-      child: Text('${c.fitPct}% התאמה',
+      child: Text(
+          AppLocalizations.of(context)!.scorecardView161967a5(c.fitPct),
           style: TextStyle(
               color: color, fontWeight: FontWeight.w800, fontSize: 12)),
     );
@@ -147,7 +149,7 @@ class _ScorecardViewState extends State<ScorecardView> {
         // (its satisfaction 0–100%), so the overall fit reads as their blend.
         if (top.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('כמה הדירה חזקה בכל פרמטר:',
+          Text(AppLocalizations.of(context)!.scorecardView2c98190f,
               style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 11,
@@ -247,7 +249,7 @@ class _ScorecardViewState extends State<ScorecardView> {
                 Icon(IconsaxPlusLinear.document_text,
                     size: 15, color: AppColors.primary),
                 const SizedBox(width: 7),
-                Text('מקורות הנתונים',
+                Text(AppLocalizations.of(context)!.scorecardView5d1b29db,
                     style: TextStyle(
                         color: AppColors.navy,
                         fontWeight: FontWeight.w800,
@@ -287,7 +289,7 @@ class _ScorecardViewState extends State<ScorecardView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('כל נתון מבוסס על מקור רשמי וניתן לאימות:',
+                  Text(AppLocalizations.of(context)!.scorecardViewE2d283c3,
                       style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 10.5,
@@ -326,7 +328,9 @@ class _ScorecardViewState extends State<ScorecardView> {
                         height: 1.3,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 1),
-                Text('מקור: ${d.source!.trim()}',
+                Text(
+                    AppLocalizations.of(context)!
+                        .scorecardViewBf4062b1(d.source!.trim()),
                     style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 10.5,
@@ -356,7 +360,7 @@ class _ScorecardViewState extends State<ScorecardView> {
       Icon(IconsaxPlusLinear.shield_tick,
           size: 13, color: AppColors.textSecondary),
       const SizedBox(width: 4),
-      Text('ביטחון $pct%',
+      Text(AppLocalizations.of(context)!.scorecardViewA33028e6(pct),
           style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11,

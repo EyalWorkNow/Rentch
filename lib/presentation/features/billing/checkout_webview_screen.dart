@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -270,18 +271,18 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'תשלום מאובטח',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.checkoutWebviewScreen4dffd049,
+                  style: const TextStyle(
                     color: _navy,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'הסליקה מתבצעת בעמוד המאובטח של Grow',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.checkoutWebviewScreen44d94c3a,
+                  style: const TextStyle(
                     color: _slate,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -322,8 +323,8 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          SizedBox(
+        children: [
+          const SizedBox(
             width: 30,
             height: 30,
             child: CircularProgressIndicator(
@@ -331,19 +332,21 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
               valueColor: AlwaysStoppedAnimation(_indigo),
             ),
           ),
-          SizedBox(height: 16),
-          Text(
-            'טוען דף תשלום מאובטח…',
-            style: TextStyle(
-              color: _slate,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          const SizedBox(height: 16),
+          _loadingText(),
         ],
       ),
     );
   }
+
+  Widget _loadingText() => Text(
+        AppLocalizations.of(context)!.checkoutWebviewScreen194aef36,
+        style: const TextStyle(
+          color: _slate,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+      );
 
   // Shown when the hosted page fails to load or times out — instead of an
   // endless spinner, the user gets a clear message with retry / go-back.
@@ -366,16 +369,16 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
                 color: Color(0xFFEF4444), size: 30),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'דף התשלום לא נטען',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context)!.checkoutWebviewScreenB17b2010,
+            style: const TextStyle(
                 color: _navy, fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'ייתכן שיש בעיית רשת או שאמצעי התשלום אינו זמין כרגע. אפשר לנסות שוב או לחזור ולבחור אמצעי אחר.',
+          Text(
+            AppLocalizations.of(context)!.checkoutWebviewScreenF5e44e77,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
                 color: _slate,
                 fontSize: 13.5,
                 height: 1.5,
@@ -395,8 +398,9 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 13),
                 ),
-                child: const Text('חזרה',
-                    style: TextStyle(fontWeight: FontWeight.w800)),
+                child: Text(
+                    AppLocalizations.of(context)!.checkoutWebviewScreen10a2352b,
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
               ),
               const SizedBox(width: 12),
               FilledButton(
@@ -408,8 +412,9 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 24, vertical: 13),
                 ),
-                child: const Text('נסו שוב',
-                    style: TextStyle(fontWeight: FontWeight.w900)),
+                child: Text(
+                    AppLocalizations.of(context)!.checkoutWebviewScreen8c634e7d,
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
               ),
             ],
           ),
@@ -433,12 +438,12 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(IconsaxPlusLinear.lock_1, size: 13, color: _slate),
-              SizedBox(width: 6),
+            children: [
+              const Icon(IconsaxPlusLinear.lock_1, size: 13, color: _slate),
+              const SizedBox(width: 6),
               Text(
-                'מוצפן SSL · פרטי הכרטיס לא נשמרים באפליקציה',
-                style: TextStyle(
+                AppLocalizations.of(context)!.checkoutWebviewScreenE2cb5610,
+                style: const TextStyle(
                   color: _slate,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
@@ -447,9 +452,9 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
             ],
           ),
           const SizedBox(height: 5),
-          const Text(
-            'Visa · Mastercard · אמריקן אקספרס · Bit',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context)!.checkoutWebviewScreenBb135a11,
+            style: const TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 11,
               fontWeight: FontWeight.w700,

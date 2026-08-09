@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:dating_app/core/config/media_cdn.dart';
 import 'package:flutter/rendering.dart';
@@ -18,16 +19,18 @@ class PanoramaExperienceView extends StatefulWidget {
   const PanoramaExperienceView({
     super.key,
     required this.tour,
-    this.title = 'סיור 360°',
+    this.title,
   });
 
   final PropertyPanoramaTour tour;
-  final String title;
+
+  /// Optional title override; falls back to the localized default when null.
+  final String? title;
 
   static Future<void> open(
     BuildContext context,
     PropertyPanoramaTour tour, {
-    String title = 'סיור 360°',
+    String? title,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
@@ -167,6 +170,8 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final effectiveTitle = widget.title ?? l10n.panoramaExperienceViewCa52b1de;
     final node = _node;
     final nodes = widget.tour.nodes;
 
@@ -176,9 +181,9 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
         fit: StackFit.expand,
         children: [
           if (node == null)
-            const Center(
-                child: Text('אין סיור זמין',
-                    style: TextStyle(color: Colors.white70)))
+            Center(
+                child: Text(l10n.panoramaExperienceView8a215f19,
+                    style: const TextStyle(color: Colors.white70)))
           else
             RepaintBoundary(
               key: _panoKey,
@@ -213,7 +218,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
                           label: h.label.isNotEmpty
                               ? h.label
                               : (widget.tour.nodeById(h.targetNodeId)?.label ??
-                                  'המשך'),
+                                  l10n.panoramaExperienceView6d5b61ae),
                           onTap: () => _goTo(h.targetNodeId),
                         ),
                       ),
@@ -266,8 +271,8 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
                     Expanded(
                       child: Text(
                         node?.label.isNotEmpty == true
-                            ? '${widget.title} · ${node!.label}'
-                            : widget.title,
+                            ? '$effectiveTitle · ${node!.label}'
+                            : effectiveTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -312,8 +317,8 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
                   ),
                   child: Text(
                     _gyro
-                        ? 'הזז את הטלפון כדי להסתכל מסביב'
-                        : 'גרור כדי להסתכל · הקש על החץ כדי להתקדם',
+                        ? l10n.panoramaExperienceViewC382b650
+                        : l10n.panoramaExperienceViewA48dc789,
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12.5,
@@ -357,7 +362,9 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
                                 color: Colors.white.withValues(alpha: 0.25)),
                           ),
                           child: Text(
-                            n.label.isNotEmpty ? n.label : 'נקודה ${i + 1}',
+                            n.label.isNotEmpty
+                                ? n.label
+                                : l10n.panoramaExperienceViewFdb5ed3b(i + 1),
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight:

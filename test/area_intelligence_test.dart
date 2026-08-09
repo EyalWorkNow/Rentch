@@ -5,9 +5,13 @@ import 'dart:io';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
 import 'package:dating_app/core/insights/target_personas.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  final l10n = lookupAppLocalizations(const Locale('he'));
+
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await GovData.instance.init(reader: (p) => File(p).readAsString());
@@ -16,7 +20,7 @@ void main() {
 
   test('7 target personas are defined', () {
     expect(TargetPersona.all.length, 7);
-    expect(TargetPersona.byKey('families')?.label, 'משפחות עם ילדים');
+    expect(TargetPersona.byKey('families')?.label(l10n), 'משפחות עם ילדים');
   });
 
   test('profileAt returns sane gov-data layers for central Tel Aviv', () {

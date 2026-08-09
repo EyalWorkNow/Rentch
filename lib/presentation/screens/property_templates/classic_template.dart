@@ -49,6 +49,7 @@ class _ClassicTemplate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final p = property;
     return Scaffold(
       backgroundColor: Colors.white,
@@ -150,9 +151,9 @@ class _ClassicTemplate extends StatelessWidget {
                       // ── Property facts/specs — DIRECTLY below gallery+title
                       // so a tenant judges fit immediately (rooms, size,
                       // floor, condition, parking, elevator, entry, price).
-                      const Text(
-                        'פרטי הנכס',
-                        style: TextStyle(
+                      Text(
+                        l10n.classicTemplate220d2733,
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                           color: AppColors.ink,
@@ -176,7 +177,7 @@ class _ClassicTemplate extends StatelessWidget {
                       // property has.
                       if (p.features.isNotEmpty) ...[
                         _SectionCardShell(
-                          title: 'מאפיינים חשובים',
+                          title: l10n.classicTemplate64680a66,
                           icon: IconsaxPlusLinear.flash_1,
                           child: _FeatureWrap(features: p.features),
                         ),
@@ -207,16 +208,16 @@ class _ClassicTemplate extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'גלריה',
-                              style: TextStyle(
+                            Text(
+                              l10n.classicTemplateEed2fbf3,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.ink,
                               ),
                             ),
                             Text(
-                              '${media.length} תמונות',
+                              l10n.classicTemplateAb29f776(media.length),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -267,8 +268,8 @@ class _ClassicTemplate extends StatelessWidget {
                                       const SizedBox(height: 6),
                                       Text(
                                         item.isVideo
-                                            ? 'סרטון'
-                                            : 'תמונה ${index + 1}',
+                                            ? l10n.classicTemplateF5686614
+                                            : l10n.classicTemplate0429d88a(index + 1),
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -290,9 +291,9 @@ class _ClassicTemplate extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'אתר מקור',
-                              style: TextStyle(
+                            Text(
+                              l10n.classicTemplateCb66c16b,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.ink,
@@ -303,9 +304,9 @@ class _ClassicTemplate extends StatelessWidget {
                                 await launchUrl(Uri.parse(p.url),
                                     mode: LaunchMode.externalApplication);
                               },
-                              child: const Text(
-                                'צפה במקור',
-                                style: TextStyle(
+                              child: Text(
+                                l10n.classicTemplate5e4548cf,
+                                style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.tealBrand,
@@ -316,7 +317,7 @@ class _ClassicTemplate extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'נכס זה פורסם במקור באתר ${Uri.parse(p.url).host}. באפשרותך לפתוח את המודעה המקורית לצפייה בפרטים המלאים.',
+                          l10n.classicTemplateB58f6b9c(Uri.parse(p.url).host),
                           style: const TextStyle(
                             color: AppColors.slate600,
                             fontSize: 13.5,
@@ -329,7 +330,7 @@ class _ClassicTemplate extends StatelessWidget {
                       // Owner Section (features + match moved up, directly
                       // below the specs).
                       _SectionCardShell(
-                        title: 'בעל הנכס',
+                        title: l10n.classicTemplateC1a89075,
                         icon: IconsaxPlusLinear.profile_2user,
                         child: _OwnerCard(property: p),
                       ),
@@ -339,16 +340,16 @@ class _ClassicTemplate extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'חוות דעת',
-                              style: TextStyle(
+                            Text(
+                              l10n.classicTemplate1c5efd6c,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.ink,
                               ),
                             ),
                             Text(
-                              '${reviews.length} ביקורות',
+                              l10n.classicTemplate16c30b46(reviews.length),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -364,7 +365,7 @@ class _ClassicTemplate extends StatelessWidget {
 
                       // Location Map Section
                       _SectionCardShell(
-                        title: 'מיקום',
+                        title: l10n.classicTemplate26d0e7de,
                         icon: IconsaxPlusLinear.location,
                         child: _MapSection(property: p),
                       ),
@@ -403,15 +404,15 @@ class _ClassicTemplate extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          RentlyIcon(IconsaxPlusBold.flash_1,
+                          const RentlyIcon(IconsaxPlusBold.flash_1,
                               color: Colors.white, size: 22),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
-                            'הקפצה',
-                            style: TextStyle(
+                            l10n.classicTemplate88aea894,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w900,

@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/compare_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
@@ -27,8 +28,8 @@ class SavedPropertiesScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text(
-            'הדירות ששמרתי',
+          title: Text(
+            AppLocalizations.of(context)!.savedPropertiesScreen2f416fd3,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           backgroundColor: AppColors.surface,
@@ -85,8 +86,8 @@ class _CompareButton extends StatelessWidget {
             elevation: 0,
           ),
           icon: const Icon(Icons.compare_arrows_rounded, size: 24),
-          label: const Text(
-            'השווה דירות שמורות',
+          label: Text(
+            AppLocalizations.of(context)!.savedPropertiesScreen18453b28,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
         ),
@@ -178,7 +179,7 @@ class _SavedCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'הסר מהשמורים',
+                tooltip: AppLocalizations.of(context)!.savedPropertiesScreen059db4ef,
                 onPressed: () => provider.toggleSave(p.id),
                 icon: const Icon(
                   Icons.favorite_rounded,
@@ -217,7 +218,7 @@ class _MatchBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        'התאמה $score%',
+        AppLocalizations.of(context)!.savedPropertiesScreenB6c4a8c7(score),
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w800,
@@ -245,10 +246,10 @@ class _EmptyState extends StatelessWidget {
               color: AppColors.textDisabled,
             ),
             const SizedBox(height: 20),
-            const Text(
-              'עדיין לא שמרת דירות — סמנו ❤ בדירות שאהבתם כדי לחזור אליהן בקלות.',
+            Text(
+              AppLocalizations.of(context)!.savedPropertiesScreen83541358,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 19,
                 height: 1.5,
                 fontWeight: FontWeight.w600,

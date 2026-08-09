@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/finance/rental_tax.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -42,7 +43,8 @@ class _TaxHelperScreenState extends State<TaxHelperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final result = RentalTax.assess(_rent);
+    final l10n = AppLocalizations.of(context)!;
+    final result = RentalTax.assess(_rent, l10n);
     final hasInput = _rent > 0;
 
     return Directionality(
@@ -53,9 +55,9 @@ class _TaxHelperScreenState extends State<TaxHelperScreen> {
           backgroundColor: AppColors.background,
           elevation: 0,
           foregroundColor: AppColors.textPrimary,
-          title: const Text(
-            'מס הכנסה — בקלות',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            l10n.taxHelperScreenAaafbb6b,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
         body: SafeArea(
@@ -64,9 +66,9 @@ class _TaxHelperScreenState extends State<TaxHelperScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'כמה שכר דירה אתה מקבל בחודש?',
-                  style: TextStyle(
+                Text(
+                  l10n.taxHelperScreen7ba61d4a,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -203,23 +205,26 @@ class _WhatDoesItMean extends StatelessWidget {
 
   String _ceiling() => '₪${kExemptCeilingMonthly.round()}'; // 5,654
 
-  String _body() {
+  String _body(AppLocalizations l10n) {
     if (result.isFullyExempt) {
-      return 'יש תקרת פטור על שכר דירה למגורים: ${_ceiling()} בחודש (נכון ל-2026). '
-          'כל עוד שכר הדירה שלך מתחת לתקרה הזו — אתה פטור ממס, '
-          'ואין צורך לדווח על ההכנסה הזו.';
+      return l10n.taxHelperScreen84600891(_ceiling()) +
+          l10n.taxHelperScreenF0b9273e +
+          l10n.taxHelperScreen8df16fa9;
     }
-    return 'יש תקרת פטור על שכר דירה למגורים: ${_ceiling()} בחודש (נכון ל-2026). '
-        'מעל התקרה יש מס. הדרך הכי פשוטה היא "המסלול של 10%": '
-        'משלמים 10% מכל שכר הדירה, בלי חישובים מסובכים ובלי ניכויים. '
-        'במקרה שלך זה ${_money(result.tenPercentMonthly)} בחודש.'
-        '${result.requiresAnnualReport ? ' בסכומים גבוהים (מעל ₪375,000 בשנה) צריך גם להגיש דוח שנתי.' : ''}';
+    return l10n.taxHelperScreen84600891(_ceiling()) +
+        l10n.taxHelperScreenE7cedab0 +
+        l10n.taxHelperScreen4dd6aab6 +
+        l10n.taxHelperScreen2546b90e(_money(result.tenPercentMonthly)) +
+        (result.requiresAnnualReport
+            ? ' בסכומים גבוהים (מעל ₪375,000 בשנה) צריך גם להגיש דוח שנתי.'
+            : '');
   }
 
   String _money(double v) => '₪${v.round()}';
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: Container(
@@ -231,9 +236,9 @@ class _WhatDoesItMean extends StatelessWidget {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          title: const Text(
-            'מה זה אומר?',
-            style: TextStyle(
+          title: Text(
+            l10n.taxHelperScreen063021d2,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -245,7 +250,7 @@ class _WhatDoesItMean extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                _body(),
+                _body(l10n),
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   fontSize: 15,

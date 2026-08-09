@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/assistant_live_service.dart' show LiveStatus;
 import 'package:dating_app/core/services/openai_realtime_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -46,7 +47,7 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
   final OpenAiRealtimeService _live = OpenAiRealtimeService(mode: 'tenant_search');
   LiveStatus _status = LiveStatus.connecting;
   String _userText = '';
-  String _atiText = 'מתחברת…';
+  String _atiText = ''; // empty until the first real chunk arrives
   int _resultCount = 0;
   bool _failed = false;
 
@@ -65,7 +66,7 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
         if (mounted) {
           setState(() {
             // First chunk of a new reply resets the caption; rest appends.
-            _atiText = _status == LiveStatus.speaking && _atiText != 'מתחברת…'
+            _atiText = _status == LiveStatus.speaking && _atiText.isNotEmpty
                 ? '$_atiText$t'
                 : t;
           });
@@ -98,18 +99,19 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
   }
 
   String get _statusLabel {
+    final l10n = AppLocalizations.of(context)!;
     switch (_status) {
       case LiveStatus.connecting:
-        return 'מתחברת…';
+        return l10n.atiLiveVoiceScreenA7587542;
       case LiveStatus.listening:
-        return 'מקשיבה — פשוט דברי 🎙️';
+        return l10n.atiLiveVoiceScreenAc995fe3;
       case LiveStatus.speaking:
-        return 'אתי מדברת';
+        return l10n.atiLiveVoiceScreen746981e0;
       case LiveStatus.error:
-        return 'תקלה בחיבור';
+        return l10n.atiLiveVoiceScreenAa5a9e29;
       case LiveStatus.idle:
       case LiveStatus.closed:
-        return 'השיחה הסתיימה';
+        return l10n.atiLiveVoiceScreenC21710c8;
     }
   }
 
@@ -126,7 +128,10 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final caption = _userText.isNotEmpty ? _userText : _atiText;
+    final l10n = AppLocalizations.of(context)!;
+    final atiDisplay =
+        _atiText.isNotEmpty ? _atiText : l10n.atiLiveVoiceScreenA7587542;
+    final caption = _userText.isNotEmpty ? _userText : atiDisplay;
     final isUser = _userText.isNotEmpty;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -227,14 +232,16 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
                                 color: AppColors.primary, size: 22),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Text('מצאתי $_resultCount דירות שמתאימות לך',
+                              child: Text(
+                                  l10n.atiLiveVoiceScreen9a60c4a8(
+                                      _resultCount),
                                   style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700)),
                             ),
-                            const Text('הצג',
-                                style: TextStyle(
+                            Text(l10n.atiLiveVoiceScreen193535e0,
+                                style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700)),

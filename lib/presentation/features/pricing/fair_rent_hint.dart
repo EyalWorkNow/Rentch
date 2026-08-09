@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/market_intelligence.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
@@ -64,7 +65,8 @@ class FairRentHint extends StatelessWidget {
     final fair = _roundRent(expected);
     if (fair <= 0) return const SizedBox.shrink();
 
-    final band = _bandFor(typedPrice, fair);
+    final l10n = AppLocalizations.of(context)!;
+    final band = _bandFor(l10n, typedPrice, fair);
 
     return Container(
       margin: const EdgeInsets.only(top: 12),
@@ -86,7 +88,7 @@ class FairRentHint extends StatelessWidget {
                   size: 18, color: AppColors.primaryDark),
               const SizedBox(width: 8),
               Text(
-                'מחיר ממוצע באזור',
+                l10n.fairRentHint2f1f13cd,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -97,7 +99,7 @@ class FairRentHint extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '₪${_formatThousands(fair)} לחודש',
+            l10n.fairRentHint9b75eb76(_formatThousands(fair)),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 30,
@@ -144,7 +146,7 @@ class FairRentHint extends StatelessWidget {
                 icon: RentlyIcon(IconsaxPlusLinear.magic_star,
                     size: 16, color: AppColors.primaryDark),
                 label: Text(
-                  'השתמש במחיר המומלץ (₪${_formatThousands(fair)})',
+                  l10n.fairRentHintAdcf7818(_formatThousands(fair)),
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
@@ -169,10 +171,10 @@ class FairRentHint extends StatelessWidget {
 
   // Decide the assessment band: green when within ~±8% of the fair rent, amber
   // when meaningfully below (could ask more) or above (may deter tenants).
-  _RentBand _bandFor(int typed, int fair) {
+  _RentBand _bandFor(AppLocalizations l10n, int typed, int fair) {
     if (typed <= 0) {
       return _RentBand(
-        message: 'המחיר המומלץ לפי השוק באזור',
+        message: l10n.fairRentHintEa004c85,
         color: AppColors.primaryDark,
         icon: IconsaxPlusLinear.info_circle,
       );
@@ -180,20 +182,20 @@ class FairRentHint extends StatelessWidget {
     final ratio = typed / fair;
     if (ratio < 0.92) {
       return _RentBand(
-        message: 'נמוך מהשוק — אפשר לבקש יותר',
+        message: l10n.fairRentHint1b102d50,
         color: AppColors.warning,
         icon: IconsaxPlusLinear.arrow_up_3,
       );
     }
     if (ratio > 1.08) {
       return _RentBand(
-        message: 'גבוה מהשוק — עלול להרתיע שוכרים',
+        message: l10n.fairRentHintAb830344,
         color: AppColors.warning,
         icon: IconsaxPlusLinear.arrow_down,
       );
     }
     return _RentBand(
-      message: 'המחיר שלך נראה הוגן ✓',
+      message: l10n.fairRentHintA4d97966,
       color: AppColors.success,
       icon: IconsaxPlusLinear.tick_circle,
     );

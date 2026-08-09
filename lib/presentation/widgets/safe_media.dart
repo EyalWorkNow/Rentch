@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -245,7 +246,7 @@ class _VideoOverlayBadge extends StatelessWidget {
           ),
           SizedBox(width: compact ? 4 : 6),
           Text(
-            'וידאו',
+            AppLocalizations.of(context)!.safeMedia773c5c3a,
             style: TextStyle(
               color: Colors.white,
               fontSize: compact ? 10 : 12,

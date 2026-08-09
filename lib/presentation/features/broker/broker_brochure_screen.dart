@@ -5,6 +5,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
@@ -76,7 +77,7 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          title: const Text('ברושור נכס ממותג'),
+          title: Text(AppLocalizations.of(context)!.brokerBrochureScreenE4ac75e8),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -343,11 +344,15 @@ class _Facts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final facts = <_Fact>[
-      _Fact(IconsaxPlusLinear.home_2, '${property.roomsLabel} חדרים'),
-      _Fact(IconsaxPlusLinear.maximize, '${property.sizeM2} מ"ר'),
+      _Fact(IconsaxPlusLinear.home_2,
+          l10n.brokerBrochureScreenD886d07f(property.roomsLabel)),
+      _Fact(IconsaxPlusLinear.maximize,
+          l10n.brokerBrochureScreen5d29dec4(property.sizeM2)),
       if (property.floor.trim().isNotEmpty)
-        _Fact(IconsaxPlusLinear.building_4, 'קומה ${property.floor}'),
+        _Fact(IconsaxPlusLinear.building_4,
+            l10n.brokerBrochureScreenD068bb57(property.floor)),
       if (property.propertyType.trim().isNotEmpty)
         _Fact(IconsaxPlusLinear.buildings, property.propertyType),
     ];
@@ -418,8 +423,9 @@ class _BrandFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final accent = branding.primaryColor;
-    final name = agentName.isEmpty ? 'המתווך שלך' : agentName;
+    final name = agentName.isEmpty ? l10n.brokerBrochureScreen04734464 : agentName;
     return Row(
       children: [
         Container(
@@ -453,9 +459,9 @@ class _BrandFooter extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
-                'תיווך נדל"ן',
-                style: TextStyle(
+              Text(
+                l10n.brokerBrochureScreenB7b87736,
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
@@ -492,6 +498,7 @@ class _ShareButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SizedBox(
       height: 60,
       child: FilledButton.icon(
@@ -504,7 +511,7 @@ class _ShareButton extends StatelessWidget {
                     strokeWidth: 2.4, color: Colors.white))
             : const Icon(IconsaxPlusBold.send_2, size: 24),
         label: Text(
-          busy ? 'מכין ברושור…' : 'שתף ברושור',
+          busy ? l10n.brokerBrochureScreenF2af0c97 : l10n.brokerBrochureScreen0312eb6d,
           style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
         ),
         style: FilledButton.styleFrom(
@@ -524,6 +531,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -536,19 +544,19 @@ class _EmptyState extends StatelessWidget {
               color: AppColors.textDisabled,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'אין עדיין נכסים',
-              style: TextStyle(
+            Text(
+              l10n.brokerBrochureScreenC96fa39c,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הוסיפו נכס כדי להפיק ברושור ממותג לשיתוף.',
+            Text(
+              l10n.brokerBrochureScreen26099985,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,

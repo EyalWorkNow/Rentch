@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:flutter/material.dart';
 import 'package:dating_app/core/config/media_cdn.dart';
@@ -24,7 +25,7 @@ class PanoramaWebTourView extends StatefulWidget {
   const PanoramaWebTourView({
     super.key,
     required this.tour,
-    this.title = 'סיור 360°',
+    this.title = '',
   });
 
   final PropertyPanoramaTour tour;
@@ -33,7 +34,7 @@ class PanoramaWebTourView extends StatefulWidget {
   static Future<void> open(
     BuildContext context,
     PropertyPanoramaTour tour, {
-    String title = 'סיור 360°',
+    String title = '',
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
@@ -354,7 +355,10 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        widget.title,
+                        widget.title.trim().isNotEmpty
+                            ? widget.title
+                            : AppLocalizations.of(context)!
+                                .panoramaWebTourCa52b1de,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

@@ -11496,6 +11496,5313 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'ייבא {count} לקוחות'**
   String brokerClientsScreenImportClients(Object count);
+
+  /// No description provided for @panoramaAlignScreen88220aef.
+  ///
+  /// In he, this message translates to:
+  /// **'אופקי'**
+  String get panoramaAlignScreen88220aef;
+
+  /// No description provided for @panoramaAlignScreenE4c00e1b.
+  ///
+  /// In he, this message translates to:
+  /// **'תקרה'**
+  String get panoramaAlignScreenE4c00e1b;
+
+  /// No description provided for @panoramaAlignScreenDbb59c32.
+  ///
+  /// In he, this message translates to:
+  /// **'רצפה'**
+  String get panoramaAlignScreenDbb59c32;
+
+  /// No description provided for @panoramaAlignScreenD798b826.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסיפו לפחות שתי פנורמות כדי להרכיב סיבוב מלא.'**
+  String get panoramaAlignScreenD798b826;
+
+  /// No description provided for @panoramaAlignScreenB2dac83d.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחילים להרכיב את ה-360°...'**
+  String get panoramaAlignScreenB2dac83d;
+
+  /// No description provided for @panoramaAlignScreen62c97e13.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו להתחיל את ההרכבה. בדקו את החיבור לאינטרנט.'**
+  String get panoramaAlignScreen62c97e13;
+
+  /// No description provided for @panoramaAlignScreen47b1e23d.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלים פנורמות... {current}/{total}'**
+  String panoramaAlignScreen47b1e23d(Object current, Object total);
+
+  /// No description provided for @panoramaAlignScreenF18b60a5.
+  ///
+  /// In he, this message translates to:
+  /// **'ההעלאה נכשלה באמצע. בדקו את החיבור ונסו שוב.'**
+  String get panoramaAlignScreenF18b60a5;
+
+  /// No description provided for @panoramaAlignScreenD2a25e0e.
+  ///
+  /// In he, this message translates to:
+  /// **'מחברים את הפנורמות לסיבוב מלא...'**
+  String get panoramaAlignScreenD2a25e0e;
+
+  /// No description provided for @panoramaAlignScreenBc47a202.
+  ///
+  /// In he, this message translates to:
+  /// **'ההרכבה נכשלה. נסו לסדר מחדש שתתקבל חפיפה ברורה בין הפנורמות.'**
+  String get panoramaAlignScreenBc47a202;
+
+  /// No description provided for @panoramaAlignScreen4a2e8e0f.
+  ///
+  /// In he, this message translates to:
+  /// **'ההרכבה לוקחת יותר מדי זמן. נסו שוב מאוחר יותר.'**
+  String get panoramaAlignScreen4a2e8e0f;
+
+  /// No description provided for @panoramaAlignScreen19c26543.
+  ///
+  /// In he, this message translates to:
+  /// **'משהו השתבש. בדקו את החיבור ונסו שוב.'**
+  String get panoramaAlignScreen19c26543;
+
+  /// No description provided for @panoramaAlignScreenFd743c18.
+  ///
+  /// In he, this message translates to:
+  /// **'הרכבת 360° מכמה פנורמות'**
+  String get panoramaAlignScreenFd743c18;
+
+  /// No description provided for @panoramaAlignScreenCa889149.
+  ///
+  /// In he, this message translates to:
+  /// **'גררו כדי לסדר על הסיבוב (0° → 360°)'**
+  String get panoramaAlignScreenCa889149;
+
+  /// No description provided for @panoramaAlignScreenFde6013b.
+  ///
+  /// In he, this message translates to:
+  /// **'הפנורמות שלכם'**
+  String get panoramaAlignScreenFde6013b;
+
+  /// No description provided for @panoramaAlignScreenD58171d2.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסף פנורמה'**
+  String get panoramaAlignScreenD58171d2;
+
+  /// No description provided for @panoramaAlignScreenE0627abd.
+  ///
+  /// In he, this message translates to:
+  /// **'סיים והרכב 360°'**
+  String get panoramaAlignScreenE0627abd;
+
+  /// No description provided for @panoramaAlignScreenAbe1f3b1.
+  ///
+  /// In he, this message translates to:
+  /// **'צלמו פנורמה אחת בטלפון, ואז עוד אחת מהצד השני. הוסיפו אותן כאן וגררו '**
+  String get panoramaAlignScreenAbe1f3b1;
+
+  /// No description provided for @panoramaAlignScreenE0274901.
+  ///
+  /// In he, this message translates to:
+  /// **'כדי שיתחברו לסיבוב מלא — אנחנו נחבר אותן ל-360° חלק.'**
+  String get panoramaAlignScreenE0274901;
+
+  /// No description provided for @panoramaAlignScreen8e131b97.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסיפו את הפנורמות שצילמתם'**
+  String get panoramaAlignScreen8e131b97;
+
+  /// No description provided for @panoramaAlignScreen6b5a2c3f.
+  ///
+  /// In he, this message translates to:
+  /// **'כל פנורמה מכסה חלק מהסיבוב. הוסיפו שתיים או יותר.'**
+  String get panoramaAlignScreen6b5a2c3f;
+
+  /// No description provided for @panoramaAlignScreenDc8906c4.
+  ///
+  /// In he, this message translates to:
+  /// **'כך נראה ה-360° שלכם'**
+  String get panoramaAlignScreenDc8906c4;
+
+  /// No description provided for @panoramaAlignScreen4d6407f1.
+  ///
+  /// In he, this message translates to:
+  /// **'פנורמה {index}'**
+  String panoramaAlignScreen4d6407f1(Object index);
+
+  /// No description provided for @panoramaAlignScreen49cc29de.
+  ///
+  /// In he, this message translates to:
+  /// **'{start}° → {end}° · רוחב {width}°'**
+  String panoramaAlignScreen49cc29de(Object end, Object start, Object width);
+
+  /// No description provided for @panoramaAlignScreenF877ef0d.
+  ///
+  /// In he, this message translates to:
+  /// **'✂ נחתך {left}% משמאל · {right}% מימין'**
+  String panoramaAlignScreenF877ef0d(Object left, Object right);
+
+  /// No description provided for @panoramaAlignScreenC32b2bbf.
+  ///
+  /// In he, this message translates to:
+  /// **'חתוך התאמה'**
+  String get panoramaAlignScreenC32b2bbf;
+
+  /// No description provided for @panoramaAlignScreen09b6bcca.
+  ///
+  /// In he, this message translates to:
+  /// **'מחק'**
+  String get panoramaAlignScreen09b6bcca;
+
+  /// No description provided for @panoramaAlignScreenFc5d14c7.
+  ///
+  /// In he, this message translates to:
+  /// **'חזרה לסידור'**
+  String get panoramaAlignScreenFc5d14c7;
+
+  /// No description provided for @panoramaAlignScreen55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get panoramaAlignScreen55247199;
+
+  /// No description provided for @panoramaAlignScreen9b77263e.
+  ///
+  /// In he, this message translates to:
+  /// **'חתכו את הקצוות כדי שיתאים לפנורמה הסמוכה'**
+  String get panoramaAlignScreen9b77263e;
+
+  /// No description provided for @panoramaAlignScreen16d13bac.
+  ///
+  /// In he, this message translates to:
+  /// **'גררו את הידיות פנימה כדי להסיר חפיפה או קצה לא טוב.'**
+  String get panoramaAlignScreen16d13bac;
+
+  /// No description provided for @panoramaAlignScreen40226151.
+  ///
+  /// In he, this message translates to:
+  /// **'איפוס'**
+  String get panoramaAlignScreen40226151;
+
+  /// No description provided for @panoramaAlignScreen2e0134d2.
+  ///
+  /// In he, this message translates to:
+  /// **'החל חיתוך'**
+  String get panoramaAlignScreen2e0134d2;
+
+  /// No description provided for @brokerPipelineScreenBb0a46bb.
+  ///
+  /// In he, this message translates to:
+  /// **'ליד נסגר בהצלחה 🎉'**
+  String get brokerPipelineScreenBb0a46bb;
+
+  /// No description provided for @brokerPipelineScreen5f575001.
+  ///
+  /// In he, this message translates to:
+  /// **'ליצור עסקה במעקב העמלות מהליד הזה?'**
+  String get brokerPipelineScreen5f575001;
+
+  /// No description provided for @brokerPipelineScreen98c8a5b8.
+  ///
+  /// In he, this message translates to:
+  /// **'לא עכשיו'**
+  String get brokerPipelineScreen98c8a5b8;
+
+  /// No description provided for @brokerPipelineScreenA250d66b.
+  ///
+  /// In he, this message translates to:
+  /// **'צור עסקה'**
+  String get brokerPipelineScreenA250d66b;
+
+  /// No description provided for @brokerPipelineScreenBf7fa86c.
+  ///
+  /// In he, this message translates to:
+  /// **'נוצרה עסקה במעקב העמלות — בדוק את הסכום והוסף אחוז עמלה'**
+  String get brokerPipelineScreenBf7fa86c;
+
+  /// No description provided for @brokerPipelineScreenCdec8cf6.
+  ///
+  /// In he, this message translates to:
+  /// **'נוצרה עסקה במעקב העמלות — השלם שם את הסכום'**
+  String get brokerPipelineScreenCdec8cf6;
+
+  /// No description provided for @brokerPipelineScreenD3e8fbc2.
+  ///
+  /// In he, this message translates to:
+  /// **'הליד'**
+  String get brokerPipelineScreenD3e8fbc2;
+
+  /// No description provided for @brokerPipelineScreen02e8a635.
+  ///
+  /// In he, this message translates to:
+  /// **'פולואפ ליד'**
+  String get brokerPipelineScreen02e8a635;
+
+  /// No description provided for @brokerPipelineScreenEef25736.
+  ///
+  /// In he, this message translates to:
+  /// **'הגיע הזמן לחזור ל{who}{what}'**
+  String brokerPipelineScreenEef25736(Object what, Object who);
+
+  /// No description provided for @brokerPipelineScreen0a1cdb54.
+  ///
+  /// In he, this message translates to:
+  /// **'פייפליין לידים'**
+  String get brokerPipelineScreen0a1cdb54;
+
+  /// No description provided for @brokerPipelineScreenEd8d552e.
+  ///
+  /// In he, this message translates to:
+  /// **'ליד חדש'**
+  String get brokerPipelineScreenEd8d552e;
+
+  /// No description provided for @brokerPipelineScreen3dd4edb0.
+  ///
+  /// In he, this message translates to:
+  /// **'אין עדיין לידים'**
+  String get brokerPipelineScreen3dd4edb0;
+
+  /// No description provided for @brokerPipelineScreen54c02219.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסיפו לקוח מתעניין כדי לעקוב אחריו עד לסגירה'**
+  String get brokerPipelineScreen54c02219;
+
+  /// No description provided for @brokerPipelineScreen1e8e9994.
+  ///
+  /// In he, this message translates to:
+  /// **'פולואפ באיחור ({count})'**
+  String brokerPipelineScreen1e8e9994(Object count);
+
+  /// No description provided for @brokerPipelineScreen1aadec4d.
+  ///
+  /// In he, this message translates to:
+  /// **'פולואפ: {date}'**
+  String brokerPipelineScreen1aadec4d(Object date);
+
+  /// No description provided for @brokerPipelineScreen313f6a17.
+  ///
+  /// In he, this message translates to:
+  /// **'העברה לשלב:'**
+  String get brokerPipelineScreen313f6a17;
+
+  /// No description provided for @brokerPipelineScreenD0f162f9.
+  ///
+  /// In he, this message translates to:
+  /// **'קביעת פולואפ'**
+  String get brokerPipelineScreenD0f162f9;
+
+  /// No description provided for @brokerPipelineScreen470fd4ec.
+  ///
+  /// In he, this message translates to:
+  /// **'הסרת פולואפ'**
+  String get brokerPipelineScreen470fd4ec;
+
+  /// No description provided for @brokerPipelineScreenB00960b9.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקת ליד'**
+  String get brokerPipelineScreenB00960b9;
+
+  /// No description provided for @brokerPipelineScreen737232c2.
+  ///
+  /// In he, this message translates to:
+  /// **'טלפון'**
+  String get brokerPipelineScreen737232c2;
+
+  /// No description provided for @brokerPipelineScreen18d43ef8.
+  ///
+  /// In he, this message translates to:
+  /// **'יש להזין שם לקוח'**
+  String get brokerPipelineScreen18d43ef8;
+
+  /// No description provided for @brokerPipelineScreen83c5428d.
+  ///
+  /// In he, this message translates to:
+  /// **'שם הלקוח *'**
+  String get brokerPipelineScreen83c5428d;
+
+  /// No description provided for @brokerPipelineScreen350eef65.
+  ///
+  /// In he, this message translates to:
+  /// **'מקור הליד:'**
+  String get brokerPipelineScreen350eef65;
+
+  /// No description provided for @brokerPipelineScreenE9adf7ad.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס מקושר:'**
+  String get brokerPipelineScreenE9adf7ad;
+
+  /// No description provided for @brokerPipelineScreenEdf6c5ad.
+  ///
+  /// In he, this message translates to:
+  /// **'בחר נכס (לא חובה)'**
+  String get brokerPipelineScreenEdf6c5ad;
+
+  /// No description provided for @brokerPipelineScreenBf7d92b1.
+  ///
+  /// In he, this message translates to:
+  /// **'ללא נכס'**
+  String get brokerPipelineScreenBf7d92b1;
+
+  /// No description provided for @brokerPipelineScreen92b0d682.
+  ///
+  /// In he, this message translates to:
+  /// **'הערות'**
+  String get brokerPipelineScreen92b0d682;
+
+  /// No description provided for @brokerPipelineScreenE6932339.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירה'**
+  String get brokerPipelineScreenE6932339;
+
+  /// No description provided for @panoramaSphereCapture40cd556b.
+  ///
+  /// In he, this message translates to:
+  /// **'הכדור הושלם ✓ — במכשיר אמיתי זה נבנה עכשיו ל-360° מלא.'**
+  String get panoramaSphereCapture40cd556b;
+
+  /// No description provided for @panoramaSphereCapture97f6b247.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחילים לבנות את הסיור...'**
+  String get panoramaSphereCapture97f6b247;
+
+  /// No description provided for @panoramaSphereCapture127d1554.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו להתחיל את העיבוד. בדקו את החיבור לאינטרנט.'**
+  String get panoramaSphereCapture127d1554;
+
+  /// No description provided for @panoramaSphereCaptureE39b6aae.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלים את התמונות...'**
+  String get panoramaSphereCaptureE39b6aae;
+
+  /// No description provided for @panoramaSphereCaptureBbb9c298.
+  ///
+  /// In he, this message translates to:
+  /// **'ההעלאה נכשלה. בדקו את החיבור ונסו שוב.'**
+  String get panoramaSphereCaptureBbb9c298;
+
+  /// No description provided for @panoramaSphereCapture1b311f3a.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלים את התמונות... ({current}/{total})'**
+  String panoramaSphereCapture1b311f3a(Object current, Object total);
+
+  /// No description provided for @panoramaSphereCapture8844cc68.
+  ///
+  /// In he, this message translates to:
+  /// **'בונים את הסיור...'**
+  String get panoramaSphereCapture8844cc68;
+
+  /// No description provided for @panoramaSphereCaptureA9e373df.
+  ///
+  /// In he, this message translates to:
+  /// **'העיבוד נכשל. נסו לצלם שוב, לאט ובאור טוב.'**
+  String get panoramaSphereCaptureA9e373df;
+
+  /// No description provided for @panoramaSphereCaptureAb4f63ba.
+  ///
+  /// In he, this message translates to:
+  /// **'העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.'**
+  String get panoramaSphereCaptureAb4f63ba;
+
+  /// No description provided for @panoramaSphereCapture19c26543.
+  ///
+  /// In he, this message translates to:
+  /// **'משהו השתבש. בדקו את החיבור ונסו שוב.'**
+  String get panoramaSphereCapture19c26543;
+
+  /// No description provided for @panoramaSphereCapture70b265d7.
+  ///
+  /// In he, this message translates to:
+  /// **'הכדור הושלם ✓'**
+  String get panoramaSphereCapture70b265d7;
+
+  /// No description provided for @panoramaSphereCapture84b777d5.
+  ///
+  /// In he, this message translates to:
+  /// **'צולמו {captured} מתוך {total}'**
+  String panoramaSphereCapture84b777d5(Object captured, Object total);
+
+  /// No description provided for @panoramaSphereCaptureE97ca842.
+  ///
+  /// In he, this message translates to:
+  /// **'מצוין! בונים את הסיור...'**
+  String get panoramaSphereCaptureE97ca842;
+
+  /// No description provided for @panoramaSphereCaptureFaa5a7cd.
+  ///
+  /// In he, this message translates to:
+  /// **'האטו — החזיקו יציב על הנקודה'**
+  String get panoramaSphereCaptureFaa5a7cd;
+
+  /// No description provided for @panoramaSphereCaptureCbe90974.
+  ///
+  /// In he, this message translates to:
+  /// **'החזיקו רגע... ננעל ומצלם 📸'**
+  String get panoramaSphereCaptureCbe90974;
+
+  /// No description provided for @panoramaSphereCapture329e59af.
+  ///
+  /// In he, this message translates to:
+  /// **'הרימו את הטלפון למעלה ☝️'**
+  String get panoramaSphereCapture329e59af;
+
+  /// No description provided for @panoramaSphereCapture3802a2f9.
+  ///
+  /// In he, this message translates to:
+  /// **'הטו את הטלפון למטה 👇'**
+  String get panoramaSphereCapture3802a2f9;
+
+  /// No description provided for @panoramaSphereCaptureCc0c751f.
+  ///
+  /// In he, this message translates to:
+  /// **'סובבו ימינה ➡️'**
+  String get panoramaSphereCaptureCc0c751f;
+
+  /// No description provided for @panoramaSphereCapture39ad314d.
+  ///
+  /// In he, this message translates to:
+  /// **'סובבו שמאלה ⬅️'**
+  String get panoramaSphereCapture39ad314d;
+
+  /// No description provided for @panoramaSphereCapture1502911e.
+  ///
+  /// In he, this message translates to:
+  /// **'כוונו את הנקודה למרכז — {dir}'**
+  String panoramaSphereCapture1502911e(Object dir);
+
+  /// No description provided for @panoramaSphereCaptureF1c50330.
+  ///
+  /// In he, this message translates to:
+  /// **'כוונו את הנקודה הזוהרת אל המרכז'**
+  String get panoramaSphereCaptureF1c50330;
+
+  /// No description provided for @panoramaSphereCapture1c86586d.
+  ///
+  /// In he, this message translates to:
+  /// **'כוונו קרוב יותר לנקודה לא-מצולמת'**
+  String get panoramaSphereCapture1c86586d;
+
+  /// No description provided for @panoramaSphereCaptureC1c39e62.
+  ///
+  /// In he, this message translates to:
+  /// **'צלמו את הנקודה שבמרכז'**
+  String get panoramaSphereCaptureC1c39e62;
+
+  /// No description provided for @panoramaSphereCapture1dc38c15.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו לבנות את הסיור'**
+  String get panoramaSphereCapture1dc38c15;
+
+  /// No description provided for @panoramaSphereCapture5a8e3f2d.
+  ///
+  /// In he, this message translates to:
+  /// **'{buildMsg}\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.'**
+  String panoramaSphereCapture5a8e3f2d(Object buildMsg);
+
+  /// No description provided for @panoramaSphereCapture3b32c520.
+  ///
+  /// In he, this message translates to:
+  /// **'צלם מחדש'**
+  String get panoramaSphereCapture3b32c520;
+
+  /// No description provided for @panoramaSphereCapture55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get panoramaSphereCapture55247199;
+
+  /// No description provided for @panoramaSphereCaptureA9e4f107.
+  ///
+  /// In he, this message translates to:
+  /// **'רחב'**
+  String get panoramaSphereCaptureA9e4f107;
+
+  /// No description provided for @panoramaSphereCapture3e20e30e.
+  ///
+  /// In he, this message translates to:
+  /// **'רגיל'**
+  String get panoramaSphereCapture3e20e30e;
+
+  /// No description provided for @panoramaSphereCapture8fc9dc18.
+  ///
+  /// In he, this message translates to:
+  /// **'מצב הדגמה (סימולטור)\nגררו כדי לכוון'**
+  String get panoramaSphereCapture8fc9dc18;
+
+  /// No description provided for @tenantDetailScreenE45aa6fe.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש/ת דירה · משתמש מאומת'**
+  String get tenantDetailScreenE45aa6fe;
+
+  /// No description provided for @tenantDetailScreen54b54821.
+  ///
+  /// In he, this message translates to:
+  /// **'מה הוא מחפש'**
+  String get tenantDetailScreen54b54821;
+
+  /// No description provided for @tenantDetailScreenDc721374.
+  ///
+  /// In he, this message translates to:
+  /// **'למה ההתאמה הזו'**
+  String get tenantDetailScreenDc721374;
+
+  /// No description provided for @tenantDetailScreen342759aa.
+  ///
+  /// In he, this message translates to:
+  /// **'הנכס שאהב'**
+  String get tenantDetailScreen342759aa;
+
+  /// No description provided for @tenantDetailScreenAede4a6e.
+  ///
+  /// In he, this message translates to:
+  /// **'קצת עליו'**
+  String get tenantDetailScreenAede4a6e;
+
+  /// No description provided for @tenantDetailScreen64680a66.
+  ///
+  /// In he, this message translates to:
+  /// **'מאפיינים חשובים'**
+  String get tenantDetailScreen64680a66;
+
+  /// No description provided for @tenantDetailScreen64967671.
+  ///
+  /// In he, this message translates to:
+  /// **'תנאים שאינם לדיון'**
+  String get tenantDetailScreen64967671;
+
+  /// No description provided for @tenantDetailScreen6987e12c.
+  ///
+  /// In he, this message translates to:
+  /// **'המלצות מבעלי דירות'**
+  String get tenantDetailScreen6987e12c;
+
+  /// No description provided for @tenantDetailScreenB4cc85ed.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש דירה'**
+  String get tenantDetailScreenB4cc85ed;
+
+  /// No description provided for @tenantDetailScreen548d9521.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים · {moveIn}'**
+  String tenantDetailScreen548d9521(Object moveIn, Object rooms);
+
+  /// No description provided for @tenantDetailScreen0ee38ad3.
+  ///
+  /// In he, this message translates to:
+  /// **'תקציב מקסימלי'**
+  String get tenantDetailScreen0ee38ad3;
+
+  /// No description provided for @tenantDetailScreenB50b3974.
+  ///
+  /// In he, this message translates to:
+  /// **'חדרים'**
+  String get tenantDetailScreenB50b3974;
+
+  /// No description provided for @tenantDetailScreen1399cd87.
+  ///
+  /// In he, this message translates to:
+  /// **'מועד כניסה'**
+  String get tenantDetailScreen1399cd87;
+
+  /// No description provided for @tenantDetailScreenC7f6f4e8.
+  ///
+  /// In he, this message translates to:
+  /// **'נקודות אמון'**
+  String get tenantDetailScreenC7f6f4e8;
+
+  /// No description provided for @tenantDetailScreen0333a357.
+  ///
+  /// In he, this message translates to:
+  /// **'לפי ההעדפות שלך מול הנכס שאהב'**
+  String get tenantDetailScreen0333a357;
+
+  /// No description provided for @tenantDetailScreen9bf902f4.
+  ///
+  /// In he, this message translates to:
+  /// **'תקציב עד ₪{budget} — מכסה את דמי השכירות (₪{price})'**
+  String tenantDetailScreen9bf902f4(Object budget, Object price);
+
+  /// No description provided for @tenantDetailScreenDe6e13c4.
+  ///
+  /// In he, this message translates to:
+  /// **'תקציב עד ₪{budget} — מתחת לדמי השכירות (₪{price})'**
+  String tenantDetailScreenDe6e13c4(Object budget, Object price);
+
+  /// No description provided for @tenantDetailScreen1e958c2f.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש {rooms} חדרים — תואם לנכס ({propRooms})'**
+  String tenantDetailScreen1e958c2f(Object propRooms, Object rooms);
+
+  /// No description provided for @tenantDetailScreenB8e3e192.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש {rooms} חדרים — הנכס {propRooms} חדרים'**
+  String tenantDetailScreenB8e3e192(Object propRooms, Object rooms);
+
+  /// No description provided for @tenantDetailScreen12c58e28.
+  ///
+  /// In he, this message translates to:
+  /// **'זמין לכניסה: {moveIn}'**
+  String tenantDetailScreen12c58e28(Object moveIn);
+
+  /// No description provided for @tenantDetailScreenE3b82a80.
+  ///
+  /// In he, this message translates to:
+  /// **'ציין: {details}'**
+  String tenantDetailScreenE3b82a80(Object details);
+
+  /// No description provided for @tenantDetailScreen0e27d010.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה מושלמת'**
+  String get tenantDetailScreen0e27d010;
+
+  /// No description provided for @tenantDetailScreen716b886b.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה מצוינת'**
+  String get tenantDetailScreen716b886b;
+
+  /// No description provided for @tenantDetailScreenAb92611a.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה טובה'**
+  String get tenantDetailScreenAb92611a;
+
+  /// No description provided for @tenantDetailScreen758f13a3.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה סבירה'**
+  String get tenantDetailScreen758f13a3;
+
+  /// No description provided for @tenantDetailScreenD886d07f.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String tenantDetailScreenD886d07f(Object rooms);
+
+  /// No description provided for @tenantDetailScreenFdb4eac7.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ״ר'**
+  String tenantDetailScreenFdb4eac7(Object size);
+
+  /// No description provided for @tenantDetailScreen6c58947e.
+  ///
+  /// In he, this message translates to:
+  /// **'בעל דירה קודם'**
+  String get tenantDetailScreen6c58947e;
+
+  /// No description provided for @tenantDetailScreen80a413c5.
+  ///
+  /// In he, this message translates to:
+  /// **'דלג'**
+  String get tenantDetailScreen80a413c5;
+
+  /// No description provided for @tenantDetailScreen96c6fb01.
+  ///
+  /// In he, this message translates to:
+  /// **'אהבתי · צור קשר'**
+  String get tenantDetailScreen96c6fb01;
+
+  /// No description provided for @brokerExclusivityScreen3c0b6cc3.
+  ///
+  /// In he, this message translates to:
+  /// **'הבלעדיות'**
+  String get brokerExclusivityScreen3c0b6cc3;
+
+  /// No description provided for @brokerExclusivityScreen8706412d.
+  ///
+  /// In he, this message translates to:
+  /// **'הבלעדיות על {title}'**
+  String brokerExclusivityScreen8706412d(Object title);
+
+  /// No description provided for @brokerExclusivityScreen4b882a37.
+  ///
+  /// In he, this message translates to:
+  /// **'חידוש בלעדיות'**
+  String get brokerExclusivityScreen4b882a37;
+
+  /// No description provided for @brokerExclusivityScreen7c5814c0.
+  ///
+  /// In he, this message translates to:
+  /// **'{what} מסתיימת ב-{date}. כדאי לחדש לפני שתפוג.'**
+  String brokerExclusivityScreen7c5814c0(Object date, Object what);
+
+  /// No description provided for @brokerExclusivityScreenCff70eb7.
+  ///
+  /// In he, this message translates to:
+  /// **'למחוק את הבלעדיות?'**
+  String get brokerExclusivityScreenCff70eb7;
+
+  /// No description provided for @brokerExclusivityScreen88ad6f14.
+  ///
+  /// In he, this message translates to:
+  /// **'הרשומה תימחק לצמיתות.'**
+  String get brokerExclusivityScreen88ad6f14;
+
+  /// No description provided for @brokerExclusivityScreen50999a4f.
+  ///
+  /// In he, this message translates to:
+  /// **'\"{title}\" תימחק לצמיתות.'**
+  String brokerExclusivityScreen50999a4f(Object title);
+
+  /// No description provided for @brokerExclusivityScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get brokerExclusivityScreenA7c55a8d;
+
+  /// No description provided for @brokerExclusivityScreen09b6bcca.
+  ///
+  /// In he, this message translates to:
+  /// **'מחק'**
+  String get brokerExclusivityScreen09b6bcca;
+
+  /// No description provided for @brokerExclusivityScreen48eff0e3.
+  ///
+  /// In he, this message translates to:
+  /// **'בלעדיות'**
+  String get brokerExclusivityScreen48eff0e3;
+
+  /// No description provided for @brokerExclusivityScreen3280ed69.
+  ///
+  /// In he, this message translates to:
+  /// **'בלעדיות חדשה'**
+  String get brokerExclusivityScreen3280ed69;
+
+  /// No description provided for @brokerExclusivityScreenD408aab3.
+  ///
+  /// In he, this message translates to:
+  /// **'אין בלעדיות פעילה.\nהוסף בלעדיות כדי לעקוב אחר תאריך הסיום.'**
+  String get brokerExclusivityScreenD408aab3;
+
+  /// No description provided for @brokerExclusivityScreen17b73df9.
+  ///
+  /// In he, this message translates to:
+  /// **'הבלעדיות פגה לפני {days} ימים'**
+  String brokerExclusivityScreen17b73df9(Object days);
+
+  /// No description provided for @brokerExclusivityScreen95962fc0.
+  ///
+  /// In he, this message translates to:
+  /// **'בלעדיות מסתיימת בעוד {days} ימים'**
+  String brokerExclusivityScreen95962fc0(Object days);
+
+  /// No description provided for @brokerExclusivityScreen99135f8c.
+  ///
+  /// In he, this message translates to:
+  /// **'בתוקף · עוד {days} ימים'**
+  String brokerExclusivityScreen99135f8c(Object days);
+
+  /// No description provided for @brokerExclusivityScreen43b54956.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס ללא שם'**
+  String get brokerExclusivityScreen43b54956;
+
+  /// No description provided for @brokerExclusivityScreenAe97df84.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלה: {pct}%'**
+  String brokerExclusivityScreenAe97df84(Object pct);
+
+  /// No description provided for @brokerExclusivityScreen39fe2593.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכה'**
+  String get brokerExclusivityScreen39fe2593;
+
+  /// No description provided for @brokerExclusivityScreen7c8173fa.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקה'**
+  String get brokerExclusivityScreen7c8173fa;
+
+  /// No description provided for @brokerExclusivityScreenFaaeacbe.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכת בלעדיות'**
+  String get brokerExclusivityScreenFaaeacbe;
+
+  /// No description provided for @brokerExclusivityScreenBa9fc140.
+  ///
+  /// In he, this message translates to:
+  /// **'כתובת / שם הנכס'**
+  String get brokerExclusivityScreenBa9fc140;
+
+  /// No description provided for @brokerExclusivityScreen1d306e9d.
+  ///
+  /// In he, this message translates to:
+  /// **'שם בעל הנכס'**
+  String get brokerExclusivityScreen1d306e9d;
+
+  /// No description provided for @brokerExclusivityScreenB8f119f3.
+  ///
+  /// In he, this message translates to:
+  /// **'טלפון בעל הנכס'**
+  String get brokerExclusivityScreenB8f119f3;
+
+  /// No description provided for @brokerExclusivityScreen7ac184b0.
+  ///
+  /// In he, this message translates to:
+  /// **'אחוז עמלה (%)'**
+  String get brokerExclusivityScreen7ac184b0;
+
+  /// No description provided for @brokerExclusivityScreen2920ef89.
+  ///
+  /// In he, this message translates to:
+  /// **'תחילת בלעדיות'**
+  String get brokerExclusivityScreen2920ef89;
+
+  /// No description provided for @brokerExclusivityScreen27dd66e7.
+  ///
+  /// In he, this message translates to:
+  /// **'סיום בלעדיות'**
+  String get brokerExclusivityScreen27dd66e7;
+
+  /// No description provided for @brokerExclusivityScreen92b0d682.
+  ///
+  /// In he, this message translates to:
+  /// **'הערות'**
+  String get brokerExclusivityScreen92b0d682;
+
+  /// No description provided for @brokerExclusivityScreenE6932339.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירה'**
+  String get brokerExclusivityScreenE6932339;
+
+  /// No description provided for @remindersScreen409fc735.
+  ///
+  /// In he, this message translates to:
+  /// **'תזכורת'**
+  String get remindersScreen409fc735;
+
+  /// No description provided for @remindersScreenF6789864.
+  ///
+  /// In he, this message translates to:
+  /// **'התזכורת נשמרה'**
+  String get remindersScreenF6789864;
+
+  /// No description provided for @remindersScreenCa25d18a.
+  ///
+  /// In he, this message translates to:
+  /// **'תזכורות'**
+  String get remindersScreenCa25d18a;
+
+  /// No description provided for @remindersScreen1d935aa3.
+  ///
+  /// In he, this message translates to:
+  /// **'תזכורת חדשה'**
+  String get remindersScreen1d935aa3;
+
+  /// No description provided for @remindersScreen9d1d367d.
+  ///
+  /// In he, this message translates to:
+  /// **'סיום חוזה'**
+  String get remindersScreen9d1d367d;
+
+  /// No description provided for @remindersScreen3e064b53.
+  ///
+  /// In he, this message translates to:
+  /// **'אין חוזים חתומים כרגע. כשתחתום על חוזה, '**
+  String get remindersScreen3e064b53;
+
+  /// No description provided for @remindersScreen4c157f3a.
+  ///
+  /// In he, this message translates to:
+  /// **'נזכיר לך חודש ושבוע לפני שהוא מסתיים.'**
+  String get remindersScreen4c157f3a;
+
+  /// No description provided for @remindersScreen3c8688c4.
+  ///
+  /// In he, this message translates to:
+  /// **'תזכורות שלי'**
+  String get remindersScreen3c8688c4;
+
+  /// No description provided for @remindersScreen4ae2e566.
+  ///
+  /// In he, this message translates to:
+  /// **'כאן לא שוכחים. נזכיר לך מתי חוזה עומד להסתיים ומתי לגבות שכר דירה.'**
+  String get remindersScreen4ae2e566;
+
+  /// No description provided for @remindersScreen3b042ffd.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה'**
+  String get remindersScreen3b042ffd;
+
+  /// No description provided for @remindersScreenBf84b357.
+  ///
+  /// In he, this message translates to:
+  /// **'החוזה כבר הסתיים'**
+  String get remindersScreenBf84b357;
+
+  /// No description provided for @remindersScreen9d434107.
+  ///
+  /// In he, this message translates to:
+  /// **'החוזה מסתיים היום'**
+  String get remindersScreen9d434107;
+
+  /// No description provided for @remindersScreen4d2730e7.
+  ///
+  /// In he, this message translates to:
+  /// **'מסתיים מחר'**
+  String get remindersScreen4d2730e7;
+
+  /// No description provided for @remindersScreenC67b1a11.
+  ///
+  /// In he, this message translates to:
+  /// **'מסתיים בעוד {days} ימים'**
+  String remindersScreenC67b1a11(Object days);
+
+  /// No description provided for @remindersScreenD66ef141.
+  ///
+  /// In he, this message translates to:
+  /// **'החוזה בדירה \"{title}\"'**
+  String remindersScreenD66ef141(Object title);
+
+  /// No description provided for @remindersScreenD0680cb9.
+  ///
+  /// In he, this message translates to:
+  /// **'התזכורת הועברה לארכיון'**
+  String get remindersScreenD0680cb9;
+
+  /// No description provided for @remindersScreen0ee389c1.
+  ///
+  /// In he, this message translates to:
+  /// **'אין תזכורות אישיות. אפשר להוסיף, למשל: \"לגבות שכר ב-10 בחודש\".'**
+  String get remindersScreen0ee389c1;
+
+  /// No description provided for @remindersScreenC6e2f375.
+  ///
+  /// In he, this message translates to:
+  /// **'פעולות'**
+  String get remindersScreenC6e2f375;
+
+  /// No description provided for @remindersScreen39fe2593.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכה'**
+  String get remindersScreen39fe2593;
+
+  /// No description provided for @remindersScreenEd0727e5.
+  ///
+  /// In he, this message translates to:
+  /// **'העברה לארכיון'**
+  String get remindersScreenEd0727e5;
+
+  /// No description provided for @remindersScreen7c8173fa.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקה'**
+  String get remindersScreen7c8173fa;
+
+  /// No description provided for @remindersScreen6ee55398.
+  ///
+  /// In he, this message translates to:
+  /// **'לגבות שכר דירה'**
+  String get remindersScreen6ee55398;
+
+  /// No description provided for @remindersScreen8dcb89b4.
+  ///
+  /// In he, this message translates to:
+  /// **'מה להזכיר לך?'**
+  String get remindersScreen8dcb89b4;
+
+  /// No description provided for @remindersScreen634d3915.
+  ///
+  /// In he, this message translates to:
+  /// **'למשל: לגבות שכר ב-10 בחודש'**
+  String get remindersScreen634d3915;
+
+  /// No description provided for @remindersScreenFa3782fd.
+  ///
+  /// In he, this message translates to:
+  /// **'מתי: {when}'**
+  String remindersScreenFa3782fd(Object when);
+
+  /// No description provided for @remindersScreen276878c2.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירת תזכורת'**
+  String get remindersScreen276878c2;
+
+  /// No description provided for @profileCardB9fe4671.
+  ///
+  /// In he, this message translates to:
+  /// **'♥ מתאים'**
+  String get profileCardB9fe4671;
+
+  /// No description provided for @profileCard80a413c5.
+  ///
+  /// In he, this message translates to:
+  /// **'דלג'**
+  String get profileCard80a413c5;
+
+  /// No description provided for @profileCardF0f71ca3.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String profileCardF0f71ca3(Object rooms);
+
+  /// No description provided for @profileCardD8b6113c.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ\"ר'**
+  String profileCardD8b6113c(Object size);
+
+  /// No description provided for @profileCard77d9ac8f.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String profileCard77d9ac8f(Object floor);
+
+  /// No description provided for @profileCardF069621c.
+  ///
+  /// In he, this message translates to:
+  /// **'₪{perM2}/מ\"ר'**
+  String profileCardF069621c(Object perM2);
+
+  /// No description provided for @profileCardEa9a5392.
+  ///
+  /// In he, this message translates to:
+  /// **'תיווך מאומת'**
+  String get profileCardEa9a5392;
+
+  /// No description provided for @profileCard6fd38fe6.
+  ///
+  /// In he, this message translates to:
+  /// **'בעלים פרטי'**
+  String get profileCard6fd38fe6;
+
+  /// No description provided for @profileCard9077b7f7.
+  ///
+  /// In he, this message translates to:
+  /// **'מאומתת'**
+  String get profileCard9077b7f7;
+
+  /// No description provided for @profileCard2af4ac1c.
+  ///
+  /// In he, this message translates to:
+  /// **'{score}% התאמה'**
+  String profileCard2af4ac1c(Object score);
+
+  /// No description provided for @profileCard8342a66c.
+  ///
+  /// In he, this message translates to:
+  /// **'מקודם'**
+  String get profileCard8342a66c;
+
+  /// No description provided for @profileCard609fac18.
+  ///
+  /// In he, this message translates to:
+  /// **'למכירה'**
+  String get profileCard609fac18;
+
+  /// No description provided for @profileCard6f21a73d.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר מעולה'**
+  String get profileCard6f21a73d;
+
+  /// No description provided for @profileCard3af1f153.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר מעל הממוצע'**
+  String get profileCard3af1f153;
+
+  /// No description provided for @profileCardE310e6a5.
+  ///
+  /// In he, this message translates to:
+  /// **'דיווח על מודעה'**
+  String get profileCardE310e6a5;
+
+  /// No description provided for @profileCard90b9bf3d.
+  ///
+  /// In he, this message translates to:
+  /// **'חסום משתמש זה'**
+  String get profileCard90b9bf3d;
+
+  /// No description provided for @profileCard07c60eb7.
+  ///
+  /// In he, this message translates to:
+  /// **'מידע שגוי'**
+  String get profileCard07c60eb7;
+
+  /// No description provided for @profileCard05a76ba7.
+  ///
+  /// In he, this message translates to:
+  /// **'תמונות מזויפות'**
+  String get profileCard05a76ba7;
+
+  /// No description provided for @profileCard5a660a20.
+  ///
+  /// In he, this message translates to:
+  /// **'תוכן פוגעני'**
+  String get profileCard5a660a20;
+
+  /// No description provided for @profileCard678b6deb.
+  ///
+  /// In he, this message translates to:
+  /// **'הונאה'**
+  String get profileCard678b6deb;
+
+  /// No description provided for @profileCardCdf4bce0.
+  ///
+  /// In he, this message translates to:
+  /// **'אחר'**
+  String get profileCardCdf4bce0;
+
+  /// No description provided for @profileCard356f7af6.
+  ///
+  /// In he, this message translates to:
+  /// **'סיבת הדיווח'**
+  String get profileCard356f7af6;
+
+  /// No description provided for @profileCard30c55079.
+  ///
+  /// In he, this message translates to:
+  /// **'הדיווח נשלח. תודה.'**
+  String get profileCard30c55079;
+
+  /// No description provided for @profileCard00fe742b.
+  ///
+  /// In he, this message translates to:
+  /// **'חסימת משתמש'**
+  String get profileCard00fe742b;
+
+  /// No description provided for @profileCard9e821d65.
+  ///
+  /// In he, this message translates to:
+  /// **'האם לחסום את \"{owner}\"? כל המודעות שלהם יוסרו מהעדכון שלך.'**
+  String profileCard9e821d65(Object owner);
+
+  /// No description provided for @profileCardA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get profileCardA7c55a8d;
+
+  /// No description provided for @profileCard367b7d06.
+  ///
+  /// In he, this message translates to:
+  /// **'\"{owner}\" נחסם בהצלחה.'**
+  String profileCard367b7d06(Object owner);
+
+  /// No description provided for @profileCard1257849a.
+  ///
+  /// In he, this message translates to:
+  /// **'חסום'**
+  String get profileCard1257849a;
+
+  /// No description provided for @tenantRightsSheet09a76cb1.
+  ///
+  /// In he, this message translates to:
+  /// **'הזכויות שלכם כשוכרים'**
+  String get tenantRightsSheet09a76cb1;
+
+  /// No description provided for @tenantRightsSheet26a4104a.
+  ///
+  /// In he, this message translates to:
+  /// **'הפיקדון מוגבל בחוק'**
+  String get tenantRightsSheet26a4104a;
+
+  /// No description provided for @tenantRightsSheet5ea0f907.
+  ///
+  /// In he, this message translates to:
+  /// **'לפי חוק שכירות הוגנת 2017, פיקדון במזומן/ערבות '**
+  String get tenantRightsSheet5ea0f907;
+
+  /// No description provided for @tenantRightsSheet998fde48.
+  ///
+  /// In he, this message translates to:
+  /// **'מוגבל ל-₪{cap}. זה הסכום המרבי שמותר לבקש '**
+  String tenantRightsSheet998fde48(Object cap);
+
+  /// No description provided for @tenantRightsSheetDaadfc3a.
+  ///
+  /// In he, this message translates to:
+  /// **'מכם בנכס הזה (הנמוך מבין ⅓ מסך השכירות לכל '**
+  String get tenantRightsSheetDaadfc3a;
+
+  /// No description provided for @tenantRightsSheet30650421.
+  ///
+  /// In he, this message translates to:
+  /// **'התקופה או 3 חודשי שכירות).\n\n'**
+  String get tenantRightsSheet30650421;
+
+  /// No description provided for @tenantRightsSheet74e1f7e7.
+  ///
+  /// In he, this message translates to:
+  /// **'בטוחות = כסף או ערבות שמשאירים אצל בעל הדירה '**
+  String get tenantRightsSheet74e1f7e7;
+
+  /// No description provided for @tenantRightsSheetFd0085dc.
+  ///
+  /// In he, this message translates to:
+  /// **'להבטחת ההסכם, ומוחזרים בסוף השכירות.'**
+  String get tenantRightsSheetFd0085dc;
+
+  /// No description provided for @tenantRightsSheet8bed726a.
+  ///
+  /// In he, this message translates to:
+  /// **'מוגבל לנמוך מבין ⅓ מסך השכירות לכל התקופה או '**
+  String get tenantRightsSheet8bed726a;
+
+  /// No description provided for @tenantRightsSheetC9040c39.
+  ///
+  /// In he, this message translates to:
+  /// **'3 חודשי שכירות.'**
+  String get tenantRightsSheetC9040c39;
+
+  /// No description provided for @tenantRightsSheet331175e3.
+  ///
+  /// In he, this message translates to:
+  /// **'דמי תיווך — רק אם חתמתם'**
+  String get tenantRightsSheet331175e3;
+
+  /// No description provided for @tenantRightsSheetC9a8fc94.
+  ///
+  /// In he, this message translates to:
+  /// **'דמי תיווך (חודש שכירות + מע״מ 18%) מגיעים למתווך '**
+  String get tenantRightsSheetC9a8fc94;
+
+  /// No description provided for @tenantRightsSheetC6aca436.
+  ///
+  /// In he, this message translates to:
+  /// **'רק אם חתמתם על הסכם תיווך. בלי חתימה — אינכם חייבים '**
+  String get tenantRightsSheetC6aca436;
+
+  /// No description provided for @tenantRightsSheet0ae2e28f.
+  ///
+  /// In he, this message translates to:
+  /// **'לשלם תיווך. שאלו תמיד מי מייצג מי.'**
+  String get tenantRightsSheet0ae2e28f;
+
+  /// No description provided for @tenantRightsSheetD8e77ae9.
+  ///
+  /// In he, this message translates to:
+  /// **'אל תשלמו לפני שראיתם את הדירה'**
+  String get tenantRightsSheetD8e77ae9;
+
+  /// No description provided for @tenantRightsSheet386b9b05.
+  ///
+  /// In he, this message translates to:
+  /// **'לעולם אל תעבירו פיקדון, מקדמה או דמי תיווך לפני '**
+  String get tenantRightsSheet386b9b05;
+
+  /// No description provided for @tenantRightsSheetC75c0e1f.
+  ///
+  /// In he, this message translates to:
+  /// **'שביקרתם בדירה פיזית ואימתתם מול מי אתם מתקשרים. '**
+  String get tenantRightsSheetC75c0e1f;
+
+  /// No description provided for @tenantRightsSheetD5e1f4c7.
+  ///
+  /// In he, this message translates to:
+  /// **'בקשה לתשלום מראש \"כדי לשמור\" את הדירה היא דגל אדום.'**
+  String get tenantRightsSheetD5e1f4c7;
+
+  /// No description provided for @tenantRightsSheet8b33be3a.
+  ///
+  /// In he, this message translates to:
+  /// **'דירה ראויה למגורים'**
+  String get tenantRightsSheet8b33be3a;
+
+  /// No description provided for @tenantRightsSheet6c2e4b93.
+  ///
+  /// In he, this message translates to:
+  /// **'על בעל הדירה למסור דירה במצב ראוי למגורים ולתקן '**
+  String get tenantRightsSheet6c2e4b93;
+
+  /// No description provided for @tenantRightsSheet7be24327.
+  ///
+  /// In he, this message translates to:
+  /// **'ליקויים מהותיים שאינם באשמתכם. דירה חייבת אוורור, '**
+  String get tenantRightsSheet7be24327;
+
+  /// No description provided for @tenantRightsSheetD89c29b2.
+  ///
+  /// In he, this message translates to:
+  /// **'מים, חשמל ומערכת ביוב תקינים.\n\n'**
+  String get tenantRightsSheetD89c29b2;
+
+  /// No description provided for @tenantRightsSheet5e967f01.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד = מרחב מוגן דירתי, חדר ביטחון. אם קיים, '**
+  String get tenantRightsSheet5e967f01;
+
+  /// No description provided for @tenantRightsSheet18d2dbed.
+  ///
+  /// In he, this message translates to:
+  /// **'אסור להשתמש בו כמחסן שמונע כניסה בשעת חירום.'**
+  String get tenantRightsSheet18d2dbed;
+
+  /// No description provided for @tenantRightsSheetF8a977ee.
+  ///
+  /// In he, this message translates to:
+  /// **'מידע כללי ואינו ייעוץ משפטי. בכל ספק התייעצו עם '**
+  String get tenantRightsSheetF8a977ee;
+
+  /// No description provided for @tenantRightsSheet190074d2.
+  ///
+  /// In he, this message translates to:
+  /// **'עורך/ת דין.'**
+  String get tenantRightsSheet190074d2;
+
+  /// No description provided for @tenantRightsSheet5e9909a0.
+  ///
+  /// In he, this message translates to:
+  /// **'הבנתי'**
+  String get tenantRightsSheet5e9909a0;
+
+  /// No description provided for @brokerCommissionScreen6d8d1136.
+  ///
+  /// In he, this message translates to:
+  /// **'למחוק את העסקה?'**
+  String get brokerCommissionScreen6d8d1136;
+
+  /// No description provided for @brokerCommissionScreen88ad6f14.
+  ///
+  /// In he, this message translates to:
+  /// **'הרשומה תימחק לצמיתות.'**
+  String get brokerCommissionScreen88ad6f14;
+
+  /// No description provided for @brokerCommissionScreen5c5ec48f.
+  ///
+  /// In he, this message translates to:
+  /// **'\"{title}\" תימחק לצמיתות.'**
+  String brokerCommissionScreen5c5ec48f(Object title);
+
+  /// No description provided for @brokerCommissionScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get brokerCommissionScreenA7c55a8d;
+
+  /// No description provided for @brokerCommissionScreen09b6bcca.
+  ///
+  /// In he, this message translates to:
+  /// **'מחק'**
+  String get brokerCommissionScreen09b6bcca;
+
+  /// No description provided for @brokerCommissionScreenA8ea0bb8.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלות ופייפליין'**
+  String get brokerCommissionScreenA8ea0bb8;
+
+  /// No description provided for @brokerCommissionScreen77289a23.
+  ///
+  /// In he, this message translates to:
+  /// **'עסקה חדשה'**
+  String get brokerCommissionScreen77289a23;
+
+  /// No description provided for @brokerCommissionScreen7d9ee511.
+  ///
+  /// In he, this message translates to:
+  /// **'צפי בצנרת'**
+  String get brokerCommissionScreen7d9ee511;
+
+  /// No description provided for @brokerCommissionScreen8b24239f.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} עסקאות פתוחות'**
+  String brokerCommissionScreen8b24239f(Object count);
+
+  /// No description provided for @brokerCommissionScreenA848f824.
+  ///
+  /// In he, this message translates to:
+  /// **'נסגר החודש'**
+  String get brokerCommissionScreenA848f824;
+
+  /// No description provided for @brokerCommissionScreenD5a65055.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלה שהתקבלה'**
+  String get brokerCommissionScreenD5a65055;
+
+  /// No description provided for @brokerCommissionScreenDd3b0aad.
+  ///
+  /// In he, this message translates to:
+  /// **'כל העסקאות'**
+  String get brokerCommissionScreenDd3b0aad;
+
+  /// No description provided for @brokerCommissionScreenC9ef0566.
+  ///
+  /// In he, this message translates to:
+  /// **'אין עדיין עסקאות. הוסף עסקה כדי לעקוב אחר העמלות.'**
+  String get brokerCommissionScreenC9ef0566;
+
+  /// No description provided for @brokerCommissionScreen6cecfe2c.
+  ///
+  /// In he, this message translates to:
+  /// **'עסקה ללא שם'**
+  String get brokerCommissionScreen6cecfe2c;
+
+  /// No description provided for @brokerCommissionScreenD629d4dc.
+  ///
+  /// In he, this message translates to:
+  /// **'לקוח: {name}'**
+  String brokerCommissionScreenD629d4dc(Object name);
+
+  /// No description provided for @brokerCommissionScreen84540fa4.
+  ///
+  /// In he, this message translates to:
+  /// **'שווי עסקה'**
+  String get brokerCommissionScreen84540fa4;
+
+  /// No description provided for @brokerCommissionScreenC3eaf8a1.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלה ({pct}%)'**
+  String brokerCommissionScreenC3eaf8a1(Object pct);
+
+  /// No description provided for @brokerCommissionScreen39fe2593.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכה'**
+  String get brokerCommissionScreen39fe2593;
+
+  /// No description provided for @brokerCommissionScreen7c8173fa.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקה'**
+  String get brokerCommissionScreen7c8173fa;
+
+  /// No description provided for @brokerCommissionScreen50b6fe45.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכת עסקה'**
+  String get brokerCommissionScreen50b6fe45;
+
+  /// No description provided for @brokerCommissionScreenBa9fc140.
+  ///
+  /// In he, this message translates to:
+  /// **'כתובת / שם הנכס'**
+  String get brokerCommissionScreenBa9fc140;
+
+  /// No description provided for @brokerCommissionScreenC416d614.
+  ///
+  /// In he, this message translates to:
+  /// **'שם הלקוח'**
+  String get brokerCommissionScreenC416d614;
+
+  /// No description provided for @brokerCommissionScreen8b26fe13.
+  ///
+  /// In he, this message translates to:
+  /// **'שווי עסקה (₪)'**
+  String get brokerCommissionScreen8b26fe13;
+
+  /// No description provided for @brokerCommissionScreen7ac184b0.
+  ///
+  /// In he, this message translates to:
+  /// **'אחוז עמלה (%)'**
+  String get brokerCommissionScreen7ac184b0;
+
+  /// No description provided for @brokerCommissionScreen4e41a655.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלה צפויה: {amount}'**
+  String brokerCommissionScreen4e41a655(Object amount);
+
+  /// No description provided for @brokerCommissionScreenE6932339.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירה'**
+  String get brokerCommissionScreenE6932339;
+
+  /// No description provided for @brokerViewingsScreen870292f7.
+  ///
+  /// In he, this message translates to:
+  /// **'הלקוח'**
+  String get brokerViewingsScreen870292f7;
+
+  /// No description provided for @brokerViewingsScreen9d30a0d7.
+  ///
+  /// In he, this message translates to:
+  /// **'צפייה בעוד שעה'**
+  String get brokerViewingsScreen9d30a0d7;
+
+  /// No description provided for @brokerViewingsScreen57c48e81.
+  ///
+  /// In he, this message translates to:
+  /// **'צפייה עם {who} בשעה {time}{where}'**
+  String brokerViewingsScreen57c48e81(Object time, Object where, Object who);
+
+  /// No description provided for @brokerViewingsScreenBb5dc197.
+  ///
+  /// In he, this message translates to:
+  /// **'תיאום צפיות'**
+  String get brokerViewingsScreenBb5dc197;
+
+  /// No description provided for @brokerViewingsScreenCfa7c35a.
+  ///
+  /// In he, this message translates to:
+  /// **'צפייה חדשה'**
+  String get brokerViewingsScreenCfa7c35a;
+
+  /// No description provided for @brokerViewingsScreen36f66af0.
+  ///
+  /// In he, this message translates to:
+  /// **'צפיות קרובות'**
+  String get brokerViewingsScreen36f66af0;
+
+  /// No description provided for @brokerViewingsScreen0b7ee118.
+  ///
+  /// In he, this message translates to:
+  /// **'אין צפיות מתוכננות'**
+  String get brokerViewingsScreen0b7ee118;
+
+  /// No description provided for @brokerViewingsScreen8726f8f5.
+  ///
+  /// In he, this message translates to:
+  /// **'היסטוריה'**
+  String get brokerViewingsScreen8726f8f5;
+
+  /// No description provided for @brokerViewingsScreen1e2e6a34.
+  ///
+  /// In he, this message translates to:
+  /// **'אין עדיין צפיות'**
+  String get brokerViewingsScreen1e2e6a34;
+
+  /// No description provided for @brokerViewingsScreen5f6aa66c.
+  ///
+  /// In he, this message translates to:
+  /// **'תאמו צפייה ותקבלו תזכורת שעה לפני'**
+  String get brokerViewingsScreen5f6aa66c;
+
+  /// No description provided for @brokerViewingsScreenE0d2c04b.
+  ///
+  /// In he, this message translates to:
+  /// **'יש {count} צפיות שמתנגשות בלו\"ז — בדקו את הסימון האדום'**
+  String brokerViewingsScreenE0d2c04b(Object count);
+
+  /// No description provided for @brokerViewingsScreenA157f372.
+  ///
+  /// In he, this message translates to:
+  /// **'התנגשות בלו\"ז'**
+  String get brokerViewingsScreenA157f372;
+
+  /// No description provided for @brokerViewingsScreen54616e37.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן: התקיימה'**
+  String get brokerViewingsScreen54616e37;
+
+  /// No description provided for @brokerViewingsScreen09644fa4.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן: לא הגיע'**
+  String get brokerViewingsScreen09644fa4;
+
+  /// No description provided for @brokerViewingsScreenB041ac86.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן: בוטלה'**
+  String get brokerViewingsScreenB041ac86;
+
+  /// No description provided for @brokerViewingsScreenC47d0392.
+  ///
+  /// In he, this message translates to:
+  /// **'החזר לתכנון'**
+  String get brokerViewingsScreenC47d0392;
+
+  /// No description provided for @brokerViewingsScreen078baeac.
+  ///
+  /// In he, this message translates to:
+  /// **'יש לבחור תאריך ושעה'**
+  String get brokerViewingsScreen078baeac;
+
+  /// No description provided for @brokerViewingsScreen18d43ef8.
+  ///
+  /// In he, this message translates to:
+  /// **'יש להזין שם לקוח'**
+  String get brokerViewingsScreen18d43ef8;
+
+  /// No description provided for @brokerViewingsScreenCd846d8d.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס:'**
+  String get brokerViewingsScreenCd846d8d;
+
+  /// No description provided for @brokerViewingsScreenEdf6c5ad.
+  ///
+  /// In he, this message translates to:
+  /// **'בחר נכס (לא חובה)'**
+  String get brokerViewingsScreenEdf6c5ad;
+
+  /// No description provided for @brokerViewingsScreenBf7d92b1.
+  ///
+  /// In he, this message translates to:
+  /// **'ללא נכס'**
+  String get brokerViewingsScreenBf7d92b1;
+
+  /// No description provided for @brokerViewingsScreen83c5428d.
+  ///
+  /// In he, this message translates to:
+  /// **'שם הלקוח *'**
+  String get brokerViewingsScreen83c5428d;
+
+  /// No description provided for @brokerViewingsScreen737232c2.
+  ///
+  /// In he, this message translates to:
+  /// **'טלפון'**
+  String get brokerViewingsScreen737232c2;
+
+  /// No description provided for @brokerViewingsScreenE8e0f191.
+  ///
+  /// In he, this message translates to:
+  /// **'בחר תאריך ושעה *'**
+  String get brokerViewingsScreenE8e0f191;
+
+  /// No description provided for @brokerViewingsScreenE6932339.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירה'**
+  String get brokerViewingsScreenE6932339;
+
+  /// No description provided for @panoramaPhotoCapture443184c1.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח את המצלמה. בדקו הרשאות מצלמה.'**
+  String get panoramaPhotoCapture443184c1;
+
+  /// No description provided for @panoramaPhotoCapture79c27a2a.
+  ///
+  /// In he, this message translates to:
+  /// **'הצילום נכשל. נסו שוב.'**
+  String get panoramaPhotoCapture79c27a2a;
+
+  /// No description provided for @panoramaPhotoCapture97f6b247.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחילים לבנות את הסיור...'**
+  String get panoramaPhotoCapture97f6b247;
+
+  /// No description provided for @panoramaPhotoCapture127d1554.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו להתחיל את העיבוד. בדקו את החיבור לאינטרנט.'**
+  String get panoramaPhotoCapture127d1554;
+
+  /// No description provided for @panoramaPhotoCaptureE39b6aae.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלים את התמונות...'**
+  String get panoramaPhotoCaptureE39b6aae;
+
+  /// No description provided for @panoramaPhotoCaptureBbb9c298.
+  ///
+  /// In he, this message translates to:
+  /// **'ההעלאה נכשלה. בדקו את החיבור ונסו שוב.'**
+  String get panoramaPhotoCaptureBbb9c298;
+
+  /// No description provided for @panoramaPhotoCapture1b311f3a.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלים את התמונות... ({current}/{total})'**
+  String panoramaPhotoCapture1b311f3a(Object current, Object total);
+
+  /// No description provided for @panoramaPhotoCapture8844cc68.
+  ///
+  /// In he, this message translates to:
+  /// **'בונים את הסיור...'**
+  String get panoramaPhotoCapture8844cc68;
+
+  /// No description provided for @panoramaPhotoCaptureA9e373df.
+  ///
+  /// In he, this message translates to:
+  /// **'העיבוד נכשל. נסו לצלם שוב, לאט ובאור טוב.'**
+  String get panoramaPhotoCaptureA9e373df;
+
+  /// No description provided for @panoramaPhotoCaptureAb4f63ba.
+  ///
+  /// In he, this message translates to:
+  /// **'העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.'**
+  String get panoramaPhotoCaptureAb4f63ba;
+
+  /// No description provided for @panoramaPhotoCapture19c26543.
+  ///
+  /// In he, this message translates to:
+  /// **'משהו השתבש. בדקו את החיבור ונסו שוב.'**
+  String get panoramaPhotoCapture19c26543;
+
+  /// No description provided for @panoramaPhotoCaptureEe690500.
+  ///
+  /// In he, this message translates to:
+  /// **'כל הצילומים הושלמו ✓'**
+  String get panoramaPhotoCaptureEe690500;
+
+  /// No description provided for @panoramaPhotoCaptureE295aedd.
+  ///
+  /// In he, this message translates to:
+  /// **'צילום {taken} מתוך {total}'**
+  String panoramaPhotoCaptureE295aedd(Object taken, Object total);
+
+  /// No description provided for @panoramaPhotoCaptureDf208dbe.
+  ///
+  /// In he, this message translates to:
+  /// **'עמדו במרכז, החזיקו ישר וצלמו את התמונה הראשונה.'**
+  String get panoramaPhotoCaptureDf208dbe;
+
+  /// No description provided for @panoramaPhotoCaptureE97ca842.
+  ///
+  /// In he, this message translates to:
+  /// **'מצוין! בונים את הסיור...'**
+  String get panoramaPhotoCaptureE97ca842;
+
+  /// No description provided for @panoramaPhotoCapture96988ada.
+  ///
+  /// In he, this message translates to:
+  /// **'החזיקו את הטלפון יציב 🤳 ואז צלמו'**
+  String get panoramaPhotoCapture96988ada;
+
+  /// No description provided for @panoramaPhotoCapture25092fb6.
+  ///
+  /// In he, this message translates to:
+  /// **'סובבו ~{deg}° ימינה — שמרו חפיפה עם הקודם'**
+  String panoramaPhotoCapture25092fb6(Object deg);
+
+  /// No description provided for @panoramaPhotoCaptureE0f98881.
+  ///
+  /// In he, this message translates to:
+  /// **'מצוין — צלמו עכשיו 📸'**
+  String get panoramaPhotoCaptureE0f98881;
+
+  /// No description provided for @panoramaPhotoCapture1dc38c15.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו לבנות את הסיור'**
+  String get panoramaPhotoCapture1dc38c15;
+
+  /// No description provided for @panoramaPhotoCapture5a8e3f2d.
+  ///
+  /// In he, this message translates to:
+  /// **'{msg}\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.'**
+  String panoramaPhotoCapture5a8e3f2d(Object msg);
+
+  /// No description provided for @panoramaPhotoCapture3b32c520.
+  ///
+  /// In he, this message translates to:
+  /// **'צלם מחדש'**
+  String get panoramaPhotoCapture3b32c520;
+
+  /// No description provided for @panoramaPhotoCapture55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get panoramaPhotoCapture55247199;
+
+  /// No description provided for @panoramaPhotoCaptureA9e4f107.
+  ///
+  /// In he, this message translates to:
+  /// **'רחב'**
+  String get panoramaPhotoCaptureA9e4f107;
+
+  /// No description provided for @panoramaPhotoCapture3e20e30e.
+  ///
+  /// In he, this message translates to:
+  /// **'רגיל'**
+  String get panoramaPhotoCapture3e20e30e;
+
+  /// No description provided for @panoramaPhotoCapture4c53a96e.
+  ///
+  /// In he, this message translates to:
+  /// **'שגיאת מצלמה'**
+  String get panoramaPhotoCapture4c53a96e;
+
+  /// No description provided for @subscriptionScreenF29b6ff9.
+  ///
+  /// In he, this message translates to:
+  /// **'מסלול שנתי (RENTLY PRO)'**
+  String get subscriptionScreenF29b6ff9;
+
+  /// No description provided for @subscriptionScreen73934490.
+  ///
+  /// In he, this message translates to:
+  /// **'מסלול חודשי (RENTLY PRO)'**
+  String get subscriptionScreen73934490;
+
+  /// No description provided for @subscriptionScreenA4257fc5.
+  ///
+  /// In he, this message translates to:
+  /// **'מסלול PRO MAX VIP'**
+  String get subscriptionScreenA4257fc5;
+
+  /// No description provided for @subscriptionScreenB18c066f.
+  ///
+  /// In he, this message translates to:
+  /// **'מסלול RENTLY PRO'**
+  String get subscriptionScreenB18c066f;
+
+  /// No description provided for @subscriptionScreen2b7d5edc.
+  ///
+  /// In he, this message translates to:
+  /// **'לבטל את המנוי?'**
+  String get subscriptionScreen2b7d5edc;
+
+  /// No description provided for @subscriptionScreenD9eefdcc.
+  ///
+  /// In he, this message translates to:
+  /// **'המנוי יישאר פעיל עד סוף תקופת החיוב הנוכחית, ולאחר מכן לא יחודש.'**
+  String get subscriptionScreenD9eefdcc;
+
+  /// No description provided for @subscriptionScreen10a2352b.
+  ///
+  /// In he, this message translates to:
+  /// **'חזרה'**
+  String get subscriptionScreen10a2352b;
+
+  /// No description provided for @subscriptionScreen00a5e771.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול מנוי'**
+  String get subscriptionScreen00a5e771;
+
+  /// No description provided for @subscriptionScreen6ca6bd18.
+  ///
+  /// In he, this message translates to:
+  /// **'המנוי יבוטל בסוף התקופה'**
+  String get subscriptionScreen6ca6bd18;
+
+  /// No description provided for @subscriptionScreenA3c4c747.
+  ///
+  /// In he, this message translates to:
+  /// **'המנוי חודש בהצלחה'**
+  String get subscriptionScreenA3c4c747;
+
+  /// No description provided for @subscriptionScreenA8ba6aa6.
+  ///
+  /// In he, this message translates to:
+  /// **'שגיאה. נסו שוב.'**
+  String get subscriptionScreenA8ba6aa6;
+
+  /// No description provided for @subscriptionScreen3c4641b6.
+  ///
+  /// In he, this message translates to:
+  /// **'אין מנוי פעיל'**
+  String get subscriptionScreen3c4641b6;
+
+  /// No description provided for @subscriptionScreen1abb5cf0.
+  ///
+  /// In he, this message translates to:
+  /// **'שלוש דירות ראשונות חינם. לפרסום דירות ללא הגבלה וגישה לכל האפשרויות — הצטרפו ל-RENTLY PRO.'**
+  String get subscriptionScreen1abb5cf0;
+
+  /// No description provided for @subscriptionScreen74b0f662.
+  ///
+  /// In he, this message translates to:
+  /// **'פרסום דירות ללא הגבלה'**
+  String get subscriptionScreen74b0f662;
+
+  /// No description provided for @subscriptionScreen6e6d4e06.
+  ///
+  /// In he, this message translates to:
+  /// **'13-30 צילומי 360 וסיור וירטואלי'**
+  String get subscriptionScreen6e6d4e06;
+
+  /// No description provided for @subscriptionScreen6b0e2fd9.
+  ///
+  /// In he, this message translates to:
+  /// **'סינון שוכרים חכם ב-AI ובוסטים'**
+  String get subscriptionScreen6b0e2fd9;
+
+  /// No description provided for @subscriptionScreenA324e706.
+  ///
+  /// In he, this message translates to:
+  /// **'בחירת מסלול RENTLY PRO'**
+  String get subscriptionScreenA324e706;
+
+  /// No description provided for @subscriptionScreen7aa12af9.
+  ///
+  /// In he, this message translates to:
+  /// **'חשבוניות וקבלות'**
+  String get subscriptionScreen7aa12af9;
+
+  /// No description provided for @subscriptionScreen680ede0e.
+  ///
+  /// In he, this message translates to:
+  /// **'חידוש מנוי'**
+  String get subscriptionScreen680ede0e;
+
+  /// No description provided for @subscriptionScreen6b44102c.
+  ///
+  /// In he, this message translates to:
+  /// **'מבוטל בסוף התקופה'**
+  String get subscriptionScreen6b44102c;
+
+  /// No description provided for @subscriptionScreen09900e25.
+  ///
+  /// In he, this message translates to:
+  /// **'מנוי פעיל'**
+  String get subscriptionScreen09900e25;
+
+  /// No description provided for @subscriptionScreen98e268e7.
+  ///
+  /// In he, this message translates to:
+  /// **'ללא מנוי'**
+  String get subscriptionScreen98e268e7;
+
+  /// No description provided for @subscriptionScreen03baa387.
+  ///
+  /// In he, this message translates to:
+  /// **'בתוקף עד'**
+  String get subscriptionScreen03baa387;
+
+  /// No description provided for @subscriptionScreenD4bd0d5c.
+  ///
+  /// In he, this message translates to:
+  /// **'חיוב הבא'**
+  String get subscriptionScreenD4bd0d5c;
+
+  /// No description provided for @subscriptionScreenA0d9b485.
+  ///
+  /// In he, this message translates to:
+  /// **'כרטיס'**
+  String get subscriptionScreenA0d9b485;
+
+  /// No description provided for @brokerToolsScreenF9d349b3.
+  ///
+  /// In he, this message translates to:
+  /// **'פנקס לקוחות'**
+  String get brokerToolsScreenF9d349b3;
+
+  /// No description provided for @brokerToolsScreen91412cfd.
+  ///
+  /// In he, this message translates to:
+  /// **'ניהול הלקוחות שלך + אילו נכסים מתאימים לכל אחד'**
+  String get brokerToolsScreen91412cfd;
+
+  /// No description provided for @brokerToolsScreenEda2e484.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמות חמות'**
+  String get brokerToolsScreenEda2e484;
+
+  /// No description provided for @brokerToolsScreen3c455670.
+  ///
+  /// In he, this message translates to:
+  /// **'לקוחות שמחכים בדיוק לנכס שיש לך עכשיו'**
+  String get brokerToolsScreen3c455670;
+
+  /// No description provided for @brokerToolsScreen0a1cdb54.
+  ///
+  /// In he, this message translates to:
+  /// **'פייפליין לידים'**
+  String get brokerToolsScreen0a1cdb54;
+
+  /// No description provided for @brokerToolsScreen82dc7ac7.
+  ///
+  /// In he, this message translates to:
+  /// **'כל הפניות במקום אחד — שום ליד לא נופל'**
+  String get brokerToolsScreen82dc7ac7;
+
+  /// No description provided for @brokerToolsScreenBb5dc197.
+  ///
+  /// In he, this message translates to:
+  /// **'תיאום צפיות'**
+  String get brokerToolsScreenBb5dc197;
+
+  /// No description provided for @brokerToolsScreen2bf80048.
+  ///
+  /// In he, this message translates to:
+  /// **'לקבוע ולעקוב אחרי צפיות בנכסים'**
+  String get brokerToolsScreen2bf80048;
+
+  /// No description provided for @brokerToolsScreen85518426.
+  ///
+  /// In he, this message translates to:
+  /// **'ניתוח שוק (CMA)'**
+  String get brokerToolsScreen85518426;
+
+  /// No description provided for @brokerToolsScreen34c08639.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר מומלץ לפי נכסים דומים באזור'**
+  String get brokerToolsScreen34c08639;
+
+  /// No description provided for @brokerToolsScreenA8bb0310.
+  ///
+  /// In he, this message translates to:
+  /// **'אינטליגנציית אזור'**
+  String get brokerToolsScreenA8bb0310;
+
+  /// No description provided for @brokerToolsScreen5f85ee35.
+  ///
+  /// In he, this message translates to:
+  /// **'כתובת → כל נתוני האזור + למי הוא הכי מתאים להשקעה'**
+  String get brokerToolsScreen5f85ee35;
+
+  /// No description provided for @brokerToolsScreen5ac95646.
+  ///
+  /// In he, this message translates to:
+  /// **'מעקב בלעדיות'**
+  String get brokerToolsScreen5ac95646;
+
+  /// No description provided for @brokerToolsScreenF08ed1c1.
+  ///
+  /// In he, this message translates to:
+  /// **'תוקף ההסכמים — שלא תחמיץ חידוש בלעדיות'**
+  String get brokerToolsScreenF08ed1c1;
+
+  /// No description provided for @brokerToolsScreenA8ea0bb8.
+  ///
+  /// In he, this message translates to:
+  /// **'עמלות ופייפליין'**
+  String get brokerToolsScreenA8ea0bb8;
+
+  /// No description provided for @brokerToolsScreenC384e0ce.
+  ///
+  /// In he, this message translates to:
+  /// **'מעקב עמלות צפויות והכנסות מהעסקאות'**
+  String get brokerToolsScreenC384e0ce;
+
+  /// No description provided for @brokerToolsScreen02b2074b.
+  ///
+  /// In he, this message translates to:
+  /// **'דוח לבעל הנכס'**
+  String get brokerToolsScreen02b2074b;
+
+  /// No description provided for @brokerToolsScreenFe8f7d48.
+  ///
+  /// In he, this message translates to:
+  /// **'דוח מסודר על הפעילות לשליחה לבעל הנכס'**
+  String get brokerToolsScreenFe8f7d48;
+
+  /// No description provided for @brokerToolsScreenE14de9a0.
+  ///
+  /// In he, this message translates to:
+  /// **'ברושור ממותג'**
+  String get brokerToolsScreenE14de9a0;
+
+  /// No description provided for @brokerToolsScreenE45217dd.
+  ///
+  /// In he, this message translates to:
+  /// **'דף נכס יפה עם המיתוג שלך לשיתוף'**
+  String get brokerToolsScreenE45217dd;
+
+  /// No description provided for @brokerToolsScreen2074036b.
+  ///
+  /// In he, this message translates to:
+  /// **'כלי הסוכן'**
+  String get brokerToolsScreen2074036b;
+
+  /// No description provided for @brokerToolsScreen23d1f112.
+  ///
+  /// In he, this message translates to:
+  /// **'כל מה שצריך לניהול העסק שלך במקום אחד — לקוחות, '**
+  String get brokerToolsScreen23d1f112;
+
+  /// No description provided for @brokerToolsScreenE0706866.
+  ///
+  /// In he, this message translates to:
+  /// **'לידים, צפיות, עמלות ועוד. הקש על כלי כדי להתחיל.'**
+  String get brokerToolsScreenE0706866;
+
+  /// No description provided for @brokerToolsScreenA4809695.
+  ///
+  /// In he, this message translates to:
+  /// **'הנתונים מגובים בענן'**
+  String get brokerToolsScreenA4809695;
+
+  /// No description provided for @brokerToolsScreenE2adc4d9.
+  ///
+  /// In he, this message translates to:
+  /// **'מקומי בלבד — אין חיבור לענן'**
+  String get brokerToolsScreenE2adc4d9;
+
+  /// No description provided for @notifConsoleScreen8d5f5869.
+  ///
+  /// In he, this message translates to:
+  /// **'תמונה גדולה'**
+  String get notifConsoleScreen8d5f5869;
+
+  /// No description provided for @notifConsoleScreen61993e0f.
+  ///
+  /// In he, this message translates to:
+  /// **'צבע נועז'**
+  String get notifConsoleScreen61993e0f;
+
+  /// No description provided for @notifConsoleScreen3649be51.
+  ///
+  /// In he, this message translates to:
+  /// **'חגיגת אימוג׳י'**
+  String get notifConsoleScreen3649be51;
+
+  /// No description provided for @notifConsoleScreen55b43250.
+  ///
+  /// In he, this message translates to:
+  /// **'מינימלי'**
+  String get notifConsoleScreen55b43250;
+
+  /// No description provided for @notifConsoleScreenE47df89f.
+  ///
+  /// In he, this message translates to:
+  /// **'טעינת ההיסטוריה נכשלה'**
+  String get notifConsoleScreenE47df89f;
+
+  /// No description provided for @notifConsoleScreenB5cb1ebd.
+  ///
+  /// In he, this message translates to:
+  /// **'לשלוח לכל המשתמשים?'**
+  String get notifConsoleScreenB5cb1ebd;
+
+  /// No description provided for @notifConsoleScreen4d875ef7.
+  ///
+  /// In he, this message translates to:
+  /// **'ההתראה תישלח לכל משתמשי האפליקציה. הפעולה אינה ניתנת לביטול.'**
+  String get notifConsoleScreen4d875ef7;
+
+  /// No description provided for @notifConsoleScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get notifConsoleScreenA7c55a8d;
+
+  /// No description provided for @notifConsoleScreen5239bffa.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחה'**
+  String get notifConsoleScreen5239bffa;
+
+  /// No description provided for @notifConsoleScreenFf800e24.
+  ///
+  /// In he, this message translates to:
+  /// **'נשלח בהצלחה • הצליחו {sent} • נכשלו {failed}'**
+  String notifConsoleScreenFf800e24(Object failed, Object sent);
+
+  /// No description provided for @notifConsoleScreenEe5a07f1.
+  ///
+  /// In he, this message translates to:
+  /// **'השליחה נכשלה. נסו שוב.'**
+  String get notifConsoleScreenEe5a07f1;
+
+  /// No description provided for @notifConsoleScreen18ec902a.
+  ///
+  /// In he, this message translates to:
+  /// **'קונסולת התראות'**
+  String get notifConsoleScreen18ec902a;
+
+  /// No description provided for @notifConsoleScreen689c3cf5.
+  ///
+  /// In he, this message translates to:
+  /// **'עיצוב ההתראה'**
+  String get notifConsoleScreen689c3cf5;
+
+  /// No description provided for @notifConsoleScreenB135a00a.
+  ///
+  /// In he, this message translates to:
+  /// **'תוכן'**
+  String get notifConsoleScreenB135a00a;
+
+  /// No description provided for @notifConsoleScreenA21f5710.
+  ///
+  /// In he, this message translates to:
+  /// **'כותרת'**
+  String get notifConsoleScreenA21f5710;
+
+  /// No description provided for @notifConsoleScreenF1475bfa.
+  ///
+  /// In he, this message translates to:
+  /// **'תוכן ההתראה'**
+  String get notifConsoleScreenF1475bfa;
+
+  /// No description provided for @notifConsoleScreenC837e5e6.
+  ///
+  /// In he, this message translates to:
+  /// **'כתובת תמונה (אופציונלי)'**
+  String get notifConsoleScreenC837e5e6;
+
+  /// No description provided for @notifConsoleScreenE95c9328.
+  ///
+  /// In he, this message translates to:
+  /// **'תצוגה מקדימה'**
+  String get notifConsoleScreenE95c9328;
+
+  /// No description provided for @notifConsoleScreen13e7d29e.
+  ///
+  /// In he, this message translates to:
+  /// **'היסטוריית שליחות'**
+  String get notifConsoleScreen13e7d29e;
+
+  /// No description provided for @notifConsoleScreen0264cdd3.
+  ///
+  /// In he, this message translates to:
+  /// **'קהל יעד: כל המשתמשים'**
+  String get notifConsoleScreen0264cdd3;
+
+  /// No description provided for @notifConsoleScreen9a1364b4.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחה לכל המשתמשים'**
+  String get notifConsoleScreen9a1364b4;
+
+  /// No description provided for @notifConsoleScreenB4c5133d.
+  ///
+  /// In he, this message translates to:
+  /// **'עדיין לא נשלחו התראות'**
+  String get notifConsoleScreenB4c5133d;
+
+  /// No description provided for @notifConsoleScreenAbaa0cd6.
+  ///
+  /// In he, this message translates to:
+  /// **'הצליחו {sent} • נכשלו {failed} • {date}'**
+  String notifConsoleScreenAbaa0cd6(Object date, Object failed, Object sent);
+
+  /// No description provided for @notifConsoleScreen4fa84be8.
+  ///
+  /// In he, this message translates to:
+  /// **'כותרת ההתראה'**
+  String get notifConsoleScreen4fa84be8;
+
+  /// No description provided for @notifConsoleScreen8d2574fe.
+  ///
+  /// In he, this message translates to:
+  /// **'תוכן ההתראה יופיע כאן…'**
+  String get notifConsoleScreen8d2574fe;
+
+  /// No description provided for @atiVoiceScreenF0dad564.
+  ///
+  /// In he, this message translates to:
+  /// **'שלום, אני אתי 👋\nספרו לי מה אתם מחפשים.'**
+  String get atiVoiceScreenF0dad564;
+
+  /// No description provided for @atiVoiceScreenF90c23d4.
+  ///
+  /// In he, this message translates to:
+  /// **'אני מחפשת 3 חדרים בתל אביב, קרוב לים, עם מרפסת…'**
+  String get atiVoiceScreenF90c23d4;
+
+  /// No description provided for @atiVoiceScreen2c1f2bbd.
+  ///
+  /// In he, this message translates to:
+  /// **'תל אביב'**
+  String get atiVoiceScreen2c1f2bbd;
+
+  /// No description provided for @atiVoiceScreen535bb0c7.
+  ///
+  /// In he, this message translates to:
+  /// **'3 חדרים'**
+  String get atiVoiceScreen535bb0c7;
+
+  /// No description provided for @atiVoiceScreen2ac25940.
+  ///
+  /// In he, this message translates to:
+  /// **'עד 8,000 ₪'**
+  String get atiVoiceScreen2ac25940;
+
+  /// No description provided for @atiVoiceScreen86425fcf.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת'**
+  String get atiVoiceScreen86425fcf;
+
+  /// No description provided for @atiVoiceScreen46602c9d.
+  ///
+  /// In he, this message translates to:
+  /// **'ליד הים'**
+  String get atiVoiceScreen46602c9d;
+
+  /// No description provided for @atiVoiceScreen115e4778.
+  ///
+  /// In he, this message translates to:
+  /// **'צריך הרשאת מיקרופון — אשרו בהגדרות המכשיר 🎙️'**
+  String get atiVoiceScreen115e4778;
+
+  /// No description provided for @atiVoiceScreen32371f9e.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחתי להתחיל הקלטה 🙈\n'**
+  String get atiVoiceScreen32371f9e;
+
+  /// No description provided for @atiVoiceScreen77515f7a.
+  ///
+  /// In he, this message translates to:
+  /// **'לא שמעתי אותך 🙈 החזק/י את הכדור ודבר/י'**
+  String get atiVoiceScreen77515f7a;
+
+  /// No description provided for @atiVoiceScreenCcaa1ca0.
+  ///
+  /// In he, this message translates to:
+  /// **'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לנסות שוב?'**
+  String get atiVoiceScreenCcaa1ca0;
+
+  /// No description provided for @atiVoiceScreenF9ff4f53.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיבה… שחרר/י כדי לשלוח'**
+  String get atiVoiceScreenF9ff4f53;
+
+  /// No description provided for @atiVoiceScreenA6de1c7e.
+  ///
+  /// In he, this message translates to:
+  /// **'רגע, חושבת…'**
+  String get atiVoiceScreenA6de1c7e;
+
+  /// No description provided for @atiVoiceScreen374487f8.
+  ///
+  /// In he, this message translates to:
+  /// **'אתי מדברת · החזק/י כדי לענות'**
+  String get atiVoiceScreen374487f8;
+
+  /// No description provided for @atiVoiceScreen69a4351d.
+  ///
+  /// In he, this message translates to:
+  /// **'החזק/י את הכדור כדי לדבר 🎙️'**
+  String get atiVoiceScreen69a4351d;
+
+  /// No description provided for @atiVoiceScreen8e4d1523.
+  ///
+  /// In he, this message translates to:
+  /// **'אתי'**
+  String get atiVoiceScreen8e4d1523;
+
+  /// No description provided for @atiVoiceScreen5ddb8c89.
+  ///
+  /// In he, this message translates to:
+  /// **'העוזרת החכמה שלך'**
+  String get atiVoiceScreen5ddb8c89;
+
+  /// No description provided for @atiVoiceScreen82c40bcf.
+  ///
+  /// In he, this message translates to:
+  /// **'שיחה חדשה'**
+  String get atiVoiceScreen82c40bcf;
+
+  /// No description provided for @atiVoiceScreenE3d4bb2b.
+  ///
+  /// In he, this message translates to:
+  /// **'שיחה חדשה 👋 מה נחפש עכשיו?'**
+  String get atiVoiceScreenE3d4bb2b;
+
+  /// No description provided for @atiVoiceScreen38f0b537.
+  ///
+  /// In he, this message translates to:
+  /// **'מצאתי {count} דירות שמתאימות לך 👇'**
+  String atiVoiceScreen38f0b537(Object count);
+
+  /// No description provided for @atiVoiceScreen9a60c4a8.
+  ///
+  /// In he, this message translates to:
+  /// **'מצאתי {count} דירות שמתאימות לך'**
+  String atiVoiceScreen9a60c4a8(Object count);
+
+  /// No description provided for @atiVoiceScreen193535e0.
+  ///
+  /// In he, this message translates to:
+  /// **'הצג'**
+  String get atiVoiceScreen193535e0;
+
+  /// No description provided for @atiVoiceScreen7ddcbdea.
+  ///
+  /// In he, this message translates to:
+  /// **'שיתוף המיקום שלי'**
+  String get atiVoiceScreen7ddcbdea;
+
+  /// No description provided for @chatPartnerProfileScreenF0d12f45.
+  ///
+  /// In he, this message translates to:
+  /// **'{name} · {city} — דרך Rently'**
+  String chatPartnerProfileScreenF0d12f45(Object city, Object name);
+
+  /// No description provided for @chatPartnerProfileScreen025b94a3.
+  ///
+  /// In he, this message translates to:
+  /// **'{name} — דרך Rently'**
+  String chatPartnerProfileScreen025b94a3(Object name);
+
+  /// No description provided for @chatPartnerProfileScreen1956aee8.
+  ///
+  /// In he, this message translates to:
+  /// **'הודעות'**
+  String get chatPartnerProfileScreen1956aee8;
+
+  /// No description provided for @chatPartnerProfileScreenDbac683f.
+  ///
+  /// In he, this message translates to:
+  /// **'תמונות'**
+  String get chatPartnerProfileScreenDbac683f;
+
+  /// No description provided for @chatPartnerProfileScreenB151b3b1.
+  ///
+  /// In he, this message translates to:
+  /// **'הקלטות'**
+  String get chatPartnerProfileScreenB151b3b1;
+
+  /// No description provided for @chatPartnerProfileScreen3a232c1e.
+  ///
+  /// In he, this message translates to:
+  /// **'מדיה בשיחה'**
+  String get chatPartnerProfileScreen3a232c1e;
+
+  /// No description provided for @chatPartnerProfileScreen78f089fd.
+  ///
+  /// In he, this message translates to:
+  /// **'עדיין לא שותפו תמונות או הקלטות בשיחה.'**
+  String get chatPartnerProfileScreen78f089fd;
+
+  /// No description provided for @chatPartnerProfileScreen7c303765.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} הקלטות קוליות'**
+  String chatPartnerProfileScreen7c303765(Object count);
+
+  /// No description provided for @chatPartnerProfileScreen0a303443.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה בשיחה'**
+  String get chatPartnerProfileScreen0a303443;
+
+  /// No description provided for @chatPartnerProfileScreen00fe742b.
+  ///
+  /// In he, this message translates to:
+  /// **'חסימת משתמש'**
+  String get chatPartnerProfileScreen00fe742b;
+
+  /// No description provided for @chatPartnerProfileScreen59f1446c.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקת היסטוריית השיחה'**
+  String get chatPartnerProfileScreen59f1446c;
+
+  /// No description provided for @chatPartnerProfileScreen45a6c3ab.
+  ///
+  /// In he, this message translates to:
+  /// **'פתיחת הדירה'**
+  String get chatPartnerProfileScreen45a6c3ab;
+
+  /// No description provided for @chatPartnerProfileScreen32033594.
+  ///
+  /// In he, this message translates to:
+  /// **'שיתוף'**
+  String get chatPartnerProfileScreen32033594;
+
+  /// No description provided for @chatPartnerProfileScreenB5c83bf6.
+  ///
+  /// In he, this message translates to:
+  /// **'חסום את \"{name}\"?'**
+  String chatPartnerProfileScreenB5c83bf6(Object name);
+
+  /// No description provided for @chatPartnerProfileScreen09fd6568.
+  ///
+  /// In he, this message translates to:
+  /// **'המשתמש לא יוכל יותר ליצור איתך קשר או לצפות במודעות שלך.'**
+  String get chatPartnerProfileScreen09fd6568;
+
+  /// No description provided for @chatPartnerProfileScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get chatPartnerProfileScreenA7c55a8d;
+
+  /// No description provided for @chatPartnerProfileScreen1257849a.
+  ///
+  /// In he, this message translates to:
+  /// **'חסום'**
+  String get chatPartnerProfileScreen1257849a;
+
+  /// No description provided for @chatPartnerProfileScreen887fd210.
+  ///
+  /// In he, this message translates to:
+  /// **'פעולה זו תמחק את כל ההודעות בשיחה זו. האם להמשיך?'**
+  String get chatPartnerProfileScreen887fd210;
+
+  /// No description provided for @chatPartnerProfileScreen09b6bcca.
+  ///
+  /// In he, this message translates to:
+  /// **'מחק'**
+  String get chatPartnerProfileScreen09b6bcca;
+
+  /// No description provided for @marketBoardTemplate48227f9c.
+  ///
+  /// In he, this message translates to:
+  /// **'צפיות'**
+  String get marketBoardTemplate48227f9c;
+
+  /// No description provided for @marketBoardTemplate066de4f8.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירות'**
+  String get marketBoardTemplate066de4f8;
+
+  /// No description provided for @marketBoardTemplate07433e11.
+  ///
+  /// In he, this message translates to:
+  /// **'לייקים'**
+  String get marketBoardTemplate07433e11;
+
+  /// No description provided for @marketBoardTemplate23785eb4.
+  ///
+  /// In he, this message translates to:
+  /// **'פניות'**
+  String get marketBoardTemplate23785eb4;
+
+  /// No description provided for @marketBoardTemplate60c1e500.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר למ״ר'**
+  String get marketBoardTemplate60c1e500;
+
+  /// No description provided for @marketBoardTemplate13f110df.
+  ///
+  /// In he, this message translates to:
+  /// **'ימים בשוק'**
+  String get marketBoardTemplate13f110df;
+
+  /// No description provided for @marketBoardTemplate95d86d7f.
+  ///
+  /// In he, this message translates to:
+  /// **'היום'**
+  String get marketBoardTemplate95d86d7f;
+
+  /// No description provided for @marketBoardTemplateD51f71fc.
+  ///
+  /// In he, this message translates to:
+  /// **'זמן צפייה ממוצע'**
+  String get marketBoardTemplateD51f71fc;
+
+  /// No description provided for @marketBoardTemplate261cf748.
+  ///
+  /// In he, this message translates to:
+  /// **'החלקות בגלריה'**
+  String get marketBoardTemplate261cf748;
+
+  /// No description provided for @marketBoardTemplate2c925bfb.
+  ///
+  /// In he, this message translates to:
+  /// **'נצפה ממש עכשיו'**
+  String get marketBoardTemplate2c925bfb;
+
+  /// No description provided for @marketBoardTemplateC88d38fc.
+  ///
+  /// In he, this message translates to:
+  /// **'נצפה לפני {minutes} דק׳'**
+  String marketBoardTemplateC88d38fc(Object minutes);
+
+  /// No description provided for @marketBoardTemplate5787aec5.
+  ///
+  /// In he, this message translates to:
+  /// **'נצפה לפני {hours} שע׳'**
+  String marketBoardTemplate5787aec5(Object hours);
+
+  /// No description provided for @marketBoardTemplate0a58ff05.
+  ///
+  /// In he, this message translates to:
+  /// **'נצפה לפני {days} ימים'**
+  String marketBoardTemplate0a58ff05(Object days);
+
+  /// No description provided for @marketBoardTemplate3af8a1a1.
+  ///
+  /// In he, this message translates to:
+  /// **'לוח שוק'**
+  String get marketBoardTemplate3af8a1a1;
+
+  /// No description provided for @marketBoardTemplate818d00f3.
+  ///
+  /// In he, this message translates to:
+  /// **'נתוני ביקוש בזמן אמת'**
+  String get marketBoardTemplate818d00f3;
+
+  /// No description provided for @marketBoardTemplate636e854d.
+  ///
+  /// In he, this message translates to:
+  /// **'צופה עכשיו'**
+  String get marketBoardTemplate636e854d;
+
+  /// No description provided for @marketBoardTemplate9b8e10c5.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} צופים'**
+  String marketBoardTemplate9b8e10c5(Object count);
+
+  /// No description provided for @marketBoardTemplateAd039ab0.
+  ///
+  /// In he, this message translates to:
+  /// **'מגמת מחיר'**
+  String get marketBoardTemplateAd039ab0;
+
+  /// No description provided for @marketBoardTemplate2166e531.
+  ///
+  /// In he, this message translates to:
+  /// **'{seconds} שנ׳'**
+  String marketBoardTemplate2166e531(Object seconds);
+
+  /// No description provided for @marketBoardTemplate80126da3.
+  ///
+  /// In he, this message translates to:
+  /// **'{minutes} דק׳'**
+  String marketBoardTemplate80126da3(Object minutes);
+
+  /// No description provided for @marketBoardTemplateAa8238e7.
+  ///
+  /// In he, this message translates to:
+  /// **'{hours} שע׳'**
+  String marketBoardTemplateAa8238e7(Object hours);
+
+  /// No description provided for @savedSearchesScreenC7d46456.
+  ///
+  /// In he, this message translates to:
+  /// **'החיפוש שלי'**
+  String get savedSearchesScreenC7d46456;
+
+  /// No description provided for @savedSearchesScreenAce44591.
+  ///
+  /// In he, this message translates to:
+  /// **'החיפושים שלי'**
+  String get savedSearchesScreenAce44591;
+
+  /// No description provided for @savedSearchesScreenDe24f588.
+  ///
+  /// In he, this message translates to:
+  /// **'שלחנו לך התראה לדוגמה'**
+  String get savedSearchesScreenDe24f588;
+
+  /// No description provided for @savedSearchesScreenA6ccd3f5.
+  ///
+  /// In he, this message translates to:
+  /// **'למחוק את החיפוש?'**
+  String get savedSearchesScreenA6ccd3f5;
+
+  /// No description provided for @savedSearchesScreenCa9c8510.
+  ///
+  /// In he, this message translates to:
+  /// **'לא נודיע לך יותר על דירות חדשות מתאימות ל\"{name}\".'**
+  String savedSearchesScreenCa9c8510(Object name);
+
+  /// No description provided for @savedSearchesScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get savedSearchesScreenA7c55a8d;
+
+  /// No description provided for @savedSearchesScreen09b6bcca.
+  ///
+  /// In he, this message translates to:
+  /// **'מחק'**
+  String get savedSearchesScreen09b6bcca;
+
+  /// No description provided for @savedSearchesScreen932eb7ab.
+  ///
+  /// In he, this message translates to:
+  /// **'נודיע לך על דירות חדשות'**
+  String get savedSearchesScreen932eb7ab;
+
+  /// No description provided for @savedSearchesScreen0d57719f.
+  ///
+  /// In he, this message translates to:
+  /// **'ההתראות כבויות'**
+  String get savedSearchesScreen0d57719f;
+
+  /// No description provided for @savedSearchesScreen0133e3ff.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String savedSearchesScreen0133e3ff(Object rooms);
+
+  /// No description provided for @savedSearchesScreenB336259f.
+  ///
+  /// In he, this message translates to:
+  /// **'להשכרה'**
+  String get savedSearchesScreenB336259f;
+
+  /// No description provided for @savedSearchesScreen609fac18.
+  ///
+  /// In he, this message translates to:
+  /// **'למכירה'**
+  String get savedSearchesScreen609fac18;
+
+  /// No description provided for @savedSearchesScreenFe06d013.
+  ///
+  /// In he, this message translates to:
+  /// **'מ-{min}'**
+  String savedSearchesScreenFe06d013(Object min);
+
+  /// No description provided for @savedSearchesScreen36f2a6b9.
+  ///
+  /// In he, this message translates to:
+  /// **'עד {max}'**
+  String savedSearchesScreen36f2a6b9(Object max);
+
+  /// No description provided for @savedSearchesScreenA02655ab.
+  ///
+  /// In he, this message translates to:
+  /// **'מ-{min}'**
+  String savedSearchesScreenA02655ab(Object min);
+
+  /// No description provided for @savedSearchesScreen09a44457.
+  ///
+  /// In he, this message translates to:
+  /// **'עד {max}'**
+  String savedSearchesScreen09a44457(Object max);
+
+  /// No description provided for @savedSearchesScreenC0e45e79.
+  ///
+  /// In he, this message translates to:
+  /// **'עדיין לא שמרת חיפוש'**
+  String get savedSearchesScreenC0e45e79;
+
+  /// No description provided for @savedSearchesScreen93343d42.
+  ///
+  /// In he, this message translates to:
+  /// **'שמור חיפוש כדי שנודיע לך כשתעלה דירה שמתאימה.\n'**
+  String get savedSearchesScreen93343d42;
+
+  /// No description provided for @savedSearchesScreen962807e9.
+  ///
+  /// In he, this message translates to:
+  /// **'דירות טובות נחטפות תוך ימים — שווה להיות הראשונים.'**
+  String get savedSearchesScreen962807e9;
+
+  /// No description provided for @savedSearchesScreen023a3173.
+  ///
+  /// In he, this message translates to:
+  /// **'שלחו לי התראה לדוגמה'**
+  String get savedSearchesScreen023a3173;
+
+  /// No description provided for @boostFlowE384d773.
+  ///
+  /// In he, this message translates to:
+  /// **'הקפצה רגילה'**
+  String get boostFlowE384d773;
+
+  /// No description provided for @boostFlow648bee95.
+  ///
+  /// In he, this message translates to:
+  /// **'הקפצת Ultra'**
+  String get boostFlow648bee95;
+
+  /// No description provided for @boostFlowD39058af.
+  ///
+  /// In he, this message translates to:
+  /// **'המודעה הוקפצה לראש הפיד! 🚀'**
+  String get boostFlowD39058af;
+
+  /// No description provided for @boostFlow51c32033.
+  ///
+  /// In he, this message translates to:
+  /// **'המודעה הוקפצה! נותרו {remaining} הקפצות החודש.'**
+  String boostFlow51c32033(Object remaining);
+
+  /// No description provided for @boostFlow172c92b5.
+  ///
+  /// In he, this message translates to:
+  /// **'ניצלת את מכסת ההקפצות החודשית.'**
+  String get boostFlow172c92b5;
+
+  /// No description provided for @boostFlowDabea174.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו להקפיץ כרגע. נסו שוב.'**
+  String get boostFlowDabea174;
+
+  /// No description provided for @boostFlowEdb0335e.
+  ///
+  /// In he, this message translates to:
+  /// **'פתיחת התשלום נכשלה. נסו שוב.'**
+  String get boostFlowEdb0335e;
+
+  /// No description provided for @boostFlow9ec81271.
+  ///
+  /// In he, this message translates to:
+  /// **'{label} בוצעה! המודעה עלתה לראש הפיד 🚀'**
+  String boostFlow9ec81271(Object label);
+
+  /// No description provided for @boostFlowB43318dd.
+  ///
+  /// In he, this message translates to:
+  /// **'הקפצת המודעה'**
+  String get boostFlowB43318dd;
+
+  /// No description provided for @boostFlow9a4075d7.
+  ///
+  /// In he, this message translates to:
+  /// **'נגמרו ההקפצות שלך החודש'**
+  String get boostFlow9a4075d7;
+
+  /// No description provided for @boostFlow382ea104.
+  ///
+  /// In he, this message translates to:
+  /// **'הקפיצו את המודעה'**
+  String get boostFlow382ea104;
+
+  /// No description provided for @boostFlow6497b9da.
+  ///
+  /// In he, this message translates to:
+  /// **'קפיצה לראש הפיד = יותר צופים, מהר יותר.'**
+  String get boostFlow6497b9da;
+
+  /// No description provided for @boostFlow3635a9db.
+  ///
+  /// In he, this message translates to:
+  /// **'רוצה שהדירה תמשיך לבלוט? הקפיצו אותה עכשיו.'**
+  String get boostFlow3635a9db;
+
+  /// No description provided for @boostFlowD9ad80b8.
+  ///
+  /// In he, this message translates to:
+  /// **'תמורת ₪10 הדירה תעלה לראש הפיד ותגיע לכפול שוכרים היום.'**
+  String get boostFlowD9ad80b8;
+
+  /// No description provided for @boostFlow4d1b0704.
+  ///
+  /// In he, this message translates to:
+  /// **'×2 חשיפה · ראש הפיד · 7 ימים'**
+  String get boostFlow4d1b0704;
+
+  /// No description provided for @boostFlow58bc394e.
+  ///
+  /// In he, this message translates to:
+  /// **'כלול'**
+  String get boostFlow58bc394e;
+
+  /// No description provided for @boostFlowFaea170c.
+  ///
+  /// In he, this message translates to:
+  /// **'נותרו {remaining}'**
+  String boostFlowFaea170c(Object remaining);
+
+  /// No description provided for @boostFlow58d8e569.
+  ///
+  /// In he, this message translates to:
+  /// **'×5 חשיפה · מסגרת זהב · קדימות על הקפצות רגילות · 7 ימים'**
+  String get boostFlow58d8e569;
+
+  /// No description provided for @brokerCmaScreen9c3d866e.
+  ///
+  /// In he, this message translates to:
+  /// **'ניתוח שוק ותמחור'**
+  String get brokerCmaScreen9c3d866e;
+
+  /// No description provided for @brokerCmaScreenC5a0f18d.
+  ///
+  /// In he, this message translates to:
+  /// **'אין לך נכסים פעילים לניתוח עדיין.'**
+  String get brokerCmaScreenC5a0f18d;
+
+  /// No description provided for @brokerCmaScreen522d75ea.
+  ///
+  /// In he, this message translates to:
+  /// **'בחר נכס לניתוח'**
+  String get brokerCmaScreen522d75ea;
+
+  /// No description provided for @brokerCmaScreen07694aa8.
+  ///
+  /// In he, this message translates to:
+  /// **'{address} · {rooms} חד׳'**
+  String brokerCmaScreen07694aa8(Object address, Object rooms);
+
+  /// No description provided for @brokerCmaScreen0f726673.
+  ///
+  /// In he, this message translates to:
+  /// **'נכסים להשוואה ({count})'**
+  String brokerCmaScreen0f726673(Object count);
+
+  /// No description provided for @brokerCmaScreen6fe1b49e.
+  ///
+  /// In he, this message translates to:
+  /// **'אותה עיר · עד חדר הפרש · אותו סוג עסקה'**
+  String get brokerCmaScreen6fe1b49e;
+
+  /// No description provided for @brokerCmaScreenBc3ff8c5.
+  ///
+  /// In he, this message translates to:
+  /// **'לא נמצאו נכסים דומים בשוק להשוואה.'**
+  String get brokerCmaScreenBc3ff8c5;
+
+  /// No description provided for @brokerCmaScreenBdb3f99c.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחת לטווח המומלץ — אפשר אולי להעלות מחיר'**
+  String get brokerCmaScreenBdb3f99c;
+
+  /// No description provided for @brokerCmaScreenEbc33063.
+  ///
+  /// In he, this message translates to:
+  /// **'מעל הטווח המומלץ — קשה יותר להצדיק מול הקונה'**
+  String get brokerCmaScreenEbc33063;
+
+  /// No description provided for @brokerCmaScreen8d3fc214.
+  ///
+  /// In he, this message translates to:
+  /// **'בתוך הטווח המומלץ — תמחור תואם שוק'**
+  String get brokerCmaScreen8d3fc214;
+
+  /// No description provided for @brokerCmaScreen71fb17fd.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חד׳ · {size} מ״ר · {transaction}'**
+  String brokerCmaScreen71fb17fd(Object rooms, Object size, Object transaction);
+
+  /// No description provided for @brokerCmaScreen50d090d2.
+  ///
+  /// In he, this message translates to:
+  /// **'המחיר הנוכחי: {price}'**
+  String brokerCmaScreen50d090d2(Object price);
+
+  /// No description provided for @brokerCmaScreen130275e8.
+  ///
+  /// In he, this message translates to:
+  /// **'מעט נכסים דומים בשוק — ההערכה מבוססת על מדד CBS לאזור.'**
+  String get brokerCmaScreen130275e8;
+
+  /// No description provided for @brokerCmaScreenC0d229c4.
+  ///
+  /// In he, this message translates to:
+  /// **'אין מספיק נתוני שוק לחישוב טווח מומלץ.'**
+  String get brokerCmaScreenC0d229c4;
+
+  /// No description provided for @brokerCmaScreen0c53e27e.
+  ///
+  /// In he, this message translates to:
+  /// **'טווח מחיר מומלץ (25–75 אחוזון)'**
+  String get brokerCmaScreen0c53e27e;
+
+  /// No description provided for @brokerCmaScreen6818b5d6.
+  ///
+  /// In he, this message translates to:
+  /// **'חציון השוק: {median}'**
+  String brokerCmaScreen6818b5d6(Object median);
+
+  /// No description provided for @brokerCmaScreen4d538821.
+  ///
+  /// In he, this message translates to:
+  /// **'מדד שוק (CBS · נדל\"ן)'**
+  String get brokerCmaScreen4d538821;
+
+  /// No description provided for @brokerCmaScreen320820a2.
+  ///
+  /// In he, this message translates to:
+  /// **'{price} למ״ר · חציון האזור'**
+  String brokerCmaScreen320820a2(Object price);
+
+  /// No description provided for @brokerCmaScreen2b9269cd.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר הוגן משוער לנכס: {price}'**
+  String brokerCmaScreen2b9269cd(Object price);
+
+  /// No description provided for @brokerCmaScreenE17f3334.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חד׳ · {size} מ״ר'**
+  String brokerCmaScreenE17f3334(Object rooms, Object size);
+
+  /// No description provided for @verificationInfoSheet220a89be.
+  ///
+  /// In he, this message translates to:
+  /// **'דירה מאומתת'**
+  String get verificationInfoSheet220a89be;
+
+  /// No description provided for @verificationInfoSheet1079b7b6.
+  ///
+  /// In he, this message translates to:
+  /// **'בעל הדירה צילם סרטון אמיתי של הדירה ישירות מתוך האפליקציה. '**
+  String get verificationInfoSheet1079b7b6;
+
+  /// No description provided for @verificationInfoSheetF194db27.
+  ///
+  /// In he, this message translates to:
+  /// **'זה אומר שמדובר בדירה אמיתית וקיימת — לא תמונה שנלקחה מהאינטרנט.'**
+  String get verificationInfoSheetF194db27;
+
+  /// No description provided for @verificationInfoSheet92ba2f6a.
+  ///
+  /// In he, this message translates to:
+  /// **'שימו לב: אימות מאשר שהדירה אמיתית — אבל תמיד כדאי לבדוק כל מודעה לפי הסימנים שלמטה.'**
+  String get verificationInfoSheet92ba2f6a;
+
+  /// No description provided for @verificationInfoSheet7e5cc81f.
+  ///
+  /// In he, this message translates to:
+  /// **'שלושה סימני אזהרה להונאה'**
+  String get verificationInfoSheet7e5cc81f;
+
+  /// No description provided for @verificationInfoSheet515b9741.
+  ///
+  /// In he, this message translates to:
+  /// **'נכון לכל מודעה — גם למאומתת.'**
+  String get verificationInfoSheet515b9741;
+
+  /// No description provided for @verificationInfoSheet34c41aab.
+  ///
+  /// In he, this message translates to:
+  /// **'אל תשלמו כסף לפני שראיתם את הדירה פיזית'**
+  String get verificationInfoSheet34c41aab;
+
+  /// No description provided for @verificationInfoSheetF3def21a.
+  ///
+  /// In he, this message translates to:
+  /// **'אף פעם אל תעבירו מקדמה, פיקדון או \"דמי רצינות\" לפני שביקרתם בדירה במו עיניכם '**
+  String get verificationInfoSheetF3def21a;
+
+  /// No description provided for @verificationInfoSheet62b9758c.
+  ///
+  /// In he, this message translates to:
+  /// **'ופגשתם את בעל הדירה. בקשה לתשלום מראש היא הסימן הכי נפוץ להונאה.'**
+  String get verificationInfoSheet62b9758c;
+
+  /// No description provided for @verificationInfoSheet8e732266.
+  ///
+  /// In he, this message translates to:
+  /// **'פיקדון חוקי מוגבל ל-3 חודשי שכירות'**
+  String get verificationInfoSheet8e732266;
+
+  /// No description provided for @verificationInfoSheetEf8e2318.
+  ///
+  /// In he, this message translates to:
+  /// **'לפי חוק שכירות הוגנת, בעל הדירה לא יכול לדרוש פיקדון גבוה משלושה חודשי שכירות. '**
+  String get verificationInfoSheetEf8e2318;
+
+  /// No description provided for @verificationInfoSheetF18547d6.
+  ///
+  /// In he, this message translates to:
+  /// **'דרישה לסכום גבוה בהרבה היא סימן אזהרה.'**
+  String get verificationInfoSheetF18547d6;
+
+  /// No description provided for @verificationInfoSheet488f7486.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר נמוך בצורה חשודה = כנראה הונאה'**
+  String get verificationInfoSheet488f7486;
+
+  /// No description provided for @verificationInfoSheet0d24ccbd.
+  ///
+  /// In he, this message translates to:
+  /// **'אם המחיר נמוך בהרבה מדירות דומות באזור, כנראה משהו לא בסדר. '**
+  String get verificationInfoSheet0d24ccbd;
+
+  /// No description provided for @verificationInfoSheet82cdbe86.
+  ///
+  /// In he, this message translates to:
+  /// **'מרמים מפתים עם מחיר זול כדי שתעבירו כסף מהר.'**
+  String get verificationInfoSheet82cdbe86;
+
+  /// No description provided for @verificationInfoSheet0cba7786.
+  ///
+  /// In he, this message translates to:
+  /// **'נתקלתם במשהו חשוד? '**
+  String get verificationInfoSheet0cba7786;
+
+  /// No description provided for @verificationInfoSheetE3638d06.
+  ///
+  /// In he, this message translates to:
+  /// **'לחצו על כפתור הדיווח (⋯) שבמודעה ובחרו \"דיווח על מודעה\". '**
+  String get verificationInfoSheetE3638d06;
+
+  /// No description provided for @verificationInfoSheet49e4fb5f.
+  ///
+  /// In he, this message translates to:
+  /// **'הצוות שלנו בודק כל דיווח ומסיר מודעות מזויפות.'**
+  String get verificationInfoSheet49e4fb5f;
+
+  /// No description provided for @verificationInfoSheetEe9c82fc.
+  ///
+  /// In he, this message translates to:
+  /// **'הבנתי, תודה'**
+  String get verificationInfoSheetEe9c82fc;
+
+  /// No description provided for @areaRankingScreen55528b91.
+  ///
+  /// In he, this message translates to:
+  /// **'לא מצאתי אזורים סטטיסטיים לעיר הזו. נסה שם עיר מלא (למשל: תל אביב, חיפה, ירושלים).'**
+  String get areaRankingScreen55528b91;
+
+  /// No description provided for @areaRankingScreen8b5f2411.
+  ///
+  /// In he, this message translates to:
+  /// **'דרג אזורים בעיר'**
+  String get areaRankingScreen8b5f2411;
+
+  /// No description provided for @areaRankingScreenEf8f7b72.
+  ///
+  /// In he, this message translates to:
+  /// **'רשימה'**
+  String get areaRankingScreenEf8f7b72;
+
+  /// No description provided for @areaRankingScreen876e3baa.
+  ///
+  /// In he, this message translates to:
+  /// **'מפה'**
+  String get areaRankingScreen876e3baa;
+
+  /// No description provided for @areaRankingScreen80d6e90e.
+  ///
+  /// In he, this message translates to:
+  /// **'עיר (למשל: תל אביב)'**
+  String get areaRankingScreen80d6e90e;
+
+  /// No description provided for @areaRankingScreen71771aec.
+  ///
+  /// In he, this message translates to:
+  /// **'דרג'**
+  String get areaRankingScreen71771aec;
+
+  /// No description provided for @areaRankingScreen56ee2a52.
+  ///
+  /// In he, this message translates to:
+  /// **'אזור {id}  ·  אשכול {ses}/10'**
+  String areaRankingScreen56ee2a52(Object id, Object ses);
+
+  /// No description provided for @areaRankingScreen2d376c8a.
+  ///
+  /// In he, this message translates to:
+  /// **'אזור {id}'**
+  String areaRankingScreen2d376c8a(Object id);
+
+  /// No description provided for @areaRankingScreen711ab217.
+  ///
+  /// In he, this message translates to:
+  /// **'{pct}% התאמה'**
+  String areaRankingScreen711ab217(Object pct);
+
+  /// No description provided for @areaRankingScreen581d0b4f.
+  ///
+  /// In he, this message translates to:
+  /// **'אשכול סוציו-אקונומי'**
+  String get areaRankingScreen581d0b4f;
+
+  /// No description provided for @areaRankingScreenE642cece.
+  ///
+  /// In he, this message translates to:
+  /// **'בטיחות'**
+  String get areaRankingScreenE642cece;
+
+  /// No description provided for @areaRankingScreen096a70c8.
+  ///
+  /// In he, this message translates to:
+  /// **'מרכזיות'**
+  String get areaRankingScreen096a70c8;
+
+  /// No description provided for @areaRankingScreen8cf2e63d.
+  ///
+  /// In he, this message translates to:
+  /// **'תחבורה'**
+  String get areaRankingScreen8cf2e63d;
+
+  /// No description provided for @areaRankingScreen930bb12c.
+  ///
+  /// In he, this message translates to:
+  /// **'חינוך'**
+  String get areaRankingScreen930bb12c;
+
+  /// No description provided for @areaRankingScreenC2a64aa6.
+  ///
+  /// In he, this message translates to:
+  /// **'ילדים / עובדים / 65+'**
+  String get areaRankingScreenC2a64aa6;
+
+  /// No description provided for @areaRankingScreenDae2e4fc.
+  ///
+  /// In he, this message translates to:
+  /// **'💰 ציון השקעה'**
+  String get areaRankingScreenDae2e4fc;
+
+  /// No description provided for @areaRankingScreen9e42f94f.
+  ///
+  /// In he, this message translates to:
+  /// **'ביקוש שכירות'**
+  String get areaRankingScreen9e42f94f;
+
+  /// No description provided for @areaRankingScreen4d408308.
+  ///
+  /// In he, this message translates to:
+  /// **'הערכת תשואה (גסה)'**
+  String get areaRankingScreen4d408308;
+
+  /// No description provided for @notificationsScreen86ed07cf.
+  ///
+  /// In he, this message translates to:
+  /// **'המכשיר עוד לא רשום להתראות 📵 סגור ופתח מחדש את האפליקציה ונסה שוב'**
+  String get notificationsScreen86ed07cf;
+
+  /// No description provided for @notificationsScreen72b5771b.
+  ///
+  /// In he, this message translates to:
+  /// **'שלחתי התראה 🔔 אמורה לקפוץ תוך רגע (נשלח ל-{pushed} מכשירים)'**
+  String notificationsScreen72b5771b(Object pushed);
+
+  /// No description provided for @notificationsScreen34803854.
+  ///
+  /// In he, this message translates to:
+  /// **'הטוקן רשום אבל השליחה נכשלה — כנראה טוקן ישן, סגור ופתח את האפליקציה'**
+  String get notificationsScreen34803854;
+
+  /// No description provided for @notificationsScreen5c3916c3.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחתי לשלוח כרגע, נסה שוב'**
+  String get notificationsScreen5c3916c3;
+
+  /// No description provided for @notificationsScreenA8e71c4c.
+  ///
+  /// In he, this message translates to:
+  /// **'התראות'**
+  String get notificationsScreenA8e71c4c;
+
+  /// No description provided for @notificationsScreen972c5de2.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחת התראת בדיקה'**
+  String get notificationsScreen972c5de2;
+
+  /// No description provided for @notificationsScreenFc4def53.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן הכל כנקרא'**
+  String get notificationsScreenFc4def53;
+
+  /// No description provided for @notificationsScreen40381be4.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו לטעון התראות'**
+  String get notificationsScreen40381be4;
+
+  /// No description provided for @notificationsScreenB8dcc665.
+  ///
+  /// In he, this message translates to:
+  /// **'משכו למטה כדי לנסות שוב'**
+  String get notificationsScreenB8dcc665;
+
+  /// No description provided for @notificationsScreen838add51.
+  ///
+  /// In he, this message translates to:
+  /// **'אין התראות חדשות'**
+  String get notificationsScreen838add51;
+
+  /// No description provided for @notificationsScreenD3556461.
+  ///
+  /// In he, this message translates to:
+  /// **'כאן יופיעו עדכונים על התאמות, הודעות ועוד'**
+  String get notificationsScreenD3556461;
+
+  /// No description provided for @notificationsScreenA26f165a.
+  ///
+  /// In he, this message translates to:
+  /// **'עכשיו'**
+  String get notificationsScreenA26f165a;
+
+  /// No description provided for @notificationsScreen5fede189.
+  ///
+  /// In he, this message translates to:
+  /// **'לפני {minutes} דק׳'**
+  String notificationsScreen5fede189(Object minutes);
+
+  /// No description provided for @notificationsScreen18f294e5.
+  ///
+  /// In he, this message translates to:
+  /// **'לפני {hours} שע׳'**
+  String notificationsScreen18f294e5(Object hours);
+
+  /// No description provided for @notificationsScreenBe285a01.
+  ///
+  /// In he, this message translates to:
+  /// **'אתמול'**
+  String get notificationsScreenBe285a01;
+
+  /// No description provided for @notificationsScreen0cfbdf39.
+  ///
+  /// In he, this message translates to:
+  /// **'לפני {days} ימים'**
+  String notificationsScreen0cfbdf39(Object days);
+
+  /// No description provided for @notificationsScreen3e4eb262.
+  ///
+  /// In he, this message translates to:
+  /// **'לפני שבוע'**
+  String get notificationsScreen3e4eb262;
+
+  /// No description provided for @notificationsScreen920434a5.
+  ///
+  /// In he, this message translates to:
+  /// **'לפני {weeks} שבועות'**
+  String notificationsScreen920434a5(Object weeks);
+
+  /// No description provided for @propertyShareSheetF15bfc25.
+  ///
+  /// In he, this message translates to:
+  /// **'מצאתי נכס מעניין ב-Rently'**
+  String get propertyShareSheetF15bfc25;
+
+  /// No description provided for @propertyShareSheetD886d07f.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String propertyShareSheetD886d07f(Object rooms);
+
+  /// No description provided for @propertyShareSheet5d29dec4.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ\"ר'**
+  String propertyShareSheet5d29dec4(Object size);
+
+  /// No description provided for @propertyShareSheetEd00d602.
+  ///
+  /// In he, this message translates to:
+  /// **'שלח את הנכס מהר דרך האפליקציה שנוחה לך, או העתק את הפרטים לשיתוף ידני.'**
+  String get propertyShareSheetEd00d602;
+
+  /// No description provided for @propertyShareSheet827cec4d.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחה ישירה'**
+  String get propertyShareSheet827cec4d;
+
+  /// No description provided for @propertyShareSheetC23278cd.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח את WhatsApp כרגע'**
+  String get propertyShareSheetC23278cd;
+
+  /// No description provided for @propertyShareSheet5abda5bb.
+  ///
+  /// In he, this message translates to:
+  /// **'הודעת טקסט'**
+  String get propertyShareSheet5abda5bb;
+
+  /// No description provided for @propertyShareSheet12d7a7d4.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח SMS כרגע'**
+  String get propertyShareSheet12d7a7d4;
+
+  /// No description provided for @propertyShareSheetC57dda61.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחה במייל'**
+  String get propertyShareSheetC57dda61;
+
+  /// No description provided for @propertyShareSheet88f45e7e.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס שיכול להתאים לך'**
+  String get propertyShareSheet88f45e7e;
+
+  /// No description provided for @propertyShareSheet600502fd.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח אימייל כרגע'**
+  String get propertyShareSheet600502fd;
+
+  /// No description provided for @propertyShareSheetB26acdf0.
+  ///
+  /// In he, this message translates to:
+  /// **'העתק פרטים'**
+  String get propertyShareSheetB26acdf0;
+
+  /// No description provided for @propertyShareSheet3a798b8a.
+  ///
+  /// In he, this message translates to:
+  /// **'טקסט מלא לשיתוף'**
+  String get propertyShareSheet3a798b8a;
+
+  /// No description provided for @propertyShareSheet79a0ff65.
+  ///
+  /// In he, this message translates to:
+  /// **'פרטי הנכס הועתקו'**
+  String get propertyShareSheet79a0ff65;
+
+  /// No description provided for @propertyShareSheet4aa70f6f.
+  ///
+  /// In he, this message translates to:
+  /// **'הקישור הועתק'**
+  String get propertyShareSheet4aa70f6f;
+
+  /// No description provided for @propertyShareSheet3589781c.
+  ///
+  /// In he, this message translates to:
+  /// **'העתק קישור לשיתוף'**
+  String get propertyShareSheet3589781c;
+
+  /// No description provided for @targetPersonasB0b0c3cf.
+  ///
+  /// In he, this message translates to:
+  /// **'זוגות צעירים'**
+  String get targetPersonasB0b0c3cf;
+
+  /// No description provided for @targetPersonasF56f1edd.
+  ///
+  /// In he, this message translates to:
+  /// **'משפחות עם ילדים'**
+  String get targetPersonasF56f1edd;
+
+  /// No description provided for @targetPersonas99e7c02f.
+  ///
+  /// In he, this message translates to:
+  /// **'סטודנטים'**
+  String get targetPersonas99e7c02f;
+
+  /// No description provided for @targetPersonasD468d495.
+  ///
+  /// In he, this message translates to:
+  /// **'אנשי הייטק'**
+  String get targetPersonasD468d495;
+
+  /// No description provided for @targetPersonasA8dc0f49.
+  ///
+  /// In he, this message translates to:
+  /// **'מבוגרים / פרישה'**
+  String get targetPersonasA8dc0f49;
+
+  /// No description provided for @targetPersonasE86bb514.
+  ///
+  /// In he, this message translates to:
+  /// **'משקיע תשואה'**
+  String get targetPersonasE86bb514;
+
+  /// No description provided for @targetPersonas55c1710d.
+  ///
+  /// In he, this message translates to:
+  /// **'משקיע השבחה'**
+  String get targetPersonas55c1710d;
+
+  /// No description provided for @affordability5e721167.
+  ///
+  /// In he, this message translates to:
+  /// **'שכר דירה לחודש הראשון'**
+  String get affordability5e721167;
+
+  /// No description provided for @affordability26a740b7.
+  ///
+  /// In he, this message translates to:
+  /// **'פיקדון/בטוחות (מוגבל בחוק)'**
+  String get affordability26a740b7;
+
+  /// No description provided for @affordabilityFc095a4e.
+  ///
+  /// In he, this message translates to:
+  /// **'דמי תיווך (חודש + מע״מ 18%)'**
+  String get affordabilityFc095a4e;
+
+  /// No description provided for @erikVoiceCallCc39e21a.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחבר...'**
+  String get erikVoiceCallCc39e21a;
+
+  /// No description provided for @erikVoiceCall8f3676b5.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיב — דבר חופשי'**
+  String get erikVoiceCall8f3676b5;
+
+  /// No description provided for @erikVoiceCallD96185d1.
+  ///
+  /// In he, this message translates to:
+  /// **'עזרא · מוכן לשיחה'**
+  String get erikVoiceCallD96185d1;
+
+  /// No description provided for @erikVoiceCall511207a2.
+  ///
+  /// In he, this message translates to:
+  /// **'גע בכדור כדי לדבר איתי, או הקש ⌨ כדי לכתוב.'**
+  String get erikVoiceCall511207a2;
+
+  /// No description provided for @erikVoiceCall74a231d6.
+  ///
+  /// In he, this message translates to:
+  /// **'עזרא עונה לך...'**
+  String get erikVoiceCall74a231d6;
+
+  /// No description provided for @erikVoiceCall2d820199.
+  ///
+  /// In he, this message translates to:
+  /// **'אני מקשיב — דבר חופשי על הדירה.'**
+  String get erikVoiceCall2d820199;
+
+  /// No description provided for @erikVoiceCall4443ec8d.
+  ///
+  /// In he, this message translates to:
+  /// **'קול פעיל'**
+  String get erikVoiceCall4443ec8d;
+
+  /// No description provided for @erikVoiceCall594c7589.
+  ///
+  /// In he, this message translates to:
+  /// **'מושתק'**
+  String get erikVoiceCall594c7589;
+
+  /// No description provided for @erikVoiceCall04195099.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיב...'**
+  String get erikVoiceCall04195099;
+
+  /// No description provided for @erikVoiceCall3eee9380.
+  ///
+  /// In he, this message translates to:
+  /// **'דבר'**
+  String get erikVoiceCall3eee9380;
+
+  /// No description provided for @erikVoiceCallC6f7f477.
+  ///
+  /// In he, this message translates to:
+  /// **'מקלדת'**
+  String get erikVoiceCallC6f7f477;
+
+  /// No description provided for @erikVoiceCall55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get erikVoiceCall55247199;
+
+  /// No description provided for @erikVoiceCall2f3790da.
+  ///
+  /// In he, this message translates to:
+  /// **'כתוב לעזרא'**
+  String get erikVoiceCall2f3790da;
+
+  /// No description provided for @erikVoiceCallB8b81253.
+  ///
+  /// In he, this message translates to:
+  /// **'כתוב הודעה...'**
+  String get erikVoiceCallB8b81253;
+
+  /// No description provided for @classicTemplate220d2733.
+  ///
+  /// In he, this message translates to:
+  /// **'פרטי הנכס'**
+  String get classicTemplate220d2733;
+
+  /// No description provided for @classicTemplate64680a66.
+  ///
+  /// In he, this message translates to:
+  /// **'מאפיינים חשובים'**
+  String get classicTemplate64680a66;
+
+  /// No description provided for @classicTemplateEed2fbf3.
+  ///
+  /// In he, this message translates to:
+  /// **'גלריה'**
+  String get classicTemplateEed2fbf3;
+
+  /// No description provided for @classicTemplateAb29f776.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} תמונות'**
+  String classicTemplateAb29f776(Object count);
+
+  /// No description provided for @classicTemplateF5686614.
+  ///
+  /// In he, this message translates to:
+  /// **'סרטון'**
+  String get classicTemplateF5686614;
+
+  /// No description provided for @classicTemplate0429d88a.
+  ///
+  /// In he, this message translates to:
+  /// **'תמונה {index}'**
+  String classicTemplate0429d88a(Object index);
+
+  /// No description provided for @classicTemplateCb66c16b.
+  ///
+  /// In he, this message translates to:
+  /// **'אתר מקור'**
+  String get classicTemplateCb66c16b;
+
+  /// No description provided for @classicTemplate5e4548cf.
+  ///
+  /// In he, this message translates to:
+  /// **'צפה במקור'**
+  String get classicTemplate5e4548cf;
+
+  /// No description provided for @classicTemplateB58f6b9c.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס זה פורסם במקור באתר {host}. באפשרותך לפתוח את המודעה המקורית לצפייה בפרטים המלאים.'**
+  String classicTemplateB58f6b9c(Object host);
+
+  /// No description provided for @classicTemplateC1a89075.
+  ///
+  /// In he, this message translates to:
+  /// **'בעל הנכס'**
+  String get classicTemplateC1a89075;
+
+  /// No description provided for @classicTemplate1c5efd6c.
+  ///
+  /// In he, this message translates to:
+  /// **'חוות דעת'**
+  String get classicTemplate1c5efd6c;
+
+  /// No description provided for @classicTemplate16c30b46.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} ביקורות'**
+  String classicTemplate16c30b46(Object count);
+
+  /// No description provided for @classicTemplate26d0e7de.
+  ///
+  /// In he, this message translates to:
+  /// **'מיקום'**
+  String get classicTemplate26d0e7de;
+
+  /// No description provided for @classicTemplate88aea894.
+  ///
+  /// In he, this message translates to:
+  /// **'הקפצה'**
+  String get classicTemplate88aea894;
+
+  /// No description provided for @galleryEditorialTemplate4771acf8.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס נבחר'**
+  String get galleryEditorialTemplate4771acf8;
+
+  /// No description provided for @galleryEditorialTemplate17773b7f.
+  ///
+  /// In he, this message translates to:
+  /// **'{type} ב{street}{number}'**
+  String galleryEditorialTemplate17773b7f(
+      Object number, Object street, Object type);
+
+  /// No description provided for @galleryEditorialTemplateD886d07f.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String galleryEditorialTemplateD886d07f(Object rooms);
+
+  /// No description provided for @galleryEditorialTemplateFdb4eac7.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ״ר'**
+  String galleryEditorialTemplateFdb4eac7(Object size);
+
+  /// No description provided for @galleryEditorialTemplateCa554bb0.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor} מתוך {total}'**
+  String galleryEditorialTemplateCa554bb0(Object floor, Object total);
+
+  /// No description provided for @galleryEditorialTemplateD068bb57.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String galleryEditorialTemplateD068bb57(Object floor);
+
+  /// No description provided for @galleryEditorialTemplate19aad790.
+  ///
+  /// In he, this message translates to:
+  /// **'{type} ב{place}. {spec}.'**
+  String galleryEditorialTemplate19aad790(
+      Object place, Object spec, Object type);
+
+  /// No description provided for @galleryEditorialTemplateA765f2f3.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס למכירה'**
+  String get galleryEditorialTemplateA765f2f3;
+
+  /// No description provided for @galleryEditorialTemplate900c3a51.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס להשכרה'**
+  String get galleryEditorialTemplate900c3a51;
+
+  /// No description provided for @galleryEditorialTemplateE5340f86.
+  ///
+  /// In he, this message translates to:
+  /// **'₪{ppm} למ״ר'**
+  String galleryEditorialTemplateE5340f86(Object ppm);
+
+  /// No description provided for @galleryEditorialTemplateB50b3974.
+  ///
+  /// In he, this message translates to:
+  /// **'חדרים'**
+  String get galleryEditorialTemplateB50b3974;
+
+  /// No description provided for @galleryEditorialTemplateD3b9013b.
+  ///
+  /// In he, this message translates to:
+  /// **'מ״ר'**
+  String get galleryEditorialTemplateD3b9013b;
+
+  /// No description provided for @galleryEditorialTemplate047e630b.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה'**
+  String get galleryEditorialTemplate047e630b;
+
+  /// No description provided for @galleryEditorialTemplate71c5f6b5.
+  ///
+  /// In he, this message translates to:
+  /// **'קומות'**
+  String get galleryEditorialTemplate71c5f6b5;
+
+  /// No description provided for @neighborhoodScoreCardE642cece.
+  ///
+  /// In he, this message translates to:
+  /// **'בטיחות'**
+  String get neighborhoodScoreCardE642cece;
+
+  /// No description provided for @neighborhoodScoreCard0fff92d0.
+  ///
+  /// In he, this message translates to:
+  /// **'הליכתיות'**
+  String get neighborhoodScoreCard0fff92d0;
+
+  /// No description provided for @neighborhoodScoreCard5a567748.
+  ///
+  /// In he, this message translates to:
+  /// **'בתי״ס'**
+  String get neighborhoodScoreCard5a567748;
+
+  /// No description provided for @neighborhoodScoreCard00a5eaf2.
+  ///
+  /// In he, this message translates to:
+  /// **'גני ילדים'**
+  String get neighborhoodScoreCard00a5eaf2;
+
+  /// No description provided for @neighborhoodScoreCard8cf2e63d.
+  ///
+  /// In he, this message translates to:
+  /// **'תחבורה'**
+  String get neighborhoodScoreCard8cf2e63d;
+
+  /// No description provided for @neighborhoodScoreCard08d4f99e.
+  ///
+  /// In he, this message translates to:
+  /// **'ירוק'**
+  String get neighborhoodScoreCard08d4f99e;
+
+  /// No description provided for @neighborhoodScoreCard40d07087.
+  ///
+  /// In he, this message translates to:
+  /// **'שקט'**
+  String get neighborhoodScoreCard40d07087;
+
+  /// No description provided for @neighborhoodScoreCard2de2ff3f.
+  ///
+  /// In he, this message translates to:
+  /// **'ציון השכונה'**
+  String get neighborhoodScoreCard2de2ff3f;
+
+  /// No description provided for @neighborhoodScoreCard542929e1.
+  ///
+  /// In he, this message translates to:
+  /// **'הצג פירוט ומקורות'**
+  String get neighborhoodScoreCard542929e1;
+
+  /// No description provided for @neighborhoodScoreCard63eefa9b.
+  ///
+  /// In he, this message translates to:
+  /// **'הציון הכולל הוא ממוצע משוקלל של הפרמטרים הבאים, המחושבים מנתונים ציבוריים ונקודות עניין באזור.'**
+  String get neighborhoodScoreCard63eefa9b;
+
+  /// No description provided for @neighborhoodScoreCard4c69a81b.
+  ///
+  /// In he, this message translates to:
+  /// **'אין עדיין פירוט זמין לאזור זה.'**
+  String get neighborhoodScoreCard4c69a81b;
+
+  /// No description provided for @neighborhoodScoreCard5d1b29db.
+  ///
+  /// In he, this message translates to:
+  /// **'מקורות הנתונים'**
+  String get neighborhoodScoreCard5d1b29db;
+
+  /// No description provided for @realtimeVoiceScreenE3b9c24d.
+  ///
+  /// In he, this message translates to:
+  /// **'שלום, אני אתי 👋 פשוט דברו איתי.'**
+  String get realtimeVoiceScreenE3b9c24d;
+
+  /// No description provided for @realtimeVoiceScreenA7587542.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחברת…'**
+  String get realtimeVoiceScreenA7587542;
+
+  /// No description provided for @realtimeVoiceScreen85084af4.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיבה לך…'**
+  String get realtimeVoiceScreen85084af4;
+
+  /// No description provided for @realtimeVoiceScreenA6de1c7e.
+  ///
+  /// In he, this message translates to:
+  /// **'רגע, חושבת…'**
+  String get realtimeVoiceScreenA6de1c7e;
+
+  /// No description provided for @realtimeVoiceScreen0658343f.
+  ///
+  /// In he, this message translates to:
+  /// **'אתי מדברת · פשוט דברו כדי להפריע'**
+  String get realtimeVoiceScreen0658343f;
+
+  /// No description provided for @realtimeVoiceScreen9aea3a09.
+  ///
+  /// In he, this message translates to:
+  /// **'דברו איתי'**
+  String get realtimeVoiceScreen9aea3a09;
+
+  /// No description provided for @realtimeVoiceScreenE60120ca.
+  ///
+  /// In he, this message translates to:
+  /// **'הייתה תקלה בחיבור'**
+  String get realtimeVoiceScreenE60120ca;
+
+  /// No description provided for @realtimeVoiceScreen8e4d1523.
+  ///
+  /// In he, this message translates to:
+  /// **'אתי'**
+  String get realtimeVoiceScreen8e4d1523;
+
+  /// No description provided for @realtimeVoiceScreen5a17ea8a.
+  ///
+  /// In he, this message translates to:
+  /// **'שיחה חיה • Rently'**
+  String get realtimeVoiceScreen5a17ea8a;
+
+  /// No description provided for @realtimeVoiceScreenAf4fd15c.
+  ///
+  /// In he, this message translates to:
+  /// **'עבור לשיחה רגילה 💬'**
+  String get realtimeVoiceScreenAf4fd15c;
+
+  /// No description provided for @realtimeVoiceScreen38f0b537.
+  ///
+  /// In he, this message translates to:
+  /// **'מצאתי {count} דירות שמתאימות לך 👇'**
+  String realtimeVoiceScreen38f0b537(Object count);
+
+  /// No description provided for @brokerBrochureScreenE4ac75e8.
+  ///
+  /// In he, this message translates to:
+  /// **'ברושור נכס ממותג'**
+  String get brokerBrochureScreenE4ac75e8;
+
+  /// No description provided for @brokerBrochureScreenD886d07f.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String brokerBrochureScreenD886d07f(Object rooms);
+
+  /// No description provided for @brokerBrochureScreen5d29dec4.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ\"ר'**
+  String brokerBrochureScreen5d29dec4(Object size);
+
+  /// No description provided for @brokerBrochureScreenD068bb57.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String brokerBrochureScreenD068bb57(Object floor);
+
+  /// No description provided for @brokerBrochureScreen04734464.
+  ///
+  /// In he, this message translates to:
+  /// **'המתווך שלך'**
+  String get brokerBrochureScreen04734464;
+
+  /// No description provided for @brokerBrochureScreenB7b87736.
+  ///
+  /// In he, this message translates to:
+  /// **'תיווך נדל\"ן'**
+  String get brokerBrochureScreenB7b87736;
+
+  /// No description provided for @brokerBrochureScreenF2af0c97.
+  ///
+  /// In he, this message translates to:
+  /// **'מכין ברושור…'**
+  String get brokerBrochureScreenF2af0c97;
+
+  /// No description provided for @brokerBrochureScreen0312eb6d.
+  ///
+  /// In he, this message translates to:
+  /// **'שתף ברושור'**
+  String get brokerBrochureScreen0312eb6d;
+
+  /// No description provided for @brokerBrochureScreenC96fa39c.
+  ///
+  /// In he, this message translates to:
+  /// **'אין עדיין נכסים'**
+  String get brokerBrochureScreenC96fa39c;
+
+  /// No description provided for @brokerBrochureScreen26099985.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסיפו נכס כדי להפיק ברושור ממותג לשיתוף.'**
+  String get brokerBrochureScreen26099985;
+
+  /// No description provided for @panoramaPoleCaptureE779f1ba.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח את המצלמה'**
+  String get panoramaPoleCaptureE779f1ba;
+
+  /// No description provided for @panoramaPoleCapture4c3842b7.
+  ///
+  /// In he, this message translates to:
+  /// **'צלם את הרצפה'**
+  String get panoramaPoleCapture4c3842b7;
+
+  /// No description provided for @panoramaPoleCapture66a0b2bb.
+  ///
+  /// In he, this message translates to:
+  /// **'צלם את התקרה'**
+  String get panoramaPoleCapture66a0b2bb;
+
+  /// No description provided for @panoramaPoleCapture033fdc7f.
+  ///
+  /// In he, this message translates to:
+  /// **'כוון את הטלפון כלפי מטה אל הרצפה ועמוד במקום שבו צילמת את הפנורמה'**
+  String get panoramaPoleCapture033fdc7f;
+
+  /// No description provided for @panoramaPoleCapture1ca815b5.
+  ///
+  /// In he, this message translates to:
+  /// **'כוון את הטלפון כלפי מעלה אל התקרה, מאותה נקודה בדיוק'**
+  String get panoramaPoleCapture1ca815b5;
+
+  /// No description provided for @panoramaPoleCapture4658faad.
+  ///
+  /// In he, this message translates to:
+  /// **'שלב 1 מתוך 2 · רצפה'**
+  String get panoramaPoleCapture4658faad;
+
+  /// No description provided for @panoramaPoleCapture4af99b9d.
+  ///
+  /// In he, this message translates to:
+  /// **'שלב 2 מתוך 2 · תקרה'**
+  String get panoramaPoleCapture4af99b9d;
+
+  /// No description provided for @panoramaPoleCapture80a413c5.
+  ///
+  /// In he, this message translates to:
+  /// **'דלג'**
+  String get panoramaPoleCapture80a413c5;
+
+  /// No description provided for @panoramaPoleCapture4c53a96e.
+  ///
+  /// In he, this message translates to:
+  /// **'שגיאת מצלמה'**
+  String get panoramaPoleCapture4c53a96e;
+
+  /// No description provided for @panoramaPoleCapture55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get panoramaPoleCapture55247199;
+
+  /// No description provided for @taxHelperScreenAaafbb6b.
+  ///
+  /// In he, this message translates to:
+  /// **'מס הכנסה — בקלות'**
+  String get taxHelperScreenAaafbb6b;
+
+  /// No description provided for @taxHelperScreen7ba61d4a.
+  ///
+  /// In he, this message translates to:
+  /// **'כמה שכר דירה אתה מקבל בחודש?'**
+  String get taxHelperScreen7ba61d4a;
+
+  /// No description provided for @taxHelperScreen84600891.
+  ///
+  /// In he, this message translates to:
+  /// **'יש תקרת פטור על שכר דירה למגורים: {ceiling} בחודש (נכון ל-2026). '**
+  String taxHelperScreen84600891(Object ceiling);
+
+  /// No description provided for @taxHelperScreenF0b9273e.
+  ///
+  /// In he, this message translates to:
+  /// **'כל עוד שכר הדירה שלך מתחת לתקרה הזו — אתה פטור ממס, '**
+  String get taxHelperScreenF0b9273e;
+
+  /// No description provided for @taxHelperScreen8df16fa9.
+  ///
+  /// In he, this message translates to:
+  /// **'ואין צורך לדווח על ההכנסה הזו.'**
+  String get taxHelperScreen8df16fa9;
+
+  /// No description provided for @taxHelperScreenE7cedab0.
+  ///
+  /// In he, this message translates to:
+  /// **'מעל התקרה יש מס. הדרך הכי פשוטה היא \"המסלול של 10%\": '**
+  String get taxHelperScreenE7cedab0;
+
+  /// No description provided for @taxHelperScreen4dd6aab6.
+  ///
+  /// In he, this message translates to:
+  /// **'משלמים 10% מכל שכר הדירה, בלי חישובים מסובכים ובלי ניכויים. '**
+  String get taxHelperScreen4dd6aab6;
+
+  /// No description provided for @taxHelperScreen2546b90e.
+  ///
+  /// In he, this message translates to:
+  /// **'במקרה שלך זה {amount} בחודש.'**
+  String taxHelperScreen2546b90e(Object amount);
+
+  /// No description provided for @taxHelperScreen063021d2.
+  ///
+  /// In he, this message translates to:
+  /// **'מה זה אומר?'**
+  String get taxHelperScreen063021d2;
+
+  /// No description provided for @erikLiveVoiceScreenD5fa2760.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחבר…'**
+  String get erikLiveVoiceScreenD5fa2760;
+
+  /// No description provided for @erikLiveVoiceScreen4ec210b3.
+  ///
+  /// In he, this message translates to:
+  /// **'אפשר לראות את הדירות הקיימות במסך \"הדירות שלי\".'**
+  String get erikLiveVoiceScreen4ec210b3;
+
+  /// No description provided for @erikLiveVoiceScreen15ec4d84.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיב — פשוט דבר 🎙️'**
+  String get erikLiveVoiceScreen15ec4d84;
+
+  /// No description provided for @erikLiveVoiceScreenC4ad4681.
+  ///
+  /// In he, this message translates to:
+  /// **'עזרא מדבר'**
+  String get erikLiveVoiceScreenC4ad4681;
+
+  /// No description provided for @erikLiveVoiceScreenAa5a9e29.
+  ///
+  /// In he, this message translates to:
+  /// **'תקלה בחיבור'**
+  String get erikLiveVoiceScreenAa5a9e29;
+
+  /// No description provided for @erikLiveVoiceScreenC21710c8.
+  ///
+  /// In he, this message translates to:
+  /// **'השיחה הסתיימה'**
+  String get erikLiveVoiceScreenC21710c8;
+
+  /// No description provided for @erikLiveVoiceScreen01302f08.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה פורסמה! אפשר להוסיף תמונות במסך \"הדירות שלי\".'**
+  String get erikLiveVoiceScreen01302f08;
+
+  /// No description provided for @checkoutWebviewScreen4dffd049.
+  ///
+  /// In he, this message translates to:
+  /// **'תשלום מאובטח'**
+  String get checkoutWebviewScreen4dffd049;
+
+  /// No description provided for @checkoutWebviewScreen44d94c3a.
+  ///
+  /// In he, this message translates to:
+  /// **'הסליקה מתבצעת בעמוד המאובטח של Grow'**
+  String get checkoutWebviewScreen44d94c3a;
+
+  /// No description provided for @checkoutWebviewScreen194aef36.
+  ///
+  /// In he, this message translates to:
+  /// **'טוען דף תשלום מאובטח…'**
+  String get checkoutWebviewScreen194aef36;
+
+  /// No description provided for @checkoutWebviewScreenB17b2010.
+  ///
+  /// In he, this message translates to:
+  /// **'דף התשלום לא נטען'**
+  String get checkoutWebviewScreenB17b2010;
+
+  /// No description provided for @checkoutWebviewScreenF5e44e77.
+  ///
+  /// In he, this message translates to:
+  /// **'ייתכן שיש בעיית רשת או שאמצעי התשלום אינו זמין כרגע. אפשר לנסות שוב או לחזור ולבחור אמצעי אחר.'**
+  String get checkoutWebviewScreenF5e44e77;
+
+  /// No description provided for @checkoutWebviewScreen10a2352b.
+  ///
+  /// In he, this message translates to:
+  /// **'חזרה'**
+  String get checkoutWebviewScreen10a2352b;
+
+  /// No description provided for @checkoutWebviewScreen8c634e7d.
+  ///
+  /// In he, this message translates to:
+  /// **'נסו שוב'**
+  String get checkoutWebviewScreen8c634e7d;
+
+  /// No description provided for @checkoutWebviewScreenE2cb5610.
+  ///
+  /// In he, this message translates to:
+  /// **'מוצפן SSL · פרטי הכרטיס לא נשמרים באפליקציה'**
+  String get checkoutWebviewScreenE2cb5610;
+
+  /// No description provided for @checkoutWebviewScreenBb135a11.
+  ///
+  /// In he, this message translates to:
+  /// **'Visa · Mastercard · אמריקן אקספרס · Bit'**
+  String get checkoutWebviewScreenBb135a11;
+
+  /// No description provided for @externalCheckoutScreenEd6f8b3f.
+  ///
+  /// In he, this message translates to:
+  /// **'לא הצלחנו לפתוח את הדפדפן'**
+  String get externalCheckoutScreenEd6f8b3f;
+
+  /// No description provided for @externalCheckoutScreenFed753f2.
+  ///
+  /// In he, this message translates to:
+  /// **'התשלום נפתח בדפדפן'**
+  String get externalCheckoutScreenFed753f2;
+
+  /// No description provided for @externalCheckoutScreenC8dbc943.
+  ///
+  /// In he, this message translates to:
+  /// **'נסו לפתוח שוב, או חזרו ובחרו אמצעי תשלום אחר.'**
+  String get externalCheckoutScreenC8dbc943;
+
+  /// No description provided for @externalCheckoutScreen62ff1866.
+  ///
+  /// In he, this message translates to:
+  /// **'השלימו את התשלום בדפדפן (Apple Pay / Google Pay), '**
+  String get externalCheckoutScreen62ff1866;
+
+  /// No description provided for @externalCheckoutScreen0a561779.
+  ///
+  /// In he, this message translates to:
+  /// **'ואז חזרו לכאן ולחצו \"שילמתי — המשך\".'**
+  String get externalCheckoutScreen0a561779;
+
+  /// No description provided for @externalCheckoutScreen67490ed7.
+  ///
+  /// In he, this message translates to:
+  /// **'שילמתי — המשך'**
+  String get externalCheckoutScreen67490ed7;
+
+  /// No description provided for @externalCheckoutScreenC4455ef4.
+  ///
+  /// In he, this message translates to:
+  /// **'פתחו שוב'**
+  String get externalCheckoutScreenC4455ef4;
+
+  /// No description provided for @externalCheckoutScreen81b0db62.
+  ///
+  /// In he, this message translates to:
+  /// **'פתחו שוב את דף התשלום'**
+  String get externalCheckoutScreen81b0db62;
+
+  /// No description provided for @externalCheckoutScreenA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get externalCheckoutScreenA7c55a8d;
+
+  /// No description provided for @atiLiveVoiceScreenA7587542.
+  ///
+  /// In he, this message translates to:
+  /// **'מתחברת…'**
+  String get atiLiveVoiceScreenA7587542;
+
+  /// No description provided for @atiLiveVoiceScreenAc995fe3.
+  ///
+  /// In he, this message translates to:
+  /// **'מקשיבה — פשוט דברי 🎙️'**
+  String get atiLiveVoiceScreenAc995fe3;
+
+  /// No description provided for @atiLiveVoiceScreen746981e0.
+  ///
+  /// In he, this message translates to:
+  /// **'אתי מדברת'**
+  String get atiLiveVoiceScreen746981e0;
+
+  /// No description provided for @atiLiveVoiceScreenAa5a9e29.
+  ///
+  /// In he, this message translates to:
+  /// **'תקלה בחיבור'**
+  String get atiLiveVoiceScreenAa5a9e29;
+
+  /// No description provided for @atiLiveVoiceScreenC21710c8.
+  ///
+  /// In he, this message translates to:
+  /// **'השיחה הסתיימה'**
+  String get atiLiveVoiceScreenC21710c8;
+
+  /// No description provided for @atiLiveVoiceScreen9a60c4a8.
+  ///
+  /// In he, this message translates to:
+  /// **'מצאתי {count} דירות שמתאימות לך'**
+  String atiLiveVoiceScreen9a60c4a8(Object count);
+
+  /// No description provided for @atiLiveVoiceScreen193535e0.
+  ///
+  /// In he, this message translates to:
+  /// **'הצג'**
+  String get atiLiveVoiceScreen193535e0;
+
+  /// No description provided for @atiVoicePropertyCard609fac18.
+  ///
+  /// In he, this message translates to:
+  /// **'למכירה'**
+  String get atiVoicePropertyCard609fac18;
+
+  /// No description provided for @atiVoicePropertyCardB336259f.
+  ///
+  /// In he, this message translates to:
+  /// **'להשכרה'**
+  String get atiVoicePropertyCardB336259f;
+
+  /// No description provided for @atiVoicePropertyCard77d9ac8f.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String atiVoicePropertyCard77d9ac8f(Object floor);
+
+  /// No description provided for @atiVoicePropertyCard5bf47d1e.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה 0'**
+  String get atiVoicePropertyCard5bf47d1e;
+
+  /// No description provided for @atiVoicePropertyCardF0f71ca3.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String atiVoicePropertyCardF0f71ca3(Object rooms);
+
+  /// No description provided for @atiVoicePropertyCard615d28b8.
+  ///
+  /// In he, this message translates to:
+  /// **'{size} מ״ר'**
+  String atiVoicePropertyCard615d28b8(Object size);
+
+  /// No description provided for @atiVoicePropertyCard5e3842ff.
+  ///
+  /// In he, this message translates to:
+  /// **'למה דווקא זו?'**
+  String get atiVoicePropertyCard5e3842ff;
+
+  /// No description provided for @atiVoicePropertyCardDadd9f97.
+  ///
+  /// In he, this message translates to:
+  /// **'למה אתי בחרה בדירה הזו'**
+  String get atiVoicePropertyCardDadd9f97;
+
+  /// No description provided for @atiVoicePropertyCard74f4db63.
+  ///
+  /// In he, this message translates to:
+  /// **'{fit}% התאמה — '**
+  String atiVoicePropertyCard74f4db63(Object fit);
+
+  /// No description provided for @candidateFilters4754dba1.
+  ///
+  /// In he, this message translates to:
+  /// **'פנוי מיידית'**
+  String get candidateFilters4754dba1;
+
+  /// No description provided for @candidateFiltersE5b327f6.
+  ///
+  /// In he, this message translates to:
+  /// **'תוך חודש'**
+  String get candidateFiltersE5b327f6;
+
+  /// No description provided for @candidateFilters36c73aae.
+  ///
+  /// In he, this message translates to:
+  /// **'1-3 חודשים'**
+  String get candidateFilters36c73aae;
+
+  /// No description provided for @candidateFilters81175383.
+  ///
+  /// In he, this message translates to:
+  /// **'3-6 חודשים'**
+  String get candidateFilters81175383;
+
+  /// No description provided for @candidateFilters42ed7e8d.
+  ///
+  /// In he, this message translates to:
+  /// **'סטודנט/ית'**
+  String get candidateFilters42ed7e8d;
+
+  /// No description provided for @candidateFiltersD663155d.
+  ///
+  /// In he, this message translates to:
+  /// **'צעיר/ה מקצועי/ת'**
+  String get candidateFiltersD663155d;
+
+  /// No description provided for @candidateFilters926c043f.
+  ///
+  /// In he, this message translates to:
+  /// **'משפחה'**
+  String get candidateFilters926c043f;
+
+  /// No description provided for @candidateFilters0aa42aa1.
+  ///
+  /// In he, this message translates to:
+  /// **'גיל הזהב'**
+  String get candidateFilters0aa42aa1;
+
+  /// No description provided for @brokerHotMatchesScreenEda2e484.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמות חמות'**
+  String get brokerHotMatchesScreenEda2e484;
+
+  /// No description provided for @brokerHotMatchesScreenFc4def53.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן הכל כנקרא'**
+  String get brokerHotMatchesScreenFc4def53;
+
+  /// No description provided for @brokerHotMatchesScreen86958d86.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה ל{name}'**
+  String brokerHotMatchesScreen86958d86(Object name);
+
+  /// No description provided for @brokerHotMatchesScreenB32088a8.
+  ///
+  /// In he, this message translates to:
+  /// **'סמן כנקרא'**
+  String get brokerHotMatchesScreenB32088a8;
+
+  /// No description provided for @brokerHotMatchesScreenDcef2a46.
+  ///
+  /// In he, this message translates to:
+  /// **'{price} {priceSuffix} · {rooms} חדרים · '**
+  String brokerHotMatchesScreenDcef2a46(
+      Object price, Object priceSuffix, Object rooms);
+
+  /// No description provided for @brokerHotMatchesScreen3b25d447.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה {score}%'**
+  String brokerHotMatchesScreen3b25d447(Object score);
+
+  /// No description provided for @brokerHotMatchesScreenC7283ce9.
+  ///
+  /// In he, this message translates to:
+  /// **'אין התאמות חדשות כרגע'**
+  String get brokerHotMatchesScreenC7283ce9;
+
+  /// No description provided for @brokerHotMatchesScreen78ea80be.
+  ///
+  /// In he, this message translates to:
+  /// **'כשתעלה נכס חדש שמתאים לאחד מהלקוחות בפנקס — נראה לך אותו כאן.'**
+  String get brokerHotMatchesScreen78ea80be;
+
+  /// No description provided for @panoramaSplatViewA2007314.
+  ///
+  /// In he, this message translates to:
+  /// **'סיור תלת-מימד'**
+  String get panoramaSplatViewA2007314;
+
+  /// No description provided for @panoramaSplatView3b63a83c.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לטעון את הסיור התלת-מימדי במכשיר זה.'**
+  String get panoramaSplatView3b63a83c;
+
+  /// No description provided for @panoramaSplatView7fa2edab.
+  ///
+  /// In he, this message translates to:
+  /// **'אחורה'**
+  String get panoramaSplatView7fa2edab;
+
+  /// No description provided for @panoramaSplatView1bb60018.
+  ///
+  /// In he, this message translates to:
+  /// **'קדימה'**
+  String get panoramaSplatView1bb60018;
+
+  /// No description provided for @homeScreenFfcf1893.
+  ///
+  /// In he, this message translates to:
+  /// **'חיפוש דירה'**
+  String get homeScreenFfcf1893;
+
+  /// No description provided for @homeScreen61f6102d.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמות'**
+  String get homeScreen61f6102d;
+
+  /// No description provided for @homeScreenB2367383.
+  ///
+  /// In he, this message translates to:
+  /// **'דבר עם אתי'**
+  String get homeScreenB2367383;
+
+  /// No description provided for @homeScreenE1ea2811.
+  ///
+  /// In he, this message translates to:
+  /// **'פרופיל'**
+  String get homeScreenE1ea2811;
+
+  /// No description provided for @homeScreen143fe31f.
+  ///
+  /// In he, this message translates to:
+  /// **'דשבורד'**
+  String get homeScreen143fe31f;
+
+  /// No description provided for @homeScreen1881898b.
+  ///
+  /// In he, this message translates to:
+  /// **'לקוחות'**
+  String get homeScreen1881898b;
+
+  /// No description provided for @homeScreen2c577068.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירות שלי'**
+  String get homeScreen2c577068;
+
+  /// No description provided for @ownerListingsScreenA082ba0e.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירות של {name} ב-Rently 🏠\n{link}'**
+  String ownerListingsScreenA082ba0e(Object link, Object name);
+
+  /// No description provided for @ownerListingsScreen5617dde0.
+  ///
+  /// In he, this message translates to:
+  /// **'הקישור לדירות שלך הועתק — אפשר לשלוח לכל אחד'**
+  String get ownerListingsScreen5617dde0;
+
+  /// No description provided for @ownerListingsScreen2c577068.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירות שלי'**
+  String get ownerListingsScreen2c577068;
+
+  /// No description provided for @ownerListingsScreen8704f6e2.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירות של {name}'**
+  String ownerListingsScreen8704f6e2(Object name);
+
+  /// No description provided for @ownerListingsScreen6005f6dd.
+  ///
+  /// In he, this message translates to:
+  /// **'שתף את דף הדירות'**
+  String get ownerListingsScreen6005f6dd;
+
+  /// No description provided for @ownerListingsScreenCc258a95.
+  ///
+  /// In he, this message translates to:
+  /// **'אין דירות פעילות כרגע'**
+  String get ownerListingsScreenCc258a95;
+
+  /// No description provided for @ownerListingsScreenAgencyLabel.
+  ///
+  /// In he, this message translates to:
+  /// **'מתווך נדל״ן'**
+  String get ownerListingsScreenAgencyLabel;
+
+  /// No description provided for @ownerListingsScreenPrivateLabel.
+  ///
+  /// In he, this message translates to:
+  /// **'בעל נכס פרטי'**
+  String get ownerListingsScreenPrivateLabel;
+
+  /// No description provided for @ownerListingsScreen57ed6e46.
+  ///
+  /// In he, this message translates to:
+  /// **' · {count} דירות'**
+  String ownerListingsScreen57ed6e46(Object count);
+
+  /// No description provided for @ownerListingsScreen2b748fae.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חד׳ · {size} מ״ר'**
+  String ownerListingsScreen2b748fae(Object rooms, Object size);
+
+  /// No description provided for @profileCompletionSheetAf5cd142.
+  ///
+  /// In he, this message translates to:
+  /// **'הגעה ליותר בעלי דירות'**
+  String get profileCompletionSheetAf5cd142;
+
+  /// No description provided for @profileCompletionSheetBfe0b591.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמות מדויקות לפי מה שחשוב לך'**
+  String get profileCompletionSheetBfe0b591;
+
+  /// No description provided for @profileCompletionSheetB2401b38.
+  ///
+  /// In he, this message translates to:
+  /// **'סינון מראש של הצעות לא רלוונטיות'**
+  String get profileCompletionSheetB2401b38;
+
+  /// No description provided for @profileCompletionSheet314597be.
+  ///
+  /// In he, this message translates to:
+  /// **'השלמת הפרופיל שלך'**
+  String get profileCompletionSheet314597be;
+
+  /// No description provided for @profileCompletionSheet08b939a6.
+  ///
+  /// In he, this message translates to:
+  /// **'כדי להפיק את המירב מהאפליקציה, נשמח שתשלים את המידע החסר בפרופיל שלך.'**
+  String get profileCompletionSheet08b939a6;
+
+  /// No description provided for @profileCompletionSheetF7c1459b.
+  ///
+  /// In he, this message translates to:
+  /// **'פרופיל מלא עוזר לאחרים להתחבר אליך ומשפר את החוויה הכוללת שלך באפליקציה.'**
+  String get profileCompletionSheetF7c1459b;
+
+  /// No description provided for @profileCompletionSheetC2fcc265.
+  ///
+  /// In he, this message translates to:
+  /// **'אחר כך'**
+  String get profileCompletionSheetC2fcc265;
+
+  /// No description provided for @profileCompletionSheetBbeffa00.
+  ///
+  /// In he, this message translates to:
+  /// **'השלמת הפרופיל'**
+  String get profileCompletionSheetBbeffa00;
+
+  /// No description provided for @listingScore74a07f35.
+  ///
+  /// In he, this message translates to:
+  /// **'מודעה מצוינת 🏆'**
+  String get listingScore74a07f35;
+
+  /// No description provided for @listingScoreE78d407d.
+  ///
+  /// In he, this message translates to:
+  /// **'מודעה טובה מאוד 👍'**
+  String get listingScoreE78d407d;
+
+  /// No description provided for @listingScore70fd3337.
+  ///
+  /// In he, this message translates to:
+  /// **'מודעה טובה'**
+  String get listingScore70fd3337;
+
+  /// No description provided for @listingScore15ff9d35.
+  ///
+  /// In he, this message translates to:
+  /// **'אפשר לשפר — הוסף תמונות ופרטים'**
+  String get listingScore15ff9d35;
+
+  /// No description provided for @panoramaExperienceViewCa52b1de.
+  ///
+  /// In he, this message translates to:
+  /// **'סיור 360°'**
+  String get panoramaExperienceViewCa52b1de;
+
+  /// No description provided for @panoramaExperienceView8a215f19.
+  ///
+  /// In he, this message translates to:
+  /// **'אין סיור זמין'**
+  String get panoramaExperienceView8a215f19;
+
+  /// No description provided for @panoramaExperienceView6d5b61ae.
+  ///
+  /// In he, this message translates to:
+  /// **'המשך'**
+  String get panoramaExperienceView6d5b61ae;
+
+  /// No description provided for @panoramaExperienceViewC382b650.
+  ///
+  /// In he, this message translates to:
+  /// **'הזז את הטלפון כדי להסתכל מסביב'**
+  String get panoramaExperienceViewC382b650;
+
+  /// No description provided for @panoramaExperienceViewA48dc789.
+  ///
+  /// In he, this message translates to:
+  /// **'גרור כדי להסתכל · הקש על החץ כדי להתקדם'**
+  String get panoramaExperienceViewA48dc789;
+
+  /// No description provided for @panoramaExperienceViewFdb5ed3b.
+  ///
+  /// In he, this message translates to:
+  /// **'נקודה {n}'**
+  String panoramaExperienceViewFdb5ed3b(Object n);
+
+  /// No description provided for @panoramaMapPlacement89efe952.
+  ///
+  /// In he, this message translates to:
+  /// **'מיקום הנקודה'**
+  String get panoramaMapPlacement89efe952;
+
+  /// No description provided for @panoramaMapPlacement9b8a163d.
+  ///
+  /// In he, this message translates to:
+  /// **'הקש על המפה היכן צילמת את «{label}» בבית.'**
+  String panoramaMapPlacement9b8a163d(Object label);
+
+  /// No description provided for @panoramaMapPlacementE8290949.
+  ///
+  /// In he, this message translates to:
+  /// **'זה בונה מפה קטנה שתעזור לעבור בין החדרים בסיור.'**
+  String get panoramaMapPlacementE8290949;
+
+  /// No description provided for @panoramaMapPlacement167194cf.
+  ///
+  /// In he, this message translates to:
+  /// **'העלה תוכנית דירה'**
+  String get panoramaMapPlacement167194cf;
+
+  /// No description provided for @panoramaMapPlacement17cdf785.
+  ///
+  /// In he, this message translates to:
+  /// **'החלף תוכנית'**
+  String get panoramaMapPlacement17cdf785;
+
+  /// No description provided for @panoramaMapPlacement80a413c5.
+  ///
+  /// In he, this message translates to:
+  /// **'דלג'**
+  String get panoramaMapPlacement80a413c5;
+
+  /// No description provided for @panoramaMapPlacement1bc95f85.
+  ///
+  /// In he, this message translates to:
+  /// **'אישור מיקום'**
+  String get panoramaMapPlacement1bc95f85;
+
+  /// No description provided for @fairRentHint2f1f13cd.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר ממוצע באזור'**
+  String get fairRentHint2f1f13cd;
+
+  /// No description provided for @fairRentHint9b75eb76.
+  ///
+  /// In he, this message translates to:
+  /// **'₪{amount} לחודש'**
+  String fairRentHint9b75eb76(Object amount);
+
+  /// No description provided for @fairRentHintAdcf7818.
+  ///
+  /// In he, this message translates to:
+  /// **'השתמש במחיר המומלץ (₪{amount})'**
+  String fairRentHintAdcf7818(Object amount);
+
+  /// No description provided for @fairRentHintEa004c85.
+  ///
+  /// In he, this message translates to:
+  /// **'המחיר המומלץ לפי השוק באזור'**
+  String get fairRentHintEa004c85;
+
+  /// No description provided for @fairRentHint1b102d50.
+  ///
+  /// In he, this message translates to:
+  /// **'נמוך מהשוק — אפשר לבקש יותר'**
+  String get fairRentHint1b102d50;
+
+  /// No description provided for @fairRentHintAb830344.
+  ///
+  /// In he, this message translates to:
+  /// **'גבוה מהשוק — עלול להרתיע שוכרים'**
+  String get fairRentHintAb830344;
+
+  /// No description provided for @fairRentHintA4d97966.
+  ///
+  /// In he, this message translates to:
+  /// **'המחיר שלך נראה הוגן ✓'**
+  String get fairRentHintA4d97966;
+
+  /// No description provided for @scorecardViewBd0267a3.
+  ///
+  /// In he, this message translates to:
+  /// **'למה זו?'**
+  String get scorecardViewBd0267a3;
+
+  /// No description provided for @scorecardView161967a5.
+  ///
+  /// In he, this message translates to:
+  /// **'{fit}% התאמה'**
+  String scorecardView161967a5(Object fit);
+
+  /// No description provided for @scorecardView2c98190f.
+  ///
+  /// In he, this message translates to:
+  /// **'כמה הדירה חזקה בכל פרמטר:'**
+  String get scorecardView2c98190f;
+
+  /// No description provided for @scorecardView5d1b29db.
+  ///
+  /// In he, this message translates to:
+  /// **'מקורות הנתונים'**
+  String get scorecardView5d1b29db;
+
+  /// No description provided for @scorecardViewE2d283c3.
+  ///
+  /// In he, this message translates to:
+  /// **'כל נתון מבוסס על מקור רשמי וניתן לאימות:'**
+  String get scorecardViewE2d283c3;
+
+  /// No description provided for @scorecardViewBf4062b1.
+  ///
+  /// In he, this message translates to:
+  /// **'מקור: {source}'**
+  String scorecardViewBf4062b1(Object source);
+
+  /// No description provided for @scorecardViewA33028e6.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטחון {pct}%'**
+  String scorecardViewA33028e6(Object pct);
+
+  /// No description provided for @priceBadge76f81691.
+  ///
+  /// In he, this message translates to:
+  /// **'₪{amount}/מ״ר'**
+  String priceBadge76f81691(Object amount);
+
+  /// No description provided for @priceBadgeB51a666b.
+  ///
+  /// In he, this message translates to:
+  /// **'−{pct}% מתחת לחציון האזור'**
+  String priceBadgeB51a666b(Object pct);
+
+  /// No description provided for @priceBadgeE1ecf729.
+  ///
+  /// In he, this message translates to:
+  /// **'+{pct}% מעל חציון האזור'**
+  String priceBadgeE1ecf729(Object pct);
+
+  /// No description provided for @priceBadgeB40e964e.
+  ///
+  /// In he, this message translates to:
+  /// **'סביב חציון האזור'**
+  String get priceBadgeB40e964e;
+
+  /// No description provided for @priceBadge9b42587f.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר מצוין לאזור'**
+  String get priceBadge9b42587f;
+
+  /// No description provided for @priceBadge66371906.
+  ///
+  /// In he, this message translates to:
+  /// **'מעל מחיר השוק'**
+  String get priceBadge66371906;
+
+  /// No description provided for @priceBadge25a4bda0.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיר הוגן לאזור'**
+  String get priceBadge25a4bda0;
+
+  /// No description provided for @rentalTax68d523ba.
+  ///
+  /// In he, this message translates to:
+  /// **'שכר הדירה שלך {rent} → אתה פטור ממס. אין מה לדווח.'**
+  String rentalTax68d523ba(Object rent);
+
+  /// No description provided for @rentalTax9b398d34.
+  ///
+  /// In he, this message translates to:
+  /// **'אתה מעל תקרת הפטור ({ceiling}). '**
+  String rentalTax9b398d34(Object ceiling);
+
+  /// No description provided for @rentalTaxDa3d1e79.
+  ///
+  /// In he, this message translates to:
+  /// **'חלק מהשכר עדיין פטור. המסלול הפשוט: 10% מהשכר = '**
+  String get rentalTaxDa3d1e79;
+
+  /// No description provided for @rentalTaxA2791ae8.
+  ///
+  /// In he, this message translates to:
+  /// **'{amount} לחודש.'**
+  String rentalTaxA2791ae8(Object amount);
+
+  /// No description provided for @rentalTaxDaaf39c6.
+  ///
+  /// In he, this message translates to:
+  /// **'המסלול הפשוט: 10% מהשכר = {amount} לחודש.'**
+  String rentalTaxDaaf39c6(Object amount);
+
+  /// No description provided for @scan3dViewer48726f5e.
+  ///
+  /// In he, this message translates to:
+  /// **'סריקה תלת-מימדית'**
+  String get scan3dViewer48726f5e;
+
+  /// No description provided for @scan3dViewerBf032028.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לטעון את המודל התלת-מימדי של חדר זה.'**
+  String get scan3dViewerBf032028;
+
+  /// No description provided for @scan3dViewerE24e43eb.
+  ///
+  /// In he, this message translates to:
+  /// **'חדר {roomNumber}'**
+  String scan3dViewerE24e43eb(Object roomNumber);
+
+  /// No description provided for @scan3dViewer444becda.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לטעון את המודל התלת-מימדי במכשיר זה.'**
+  String get scan3dViewer444becda;
+
+  /// No description provided for @auraHeroTemplateD068bb57.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String auraHeroTemplateD068bb57(Object floor);
+
+  /// No description provided for @auraHeroTemplate08bca18d.
+  ///
+  /// In he, this message translates to:
+  /// **'חדש'**
+  String get auraHeroTemplate08bca18d;
+
+  /// No description provided for @auraHeroTemplateFdb4eac7.
+  ///
+  /// In he, this message translates to:
+  /// **'{sizeM2} מ״ר'**
+  String auraHeroTemplateFdb4eac7(Object sizeM2);
+
+  /// No description provided for @auraHeroTemplateB50b3974.
+  ///
+  /// In he, this message translates to:
+  /// **'חדרים'**
+  String get auraHeroTemplateB50b3974;
+
+  /// No description provided for @auraHeroTemplateD3b9013b.
+  ///
+  /// In he, this message translates to:
+  /// **'מ״ר'**
+  String get auraHeroTemplateD3b9013b;
+
+  /// No description provided for @auraHeroTemplate047e630b.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה'**
+  String get auraHeroTemplate047e630b;
+
+  /// No description provided for @estateCardTemplate7de9ac58.
+  ///
+  /// In he, this message translates to:
+  /// **'מאומת'**
+  String get estateCardTemplate7de9ac58;
+
+  /// No description provided for @estateCardTemplate08bca18d.
+  ///
+  /// In he, this message translates to:
+  /// **'חדש'**
+  String get estateCardTemplate08bca18d;
+
+  /// No description provided for @estateCardTemplateCdc7944d.
+  ///
+  /// In he, this message translates to:
+  /// **'₪{price} למ״ר'**
+  String estateCardTemplateCdc7944d(Object price);
+
+  /// No description provided for @estateCardTemplateD886d07f.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String estateCardTemplateD886d07f(Object rooms);
+
+  /// No description provided for @estateCardTemplateFdb4eac7.
+  ///
+  /// In he, this message translates to:
+  /// **'{sizeM2} מ״ר'**
+  String estateCardTemplateFdb4eac7(Object sizeM2);
+
+  /// No description provided for @estateCardTemplateD068bb57.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה {floor}'**
+  String estateCardTemplateD068bb57(Object floor);
+
+  /// No description provided for @fomoWidgets67fb588b.
+  ///
+  /// In he, this message translates to:
+  /// **'מסתכל עכשיו'**
+  String get fomoWidgets67fb588b;
+
+  /// No description provided for @fomoWidgets5fc943b9.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} מסתכלים עכשיו'**
+  String fomoWidgets5fc943b9(Object count);
+
+  /// No description provided for @fomoWidgets668ee081.
+  ///
+  /// In he, this message translates to:
+  /// **'{likesCount} אהבו היום'**
+  String fomoWidgets668ee081(Object likesCount);
+
+  /// No description provided for @fomoWidgetsD5424d20.
+  ///
+  /// In he, this message translates to:
+  /// **'דירה הועלתה לאחרונה'**
+  String get fomoWidgetsD5424d20;
+
+  /// No description provided for @fomoWidgetsC646d563.
+  ///
+  /// In he, this message translates to:
+  /// **'⚠ פג תוקף בעוד {label}'**
+  String fomoWidgetsC646d563(Object label);
+
+  /// No description provided for @fomoWidgetsF3d9f53a.
+  ///
+  /// In he, this message translates to:
+  /// **'פג תוקף בעוד {label}'**
+  String fomoWidgetsF3d9f53a(Object label);
+
+  /// No description provided for @introNoteComposerF2616667.
+  ///
+  /// In he, this message translates to:
+  /// **'משפחה שקטה, חוזה ארוך'**
+  String get introNoteComposerF2616667;
+
+  /// No description provided for @introNoteComposer7d2e4fae.
+  ///
+  /// In he, this message translates to:
+  /// **'אישור הכנסה מוכן'**
+  String get introNoteComposer7d2e4fae;
+
+  /// No description provided for @introNoteComposerEf3d8df0.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסיפו מילה קצרה על עצמכם'**
+  String get introNoteComposerEf3d8df0;
+
+  /// No description provided for @introNoteComposer76250a91.
+  ///
+  /// In he, this message translates to:
+  /// **'משפט אחד שגורם לבעל הדירה לשים לב אליכם (לא חובה).'**
+  String get introNoteComposer76250a91;
+
+  /// No description provided for @introNoteComposer6a9bc309.
+  ///
+  /// In he, this message translates to:
+  /// **'למשל: זוג צעיר, ללא חיות, חוזה לשנתיים'**
+  String get introNoteComposer6a9bc309;
+
+  /// No description provided for @introNoteComposerBec7436c.
+  ///
+  /// In he, this message translates to:
+  /// **'{remaining} תווים נותרו'**
+  String introNoteComposerBec7436c(Object remaining);
+
+  /// No description provided for @notificationPermissionService95b74d9c.
+  ///
+  /// In he, this message translates to:
+  /// **'נשארים מעודכנים'**
+  String get notificationPermissionService95b74d9c;
+
+  /// No description provided for @notificationPermissionServiceC4d3318f.
+  ///
+  /// In he, this message translates to:
+  /// **'נשמח לעדכן אתכם על התאמות חדשות, הודעות מבעלי דירות ושוכרים, '**
+  String get notificationPermissionServiceC4d3318f;
+
+  /// No description provided for @notificationPermissionService18ca271e.
+  ///
+  /// In he, this message translates to:
+  /// **'ועדכונים חשובים בזמן אמת. אפשר לכבות בכל רגע מההגדרות.'**
+  String get notificationPermissionService18ca271e;
+
+  /// No description provided for @notificationPermissionService98c8a5b8.
+  ///
+  /// In he, this message translates to:
+  /// **'לא עכשיו'**
+  String get notificationPermissionService98c8a5b8;
+
+  /// No description provided for @notificationPermissionService1540caea.
+  ///
+  /// In he, this message translates to:
+  /// **'אפשר התראות'**
+  String get notificationPermissionService1540caea;
+
+  /// No description provided for @savedPropertiesScreen2f416fd3.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירות ששמרתי'**
+  String get savedPropertiesScreen2f416fd3;
+
+  /// No description provided for @savedPropertiesScreen18453b28.
+  ///
+  /// In he, this message translates to:
+  /// **'השווה דירות שמורות'**
+  String get savedPropertiesScreen18453b28;
+
+  /// No description provided for @savedPropertiesScreen059db4ef.
+  ///
+  /// In he, this message translates to:
+  /// **'הסר מהשמורים'**
+  String get savedPropertiesScreen059db4ef;
+
+  /// No description provided for @savedPropertiesScreenB6c4a8c7.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה {score}%'**
+  String savedPropertiesScreenB6c4a8c7(Object score);
+
+  /// No description provided for @savedPropertiesScreen83541358.
+  ///
+  /// In he, this message translates to:
+  /// **'עדיין לא שמרת דירות — סמנו ❤ בדירות שאהבתם כדי לחזור אליהן בקלות.'**
+  String get savedPropertiesScreen83541358;
+
+  /// No description provided for @paymentMethodSelector68e0442a.
+  ///
+  /// In he, this message translates to:
+  /// **'ביט'**
+  String get paymentMethodSelector68e0442a;
+
+  /// No description provided for @paymentMethodSelectorC5a87fbf.
+  ///
+  /// In he, this message translates to:
+  /// **'כרטיס אשראי'**
+  String get paymentMethodSelectorC5a87fbf;
+
+  /// No description provided for @paymentMethodSelectorEdd25759.
+  ///
+  /// In he, this message translates to:
+  /// **'בחירת אמצעי תשלום'**
+  String get paymentMethodSelectorEdd25759;
+
+  /// No description provided for @paymentMethodSelectorE7d7f19a.
+  ///
+  /// In he, this message translates to:
+  /// **'תשלום מאובטח · Grow · Morning'**
+  String get paymentMethodSelectorE7d7f19a;
+
+  /// No description provided for @panoramaWideCaptureE779f1ba.
+  ///
+  /// In he, this message translates to:
+  /// **'לא ניתן לפתוח את המצלמה'**
+  String get panoramaWideCaptureE779f1ba;
+
+  /// No description provided for @panoramaWideCapture67274c54.
+  ///
+  /// In he, this message translates to:
+  /// **'החזק את הטלפון אנכי וישר, ועמוד במרכז החדר'**
+  String get panoramaWideCapture67274c54;
+
+  /// No description provided for @panoramaWideCapture4c53a96e.
+  ///
+  /// In he, this message translates to:
+  /// **'שגיאת מצלמה'**
+  String get panoramaWideCapture4c53a96e;
+
+  /// No description provided for @panoramaWideCapture55247199.
+  ///
+  /// In he, this message translates to:
+  /// **'סגור'**
+  String get panoramaWideCapture55247199;
+
+  /// No description provided for @actionButton197aa0f3.
+  ///
+  /// In he, this message translates to:
+  /// **'פתח סיור תלת־ממדי'**
+  String get actionButton197aa0f3;
+
+  /// No description provided for @actionButtonC1272587.
+  ///
+  /// In he, this message translates to:
+  /// **'אהבתי דירה'**
+  String get actionButtonC1272587;
+
+  /// No description provided for @actionButton4031e827.
+  ///
+  /// In he, this message translates to:
+  /// **'דלג על דירה'**
+  String get actionButton4031e827;
+
+  /// No description provided for @panoramaPsvTourCa52b1de.
+  ///
+  /// In he, this message translates to:
+  /// **'סיור 360°'**
+  String get panoramaPsvTourCa52b1de;
+
+  /// No description provided for @panoramaPsvTour4968e76c.
+  ///
+  /// In he, this message translates to:
+  /// **'גרסה {versionNumber}'**
+  String panoramaPsvTour4968e76c(Object versionNumber);
+
+  /// No description provided for @cinematicGlassTemplateB50b3974.
+  ///
+  /// In he, this message translates to:
+  /// **'חדרים'**
+  String get cinematicGlassTemplateB50b3974;
+
+  /// No description provided for @cinematicGlassTemplateD3b9013b.
+  ///
+  /// In he, this message translates to:
+  /// **'מ״ר'**
+  String get cinematicGlassTemplateD3b9013b;
+
+  /// No description provided for @cinematicGlassTemplate047e630b.
+  ///
+  /// In he, this message translates to:
+  /// **'קומה'**
+  String get cinematicGlassTemplate047e630b;
+
+  /// No description provided for @assistantPropertyCard7de9ac58.
+  ///
+  /// In he, this message translates to:
+  /// **'מאומת'**
+  String get assistantPropertyCard7de9ac58;
+
+  /// No description provided for @assistantPropertyCardF0f71ca3.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חדרים'**
+  String assistantPropertyCardF0f71ca3(Object rooms);
+
+  /// No description provided for @assistantPropertyCard615d28b8.
+  ///
+  /// In he, this message translates to:
+  /// **'{sizeM2} מ״ר'**
+  String assistantPropertyCard615d28b8(Object sizeM2);
+
+  /// No description provided for @swipeToConfirm55ebef41.
+  ///
+  /// In he, this message translates to:
+  /// **'גרור לאישור'**
+  String get swipeToConfirm55ebef41;
+
+  /// No description provided for @swipeToConfirmA7c55a8d.
+  ///
+  /// In he, this message translates to:
+  /// **'ביטול'**
+  String get swipeToConfirmA7c55a8d;
+
+  /// No description provided for @panoramaWebTourCa52b1de.
+  ///
+  /// In he, this message translates to:
+  /// **'סיור 360°'**
+  String get panoramaWebTourCa52b1de;
+
+  /// No description provided for @leadsInboxScreenEb3c6f60.
+  ///
+  /// In he, this message translates to:
+  /// **'מועמדים'**
+  String get leadsInboxScreenEb3c6f60;
+
+  /// No description provided for @leadsInboxScreen1956aee8.
+  ///
+  /// In he, this message translates to:
+  /// **'הודעות'**
+  String get leadsInboxScreen1956aee8;
+
+  /// No description provided for @profileCompletionBar809182d3.
+  ///
+  /// In he, this message translates to:
+  /// **'השלמת הפרופיל — {percent}%'**
+  String profileCompletionBar809182d3(Object percent);
+
+  /// No description provided for @profileCompletionBarE215150d.
+  ///
+  /// In he, this message translates to:
+  /// **'הפרופיל מושלם — בעלי דירות רואים אותך ראשון'**
+  String get profileCompletionBarE215150d;
+
+  /// No description provided for @mapStylePropertyCardC6efa96a.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חד׳'**
+  String mapStylePropertyCardC6efa96a(Object rooms);
+
+  /// No description provided for @mapStylePropertyCard615d28b8.
+  ///
+  /// In he, this message translates to:
+  /// **'{sizeM2} מ״ר'**
+  String mapStylePropertyCard615d28b8(Object sizeM2);
+
+  /// No description provided for @recommendedForYouStripBd1114e6.
+  ///
+  /// In he, this message translates to:
+  /// **'מומלץ בשבילך'**
+  String get recommendedForYouStripBd1114e6;
+
+  /// No description provided for @recommendedForYouStrip0edc8568.
+  ///
+  /// In he, this message translates to:
+  /// **'{rooms} חד׳ · {sizeM2} מ״ר'**
+  String recommendedForYouStrip0edc8568(Object rooms, Object sizeM2);
+
+  /// No description provided for @speedModeSliderE8be715a.
+  ///
+  /// In he, this message translates to:
+  /// **'מותאם אישית'**
+  String get speedModeSliderE8be715a;
+
+  /// No description provided for @speedModeSlider0a97f110.
+  ///
+  /// In he, this message translates to:
+  /// **'מהיר'**
+  String get speedModeSlider0a97f110;
+
+  /// No description provided for @termTooltip32942004.
+  ///
+  /// In he, this message translates to:
+  /// **'הסבר על המונח {term}'**
+  String termTooltip32942004(Object term);
+
+  /// No description provided for @termTooltip5e9909a0.
+  ///
+  /// In he, this message translates to:
+  /// **'הבנתי'**
+  String get termTooltip5e9909a0;
+
+  /// No description provided for @whyDetailsAa1ccf6a.
+  ///
+  /// In he, this message translates to:
+  /// **'למה בחרתי לך את זו? · {fitPct}% התאמה'**
+  String whyDetailsAa1ccf6a(Object fitPct);
+
+  /// No description provided for @whyDetails80b99f5e.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאימה למה שחיפשת — אזור, תקציב וגודל'**
+  String get whyDetails80b99f5e;
+
+  /// No description provided for @trustScoreBadge65bb303d.
+  ///
+  /// In he, this message translates to:
+  /// **'ציון דייר'**
+  String get trustScoreBadge65bb303d;
+
+  /// No description provided for @profileHeader31a7e3af.
+  ///
+  /// In he, this message translates to:
+  /// **'תקציב עד {budget} • {rooms} חדרים'**
+  String profileHeader31a7e3af(Object budget, Object rooms);
+
+  /// No description provided for @safeMedia773c5c3a.
+  ///
+  /// In he, this message translates to:
+  /// **'וידאו'**
+  String get safeMedia773c5c3a;
+
+  /// No description provided for @brokerViewingsScreen7c8173fa.
+  ///
+  /// In he, this message translates to:
+  /// **'מחיקה'**
+  String get brokerViewingsScreen7c8173fa;
 }
 
 class _AppLocalizationsDelegate

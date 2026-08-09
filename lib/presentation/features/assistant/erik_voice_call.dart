@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
 
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
@@ -101,6 +102,7 @@ class ErikOrbStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final idle = state == ErikState.idle && !callActive;
+    final l10n = AppLocalizations.of(context)!;
 
     return SafeArea(
       child: LayoutBuilder(
@@ -126,7 +128,7 @@ class ErikOrbStage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
             child: Column(
               children: [
-                _statusChip(),
+                _statusChip(l10n),
                 SizedBox(height: gap),
 
                 // ── The orb — the centerpiece. Tap to start / stop the talk. ──
@@ -188,13 +190,13 @@ class ErikOrbStage extends StatelessWidget {
                 // ── Minimal reply area (Erik's latest words + user's last line)─
                 Flexible(
                   flex: 5,
-                  child: Center(child: _replyArea(idle: idle)),
+                  child: Center(child: _replyArea(idle: idle, l10n: l10n)),
                 ),
 
                 SizedBox(height: gap),
 
                 // ── Minimal control row: mic · keyboard · end ─────────────────
-                _controls(),
+                _controls(l10n),
                 const SizedBox(height: ErikTokens.s1),
               ],
             ),
@@ -204,13 +206,13 @@ class ErikOrbStage extends StatelessWidget {
     );
   }
 
-  Widget _statusChip() {
+  Widget _statusChip(AppLocalizations l10n) {
     final live = callActive && !connecting;
     final label = connecting
-        ? 'מתחבר...'
+        ? l10n.erikVoiceCallCc39e21a
         : live
-            ? 'מקשיב — דבר חופשי'
-            : 'עזרא · מוכן לשיחה';
+            ? l10n.erikVoiceCall8f3676b5
+            : l10n.erikVoiceCallD96185d1;
     final dotColor = live ? ErikTokens.online : ErikTokens.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -240,19 +242,19 @@ class ErikOrbStage extends StatelessWidget {
 
   /// A small, calm area — Erik's latest reply (primary) and the user's last
   /// utterance (secondary). Minimal: voice is the main channel.
-  Widget _replyArea({required bool idle}) {
+  Widget _replyArea({required bool idle, required AppLocalizations l10n}) {
     final erik = erikReply.trim();
     final user = userLine.trim();
 
     final String erikText = erik.isNotEmpty
         ? erik
         : idle
-            ? 'גע בכדור כדי לדבר איתי, או הקש ⌨ כדי לכתוב.'
+            ? l10n.erikVoiceCall511207a2
             : state == ErikState.thinking
                 ? '...'
                 : state == ErikState.speaking
-                    ? 'עזרא עונה לך...'
-                    : 'אני מקשיב — דבר חופשי על הדירה.';
+                    ? l10n.erikVoiceCall74a231d6
+                    : l10n.erikVoiceCall2d820199;
 
     return SingleChildScrollView(
       reverse: true,
@@ -285,7 +287,7 @@ class ErikOrbStage extends StatelessWidget {
     );
   }
 
-  Widget _controls() {
+  Widget _controls(AppLocalizations l10n) {
     // Equal-width cells (Expanded) so the row never overflows on narrow phones;
     // the big mic stays visually centred and every label sits on one baseline.
     return Row(
@@ -298,7 +300,7 @@ class ErikOrbStage extends StatelessWidget {
             icon: voiceOn
                 ? IconsaxPlusBold.volume_high
                 : IconsaxPlusLinear.volume_slash,
-            label: voiceOn ? 'קול פעיל' : 'מושתק',
+            label: voiceOn ? l10n.erikVoiceCall4443ec8d : l10n.erikVoiceCall594c7589,
             color: ErikTokens.inkSoft,
             background: ErikTokens.glassHi,
             onTap: onToggleVoice,
@@ -308,7 +310,7 @@ class ErikOrbStage extends StatelessWidget {
         Expanded(
           child: _CallButton(
             icon: IconsaxPlusBold.microphone_2,
-            label: callActive ? 'מקשיב...' : 'דבר',
+            label: callActive ? l10n.erikVoiceCall04195099 : l10n.erikVoiceCall3eee9380,
             color: Colors.white,
             background: callActive ? ErikTokens.danger : ErikTokens.accent,
             big: true,
@@ -321,7 +323,7 @@ class ErikOrbStage extends StatelessWidget {
         Expanded(
           child: _CallButton(
             icon: IconsaxPlusLinear.keyboard,
-            label: 'מקלדת',
+            label: l10n.erikVoiceCallC6f7f477,
             color: ErikTokens.inkSoft,
             background: ErikTokens.glassHi,
             onTap: onOpenKeyboard,
@@ -331,7 +333,7 @@ class ErikOrbStage extends StatelessWidget {
         Expanded(
           child: _CallButton(
             icon: IconsaxPlusBold.close_circle,
-            label: 'סגור',
+            label: l10n.erikVoiceCall55247199,
             color: ErikTokens.inkSoft,
             background: ErikTokens.glassHi,
             onTap: onClose,
@@ -360,6 +362,7 @@ class ErikTextComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
@@ -380,9 +383,9 @@ class ErikTextComposer extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'כתוב לעזרא',
-                      style: TextStyle(
+                    Text(
+                      l10n.erikVoiceCall2f3790da,
+                      style: const TextStyle(
                         color: ErikTokens.ink,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
@@ -440,9 +443,9 @@ class ErikTextComposer extends StatelessWidget {
                           cursorColor: ErikTokens.accent,
                           minLines: 1,
                           maxLines: 4,
-                          decoration: const InputDecoration(
-                            hintText: 'כתוב הודעה...',
-                            hintStyle: TextStyle(
+                          decoration: InputDecoration(
+                            hintText: l10n.erikVoiceCallB8b81253,
+                            hintStyle: const TextStyle(
                                 fontSize: 16, color: Color(0x8C5B7A99)),
                             filled: false,
                             contentPadding: EdgeInsets.symmetric(

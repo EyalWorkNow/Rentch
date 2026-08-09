@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dating_app/data/models/scanned_room.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_splat_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -33,7 +34,7 @@ class Scan3dViewerScreen extends StatefulWidget {
     super.key,
     required this.rooms,
     this.initialIndex = 0,
-    this.title = 'סריקה תלת-מימדית',
+    this.title = '',
   }) : assert(rooms.length > 0, 'provide at least one room');
 
   /// The viewable rooms, in display order. For a single scan this is a
@@ -51,7 +52,7 @@ class Scan3dViewerScreen extends StatefulWidget {
     BuildContext context, {
     String? meshGlbUrl,
     String? splatUrl,
-    String title = 'סריקה תלת-מימדית',
+    String title = '',
   }) {
     final mesh = (meshGlbUrl != null && meshGlbUrl.isNotEmpty) ? meshGlbUrl : null;
     final splat = (splatUrl != null && splatUrl.isNotEmpty) ? splatUrl : null;
@@ -70,7 +71,7 @@ class Scan3dViewerScreen extends StatefulWidget {
     BuildContext context,
     List<ScannedRoom> rooms, {
     int initialIndex = 0,
-    String title = 'סריקה תלת-מימדית',
+    String title = '',
   }) {
     final viewable = rooms.where((r) => r.hasViewableAsset).toList();
     if (viewable.isEmpty) return Future.value();
@@ -121,14 +122,18 @@ class _Scan3dViewerScreenState extends State<Scan3dViewerScreen> {
     if (mesh.isNotEmpty) {
       return _MeshView(key: ValueKey('room-$_index-mesh'), meshGlbUrl: mesh);
     }
-    return const _ViewerMessage(
-      'לא ניתן לטעון את המודל התלת-מימדי של חדר זה.',
+    return _ViewerMessage(
+      AppLocalizations.of(context)!.scan3dViewerBf032028,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final roomTitle = _room.name.trim().isNotEmpty ? _room.name : widget.title;
+    final l10n = AppLocalizations.of(context)!;
+    final defaultTitle = widget.title.trim().isNotEmpty
+        ? widget.title
+        : l10n.scan3dViewer48726f5e;
+    final roomTitle = _room.name.trim().isNotEmpty ? _room.name : defaultTitle;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -242,7 +247,8 @@ class _RoomPickerBar extends StatelessWidget {
                   child: _RoomChip(
                     label: rooms[i].name.trim().isNotEmpty
                         ? rooms[i].name
-                        : 'חדר ${i + 1}',
+                        : AppLocalizations.of(context)!
+                            .scan3dViewerE24e43eb(i + 1),
                     selected: i == selected,
                     onTap: () => onSelect(i),
                   ),
@@ -403,8 +409,8 @@ class _MeshViewState extends State<_MeshView> {
   @override
   Widget build(BuildContext context) {
     if (_failed) {
-      return const _ViewerMessage(
-        'לא ניתן לטעון את המודל התלת-מימדי במכשיר זה.',
+      return _ViewerMessage(
+        AppLocalizations.of(context)!.scan3dViewer444becda,
       );
     }
     if (_ready && _controller != null) {

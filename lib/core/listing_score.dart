@@ -1,5 +1,6 @@
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// A basic, automatic 0–100 quality score for a listing, computed by our engine
 /// from VERIFIED signals the moment it's uploaded — features, condition, how
@@ -60,10 +61,10 @@ class ListingScore {
     return 0.55;
   }
 
-  static String label(int score) {
-    if (score >= 85) return 'מודעה מצוינת 🏆';
-    if (score >= 70) return 'מודעה טובה מאוד 👍';
-    if (score >= 55) return 'מודעה טובה';
-    return 'אפשר לשפר — הוסף תמונות ופרטים';
+  static String label(int score, AppLocalizations l10n) {
+    if (score >= 85) return l10n.listingScore74a07f35;
+    if (score >= 70) return l10n.listingScoreE78d407d;
+    if (score >= 55) return l10n.listingScore70fd3337;
+    return l10n.listingScore15ff9d35;
   }
 }

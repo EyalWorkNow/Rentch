@@ -1,10 +1,12 @@
-// Israeli residential rental-income tax helper — pure Dart, no Flutter imports.
+// Israeli residential rental-income tax helper.
 //
 // Built for older, non-technical landlords who just want a single clear answer:
 // "do I owe / report anything on my rent?".
 //
 // All figures are 2026 values. They live as named constants so a future agent
 // can bump them in one place when the Tax Authority publishes new numbers.
+
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// 2026 monthly residential-rent tax-exemption ceiling (₪). Rent at or below
 /// this is fully exempt — nothing to report.
@@ -87,7 +89,7 @@ class RentalTax {
   const RentalTax._();
 
   /// Assess a [monthlyRent] (₪/month). Negative input is clamped to 0.
-  static RentalTaxResult assess(double monthlyRent) {
+  static RentalTaxResult assess(double monthlyRent, AppLocalizations l10n) {
     final double rent = monthlyRent < 0 ? 0 : monthlyRent;
 
     final double tenPercentMonthly = rent * kTenPercentRate;
@@ -115,6 +117,7 @@ class RentalTax {
     }
 
     final String summary = _summaryFor(
+      l10n: l10n,
       category: category,
       rent: rent,
       tenPercentMonthly: tenPercentMonthly,
@@ -135,6 +138,7 @@ class RentalTax {
   }
 
   static String _summaryFor({
+    required AppLocalizations l10n,
     required TaxCategory category,
     required double rent,
     required double tenPercentMonthly,
@@ -143,15 +147,15 @@ class RentalTax {
     final String rentStr = _shekel(rent);
     switch (category) {
       case TaxCategory.exempt:
-        return 'שכר הדירה שלך $rentStr → אתה פטור ממס. אין מה לדווח.';
+        return l10n.rentalTax68d523ba(rentStr);
       case TaxCategory.partialExemption:
-        return 'אתה מעל תקרת הפטור (${_shekel(kExemptCeilingMonthly)}). '
-            'חלק מהשכר עדיין פטור. המסלול הפשוט: 10% מהשכר = '
-            '${_shekel(tenPercentMonthly)} לחודש.';
+        return l10n.rentalTax9b398d34(_shekel(kExemptCeilingMonthly)) +
+            l10n.rentalTaxDa3d1e79 +
+            l10n.rentalTaxA2791ae8(_shekel(tenPercentMonthly));
       case TaxCategory.tenPercentBetter:
       case TaxCategory.taxable:
-        return 'אתה מעל תקרת הפטור (${_shekel(kExemptCeilingMonthly)}). '
-            'המסלול הפשוט: 10% מהשכר = ${_shekel(tenPercentMonthly)} לחודש.';
+        return l10n.rentalTax9b398d34(_shekel(kExemptCeilingMonthly)) +
+            l10n.rentalTaxDaaf39c6(_shekel(tenPercentMonthly));
     }
   }
 

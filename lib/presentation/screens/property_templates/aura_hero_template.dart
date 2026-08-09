@@ -117,7 +117,8 @@ class _AuraHeroTemplate extends StatelessWidget {
                     icon: IconsaxPlusLinear.layer,
                     label: property.floor.isEmpty
                         ? property.propertyType
-                        : 'קומה ${property.floor}',
+                        : AppLocalizations.of(context)!
+                            .auraHeroTemplateD068bb57(property.floor),
                     branding: branding,
                     aura: aura,
                   ),
@@ -201,14 +202,16 @@ class _AcidHeroOverlay extends StatelessWidget {
                     icon: IconsaxPlusBold.star_1,
                     label: avgRating > 0
                         ? avgRating.toStringAsFixed(1)
-                        : 'חדש',
+                        : AppLocalizations.of(context)!
+                            .auraHeroTemplate08bca18d,
                     aura: aura,
                     secondary: branding.secondaryColor,
                   ),
                   const SizedBox(width: 8),
                   _AuraGlowChip(
                     icon: IconsaxPlusLinear.maximize_3,
-                    label: '${property.sizeM2} מ״ר',
+                    label: AppLocalizations.of(context)!
+                        .auraHeroTemplateFdb4eac7(property.sizeM2),
                     aura: aura,
                     secondary: branding.secondaryColor,
                   ),
@@ -498,19 +501,19 @@ class _AcidPriceCard extends StatelessWidget {
                 _AuraStat(
                   icon: IconsaxPlusBold.building,
                   value: property.roomsLabel,
-                  label: 'חדרים',
+                  label: AppLocalizations.of(context)!.auraHeroTemplateB50b3974,
                 ),
                 _AuraStatDivider(),
                 _AuraStat(
                   icon: IconsaxPlusBold.maximize_3,
                   value: '${property.sizeM2}',
-                  label: 'מ״ר',
+                  label: AppLocalizations.of(context)!.auraHeroTemplateD3b9013b,
                 ),
                 _AuraStatDivider(),
                 _AuraStat(
                   icon: IconsaxPlusBold.layer,
                   value: property.floor.isEmpty ? '—' : property.floor,
-                  label: 'קומה',
+                  label: AppLocalizations.of(context)!.auraHeroTemplate047e630b,
                 ),
               ],
             ),

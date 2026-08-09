@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -50,7 +51,10 @@ class _PanoramaWideCaptureScreenState extends State<PanoramaWideCaptureScreen> {
       }
       setState(() => _cam = ctrl);
     } catch (_) {
-      if (mounted) setState(() => _error = 'לא ניתן לפתוח את המצלמה');
+      if (mounted) {
+        setState(() =>
+            _error = AppLocalizations.of(context)!.panoramaWideCaptureE779f1ba);
+      }
     }
   }
 
@@ -139,9 +143,9 @@ class _PanoramaWideCaptureScreenState extends State<PanoramaWideCaptureScreen> {
                           color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text(
-                          'החזק את הטלפון אנכי וישר, ועמוד במרכז החדר',
-                          style: TextStyle(
+                        child: Text(
+                          AppLocalizations.of(context)!.panoramaWideCapture67274c54,
+                          style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
                               fontWeight: FontWeight.w600),
@@ -203,13 +207,13 @@ class _PanoramaWideCaptureScreenState extends State<PanoramaWideCaptureScreen> {
             const Icon(IconsaxPlusLinear.camera_slash,
                 color: Colors.white54, size: 48),
             const SizedBox(height: 12),
-            Text(_error ?? 'שגיאת מצלמה',
+            Text(_error ?? AppLocalizations.of(context)!.panoramaWideCapture4c53a96e,
                 style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('סגור'),
+              child: Text(AppLocalizations.of(context)!.panoramaWideCapture55247199),
             ),
           ],
         ),

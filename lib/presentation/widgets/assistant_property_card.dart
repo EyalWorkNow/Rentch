@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -114,7 +115,9 @@ class AssistantPropertyCard extends StatelessWidget {
                             Icon(Icons.verified,
                                 size: 13, color: AppColors.success),
                             const SizedBox(width: 3),
-                            const Text('מאומת',
+                            Text(
+                                AppLocalizations.of(context)!
+                                    .assistantPropertyCard7de9ac58,
                                 style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
@@ -196,11 +199,13 @@ class AssistantPropertyCard extends StatelessWidget {
                     child: Row(children: [
                       _InfoChip(
                           icon: IconsaxPlusLinear.home,
-                          label: '${p.roomsLabel} חדרים'),
+                          label: AppLocalizations.of(context)!
+                              .assistantPropertyCardF0f71ca3(p.roomsLabel)),
                       const SizedBox(width: 8),
                       _InfoChip(
                           icon: IconsaxPlusLinear.maximize_3,
-                          label: '${p.sizeM2} מ״ר'),
+                          label: AppLocalizations.of(context)!
+                              .assistantPropertyCard615d28b8(p.sizeM2)),
                       for (final t in scored.tags.where((t) => !_isGeoTag(t))) ...[
                         const SizedBox(width: 8),
                         _InfoChip(label: t),

@@ -13,6 +13,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 /// A colored chip summarising how a listing's price compares to the area median.
@@ -61,20 +62,22 @@ class PriceBadge extends StatelessWidget {
     final medianPpm = _toDouble(map['medianPpm']);
     final deltaPct = _toDouble(map['deltaPct']);
 
-    final style = _styleFor(badge);
+    final l10n = AppLocalizations.of(context)!;
+    final style = _styleFor(l10n, badge);
 
     // Build the right-side comparison line defensively: only include parts we
     // actually have. Median alone, delta alone, or both — all read naturally.
     final parts = <String>[];
     if (medianPpm != null && medianPpm > 0) {
-      parts.add('₪${_formatInt(medianPpm.round())}/מ״ר');
+      parts.add(l10n.priceBadge76f81691(_formatInt(medianPpm.round())));
     }
     if (deltaPct != null && deltaPct.abs() >= 1) {
       final pct = deltaPct.abs().round();
-      parts.add(deltaPct < 0 ? '−$pct% מתחת לחציון האזור'
-          : '+$pct% מעל חציון האזור');
+      parts.add(deltaPct < 0
+          ? l10n.priceBadgeB51a666b(pct)
+          : l10n.priceBadgeE1ecf729(pct));
     } else if (deltaPct != null) {
-      parts.add('סביב חציון האזור');
+      parts.add(l10n.priceBadgeB40e964e);
     }
     final detail = parts.join(' · ');
 
@@ -126,18 +129,18 @@ class PriceBadge extends StatelessWidget {
     );
   }
 
-  _BadgeStyle _styleFor(String badge) {
+  _BadgeStyle _styleFor(AppLocalizations l10n, String badge) {
     switch (badge) {
       case 'great_deal':
-        return const _BadgeStyle(
-          label: 'מחיר מצוין לאזור',
+        return _BadgeStyle(
+          label: l10n.priceBadge9b42587f,
           fg: AppColors.scoreStrong,
           bg: AppColors.tealPale,
           icon: IconsaxPlusLinear.trend_down,
         );
       case 'above_market':
-        return const _BadgeStyle(
-          label: 'מעל מחיר השוק',
+        return _BadgeStyle(
+          label: l10n.priceBadge66371906,
           fg: AppColors.scoreMixed,
           bg: AppColors.cloud,
           icon: IconsaxPlusLinear.trend_up,
@@ -145,8 +148,8 @@ class PriceBadge extends StatelessWidget {
       case 'fair':
       default:
         // "fair" (and any unknown-but-present verdict) → neutral, calm blue.
-        return const _BadgeStyle(
-          label: 'מחיר הוגן לאזור',
+        return _BadgeStyle(
+          label: l10n.priceBadge25a4bda0,
           fg: AppColors.scoreGood,
           bg: AppColors.slate100,
           icon: IconsaxPlusLinear.tick_circle,

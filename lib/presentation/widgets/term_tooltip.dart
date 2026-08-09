@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/constants/glossary.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -37,7 +38,7 @@ class TermTooltip extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: 'הסבר על המונח $term',
+      label: AppLocalizations.of(context)!.termTooltip32942004(term),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _showDefinition(context, term, definition),
@@ -184,9 +185,9 @@ class _TermDefinitionSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'הבנתי',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  child: Text(
+                    AppLocalizations.of(context)!.termTooltip5e9909a0,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                   ),
                 ),
               ),

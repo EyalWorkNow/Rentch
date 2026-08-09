@@ -12,6 +12,7 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 /// Tenant (apartment-seeker) profile detail — restyled to be visually
 /// indistinguishable in polish from [PropertyDetailScreen]'s rentlyClassic
@@ -102,6 +103,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final tenant = widget.tenant;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -178,7 +180,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'מחפש/ת דירה · משתמש מאומת',
+                            l10n.tenantDetailScreenE45aa6fe,
                             style: TextStyle(
                               color: AppColors.primary,
                               fontSize: 14,
@@ -190,9 +192,9 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       const SizedBox(height: 24),
 
                       // ─── Key stats fact grid ────────────────────────────
-                      const Text(
-                        'מה הוא מחפש',
-                        style: TextStyle(
+                      Text(
+                        l10n.tenantDetailScreen54b54821,
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                           color: _kInk,
@@ -209,7 +211,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
 
                       // ─── Match insight ──────────────────────────────────
                       _SectionCardShell(
-                        title: 'למה ההתאמה הזו',
+                        title: l10n.tenantDetailScreenDc721374,
                         icon: IconsaxPlusLinear.flash_1,
                         child: _MatchInsightCard(
                           tenant: tenant,
@@ -219,7 +221,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
 
                       // ─── Liked property ─────────────────────────────────
                       _SectionCardShell(
-                        title: 'הנכס שאהב',
+                        title: l10n.tenantDetailScreen342759aa,
                         icon: IconsaxPlusLinear.home_2,
                         child: _LikedPropertyDetailedCard(
                           property: widget.property,
@@ -229,7 +231,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       // ─── About / bio ────────────────────────────────────
                       if (tenant.bio.isNotEmpty)
                         _SectionCardShell(
-                          title: 'קצת עליו',
+                          title: l10n.tenantDetailScreenAede4a6e,
                           icon: IconsaxPlusLinear.user,
                           child: Container(
                             width: double.infinity,
@@ -254,7 +256,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       // ─── Important details / tags ───────────────────────
                       if (tenant.importantDetails.isNotEmpty)
                         _SectionCardShell(
-                          title: 'מאפיינים חשובים',
+                          title: l10n.tenantDetailScreen64680a66,
                           icon: IconsaxPlusLinear.flash_1,
                           child: _ChipWrap(
                             tags: tenant.importantDetails,
@@ -264,7 +266,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       // ─── Deal-breakers ──────────────────────────────────
                       if (tenant.dealBreakers.isNotEmpty)
                         _SectionCardShell(
-                          title: 'תנאים שאינם לדיון',
+                          title: l10n.tenantDetailScreen64967671,
                           icon: IconsaxPlusLinear.warning_2,
                           child: _ChipWrap(
                             tags: tenant.dealBreakers,
@@ -277,9 +279,9 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'המלצות מבעלי דירות',
-                              style: TextStyle(
+                            Text(
+                              l10n.tenantDetailScreen6987e12c,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: _kInk,
@@ -495,7 +497,7 @@ class _PhotoHero extends StatelessWidget {
                   border: Border.all(color: _kTeal.withValues(alpha: 0.3)),
                 ),
                 child: Text(
-                  'מחפש דירה',
+                  AppLocalizations.of(context)!.tenantDetailScreenB4cc85ed,
                   style: TextStyle(
                     color: _kTeal,
                     fontSize: 12,
@@ -505,7 +507,8 @@ class _PhotoHero extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '$roomsLabel חדרים · ${tenant.moveInWindow}',
+                AppLocalizations.of(context)!
+                    .tenantDetailScreen548d9521(roomsLabel, tenant.moveInWindow),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -643,6 +646,7 @@ class _TenantFactsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         Row(
@@ -655,7 +659,7 @@ class _TenantFactsCard extends StatelessWidget {
                 child: _FactItemCard(
                   IconsaxPlusLinear.wallet,
                   budgetLabel,
-                  'תקציב מקסימלי',
+                  l10n.tenantDetailScreen0ee38ad3,
                 ),
               ),
             ),
@@ -668,7 +672,7 @@ class _TenantFactsCard extends StatelessWidget {
                 child: _FactItemCard(
                   IconsaxPlusLinear.building,
                   roomsLabel,
-                  'חדרים',
+                  l10n.tenantDetailScreenB50b3974,
                 ),
               ),
             ),
@@ -686,7 +690,7 @@ class _TenantFactsCard extends StatelessWidget {
                 child: _FactItemCard(
                   IconsaxPlusLinear.calendar,
                   tenant.moveInWindow,
-                  'מועד כניסה',
+                  l10n.tenantDetailScreen1399cd87,
                 ),
               ),
             ),
@@ -700,7 +704,7 @@ class _TenantFactsCard extends StatelessWidget {
                 child: _FactItemCard(
                   IconsaxPlusLinear.shield_tick,
                   '$trustScore',
-                  'נקודות אמון',
+                  l10n.tenantDetailScreenC7f6f4e8,
                 ),
               ),
             ),
@@ -825,7 +829,8 @@ class _MatchInsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reasons = _buildReasons();
+    final l10n = AppLocalizations.of(context)!;
+    final reasons = _buildReasons(l10n);
     final score = _score();
     final (fg, bg) = _tierColors(score);
 
@@ -852,12 +857,12 @@ class _MatchInsightCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _tierLabel(score),
+                    _tierLabel(l10n, score),
                     style: TextStyle(
                         color: fg, fontWeight: FontWeight.w900, fontSize: 16),
                   ),
-                  const Text(
-                    'לפי ההעדפות שלך מול הנכס שאהב',
+                  Text(
+                    l10n.tenantDetailScreen0333a357,
                     style:
                         TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
@@ -908,7 +913,7 @@ class _MatchInsightCard extends StatelessWidget {
       tenant.desiredRooms > 0 &&
       (tenant.desiredRooms - property.rooms).abs() <= 0.5;
 
-  List<(IconData, String)> _buildReasons() {
+  List<(IconData, String)> _buildReasons(AppLocalizations l10n) {
     final reasons = <(IconData, String)>[];
     final roomsText = tenant.desiredRooms
         .toStringAsFixed(tenant.desiredRooms % 1 == 0 ? 0 : 1);
@@ -917,8 +922,8 @@ class _MatchInsightCard extends StatelessWidget {
       reasons.add((
         IconsaxPlusLinear.money_recive,
         _budgetFits
-            ? 'תקציב עד ₪${tenant.budgetMax} — מכסה את דמי השכירות (₪${property.price})'
-            : 'תקציב עד ₪${tenant.budgetMax} — מתחת לדמי השכירות (₪${property.price})',
+            ? l10n.tenantDetailScreen9bf902f4(tenant.budgetMax, property.price)
+            : l10n.tenantDetailScreenDe6e13c4(tenant.budgetMax, property.price),
       ));
     }
     // Rooms — real comparison to the property.
@@ -926,20 +931,21 @@ class _MatchInsightCard extends StatelessWidget {
       reasons.add((
         IconsaxPlusLinear.home_2,
         _roomsFit
-            ? 'מחפש $roomsText חדרים — תואם לנכס (${property.roomsLabel})'
-            : 'מחפש $roomsText חדרים — הנכס ${property.roomsLabel} חדרים',
+            ? l10n.tenantDetailScreen1e958c2f(roomsText, property.roomsLabel)
+            : l10n.tenantDetailScreenB8e3e192(roomsText, property.roomsLabel),
       ));
     }
     if (tenant.moveInWindow.isNotEmpty) {
       reasons.add((
         IconsaxPlusLinear.calendar_1,
-        'זמין לכניסה: ${tenant.moveInWindow}',
+        l10n.tenantDetailScreen12c58e28(tenant.moveInWindow),
       ));
     }
     if (tenant.importantDetails.isNotEmpty) {
       reasons.add((
         IconsaxPlusLinear.flash_1,
-        'ציין: ${tenant.importantDetails.take(2).join(', ')}',
+        l10n.tenantDetailScreenE3b82a80(
+            tenant.importantDetails.take(2).join(', ')),
       ));
     }
     return reasons.take(4).toList();
@@ -957,11 +963,11 @@ class _MatchInsightCard extends StatelessWidget {
     return s.clamp(0, 99);
   }
 
-  String _tierLabel(int score) {
-    if (score >= 90) return 'התאמה מושלמת';
-    if (score >= 80) return 'התאמה מצוינת';
-    if (score >= 70) return 'התאמה טובה';
-    return 'התאמה סבירה';
+  String _tierLabel(AppLocalizations l10n, int score) {
+    if (score >= 90) return l10n.tenantDetailScreen0e27d010;
+    if (score >= 80) return l10n.tenantDetailScreen716b886b;
+    if (score >= 70) return l10n.tenantDetailScreenAb92611a;
+    return l10n.tenantDetailScreen758f13a3;
   }
 
   (Color, Color) _tierColors(int score) {
@@ -1053,7 +1059,9 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${property.roomsLabel} חדרים',
+                              AppLocalizations.of(context)!
+                                  .tenantDetailScreenD886d07f(
+                                      property.roomsLabel),
                               style: const TextStyle(
                                 color: _kMuted,
                                 fontSize: 13,
@@ -1068,7 +1076,8 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${property.sizeM2} מ״ר',
+                              AppLocalizations.of(context)!
+                                  .tenantDetailScreenFdb4eac7(property.sizeM2),
                               style: const TextStyle(
                                 color: _kMuted,
                                 fontSize: 13,
@@ -1179,9 +1188,10 @@ class _HorizontalTenantReviews extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const Text(
-                            'בעל דירה קודם',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context)!
+                                .tenantDetailScreen6c58947e,
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                               color: _kMuted,
@@ -1273,8 +1283,9 @@ class _TenantBottomBar extends StatelessWidget {
                     onPressed: onReject,
                     icon: const RentlyIcon(IconsaxPlusLinear.close_circle,
                         size: 18),
-                    label: const Text('דלג',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: Text(
+                        AppLocalizations.of(context)!.tenantDetailScreen80a413c5,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _kInk,
                       side: const BorderSide(color: _kBorder),
@@ -1294,9 +1305,9 @@ class _TenantBottomBar extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onAccept,
                     icon: const RentlyIcon(IconsaxPlusLinear.heart, size: 18),
-                    label: const Text(
-                      'אהבתי · צור קשר',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                    label: Text(
+                      AppLocalizations.of(context)!.tenantDetailScreen96c6fb01,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: _kTeal,

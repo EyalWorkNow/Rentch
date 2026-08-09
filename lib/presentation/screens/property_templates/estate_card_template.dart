@@ -330,7 +330,7 @@ class _EstatePriceCard extends StatelessWidget {
                 Icon(IconsaxPlusBold.verify, size: 16, color: gold),
                 const SizedBox(width: 5),
                 Text(
-                  'מאומת',
+                  AppLocalizations.of(context)!.estateCardTemplate7de9ac58,
                   style: TextStyle(
                     color: gold,
                     fontSize: 12,
@@ -389,7 +389,7 @@ class _EstatePriceCard extends StatelessWidget {
                     border: Border.all(color: gold.withValues(alpha: 0.45)),
                   ),
                   child: Text(
-                    'חדש',
+                    AppLocalizations.of(context)!.estateCardTemplate08bca18d,
                     style: TextStyle(
                       color: gold,
                       fontSize: 12,
@@ -406,7 +406,8 @@ class _EstatePriceCard extends StatelessWidget {
           if (ppsm != null) ...[
             const SizedBox(height: 6),
             Text(
-              '₪${_estateFormat(ppsm)} למ״ר',
+              AppLocalizations.of(context)!
+                  .estateCardTemplateCdc7944d(_estateFormat(ppsm)),
               style: TextStyle(
                 color: branding.secondaryColor.withValues(alpha: 0.50),
                 fontSize: 12.5,
@@ -499,11 +500,15 @@ class _EstateFactChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final facts = <_TemplateFact>[
-      _TemplateFact(IconsaxPlusLinear.building, '${property.roomsLabel} חדרים'),
-      _TemplateFact(IconsaxPlusLinear.maximize_3, '${property.sizeM2} מ״ר'),
+      _TemplateFact(IconsaxPlusLinear.building,
+          l10n.estateCardTemplateD886d07f(property.roomsLabel)),
+      _TemplateFact(IconsaxPlusLinear.maximize_3,
+          l10n.estateCardTemplateFdb4eac7(property.sizeM2)),
       if (property.floor.trim().isNotEmpty)
-        _TemplateFact(IconsaxPlusLinear.layer, 'קומה ${property.floor}'),
+        _TemplateFact(IconsaxPlusLinear.layer,
+            l10n.estateCardTemplateD068bb57(property.floor)),
       if (property.condition.trim().isNotEmpty)
         _TemplateFact(IconsaxPlusLinear.star, property.condition),
     ];

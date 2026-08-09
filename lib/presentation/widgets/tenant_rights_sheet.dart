@@ -8,6 +8,7 @@
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Bottom sheet explaining the tenant's rights for [monthlyRent].
@@ -44,6 +45,7 @@ class _TenantRightsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Reuse the contract model's cap — never reimplement the legal math.
     final depositCap = maxLegalDepositNis(
       monthlyRent: monthlyRent,
@@ -80,10 +82,10 @@ class _TenantRightsBody extends StatelessWidget {
                     Icon(Icons.verified_user_rounded,
                         color: AppColors.primary, size: 28),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'הזכויות שלכם כשוכרים',
-                        style: TextStyle(
+                        l10n.tenantRightsSheet09a76cb1,
+                        style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
@@ -99,50 +101,50 @@ class _TenantRightsBody extends StatelessWidget {
                   children: [
                     _RightCard(
                       icon: Icons.shield_rounded,
-                      title: 'הפיקדון מוגבל בחוק',
+                      title: l10n.tenantRightsSheet26a4104a,
                       body: depositCap > 0
-                          ? 'לפי חוק שכירות הוגנת 2017, פיקדון במזומן/ערבות '
-                              'מוגבל ל-₪$depositCap. זה הסכום המרבי שמותר לבקש '
-                              'מכם בנכס הזה (הנמוך מבין ⅓ מסך השכירות לכל '
-                              'התקופה או 3 חודשי שכירות).\n\n'
-                              'בטוחות = כסף או ערבות שמשאירים אצל בעל הדירה '
-                              'להבטחת ההסכם, ומוחזרים בסוף השכירות.'
-                          : 'לפי חוק שכירות הוגנת 2017, פיקדון במזומן/ערבות '
-                              'מוגבל לנמוך מבין ⅓ מסך השכירות לכל התקופה או '
-                              '3 חודשי שכירות.',
+                          ? l10n.tenantRightsSheet5ea0f907 +
+                              l10n.tenantRightsSheet998fde48(depositCap) +
+                              l10n.tenantRightsSheetDaadfc3a +
+                              l10n.tenantRightsSheet30650421 +
+                              l10n.tenantRightsSheet74e1f7e7 +
+                              l10n.tenantRightsSheetFd0085dc
+                          : l10n.tenantRightsSheet5ea0f907 +
+                              l10n.tenantRightsSheet8bed726a +
+                              l10n.tenantRightsSheetC9040c39,
                     ),
                     const SizedBox(height: 12),
                     _RightCard(
                       icon: Icons.handshake_rounded,
-                      title: 'דמי תיווך — רק אם חתמתם',
-                      body: 'דמי תיווך (חודש שכירות + מע״מ 18%) מגיעים למתווך '
-                          'רק אם חתמתם על הסכם תיווך. בלי חתימה — אינכם חייבים '
-                          'לשלם תיווך. שאלו תמיד מי מייצג מי.',
+                      title: l10n.tenantRightsSheet331175e3,
+                      body: l10n.tenantRightsSheetC9a8fc94 +
+                          l10n.tenantRightsSheetC6aca436 +
+                          l10n.tenantRightsSheet0ae2e28f,
                     ),
                     const SizedBox(height: 12),
                     _RightCard(
                       icon: Icons.remove_red_eye_rounded,
-                      title: 'אל תשלמו לפני שראיתם את הדירה',
-                      body: 'לעולם אל תעבירו פיקדון, מקדמה או דמי תיווך לפני '
-                          'שביקרתם בדירה פיזית ואימתתם מול מי אתם מתקשרים. '
-                          'בקשה לתשלום מראש "כדי לשמור" את הדירה היא דגל אדום.',
+                      title: l10n.tenantRightsSheetD8e77ae9,
+                      body: l10n.tenantRightsSheet386b9b05 +
+                          l10n.tenantRightsSheetC75c0e1f +
+                          l10n.tenantRightsSheetD5e1f4c7,
                     ),
                     const SizedBox(height: 12),
                     _RightCard(
                       icon: Icons.home_repair_service_rounded,
-                      title: 'דירה ראויה למגורים',
-                      body: 'על בעל הדירה למסור דירה במצב ראוי למגורים ולתקן '
-                          'ליקויים מהותיים שאינם באשמתכם. דירה חייבת אוורור, '
-                          'מים, חשמל ומערכת ביוב תקינים.\n\n'
-                          'ממ"ד = מרחב מוגן דירתי, חדר ביטחון. אם קיים, '
-                          'אסור להשתמש בו כמחסן שמונע כניסה בשעת חירום.',
+                      title: l10n.tenantRightsSheet8b33be3a,
+                      body: l10n.tenantRightsSheet6c2e4b93 +
+                          l10n.tenantRightsSheet7be24327 +
+                          l10n.tenantRightsSheetD89c29b2 +
+                          l10n.tenantRightsSheet5e967f01 +
+                          l10n.tenantRightsSheet18d2dbed,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'מידע כללי ואינו ייעוץ משפטי. בכל ספק התייעצו עם '
-                      'עורך/ת דין.',
+                      l10n.tenantRightsSheetF8a977ee +
+                          l10n.tenantRightsSheet190074d2,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -158,9 +160,9 @@ class _TenantRightsBody extends StatelessWidget {
                           ),
                         ),
                         onPressed: () => Navigator.of(context).maybePop(),
-                        child: const Text(
-                          'הבנתי',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.tenantRightsSheet5e9909a0,
+                          style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textOnPrimary,

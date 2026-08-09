@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/broker/area_intel_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_brochure_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_clients_screen.dart';
@@ -26,75 +27,76 @@ class BrokerToolsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // NOTE: AppColors.primary/primaryDark are MUTABLE statics (indigo for
     // brokers) — keep these out of any `const` constructor below.
+    final l10n = AppLocalizations.of(context)!;
     final tools = <_BrokerTool>[
       _BrokerTool(
         icon: IconsaxPlusLinear.profile_2user,
         color: AppColors.primary,
-        title: 'פנקס לקוחות',
-        subtitle: 'ניהול הלקוחות שלך + אילו נכסים מתאימים לכל אחד',
+        title: l10n.brokerToolsScreenF9d349b3,
+        subtitle: l10n.brokerToolsScreen91412cfd,
         builder: (_) => const BrokerClientsScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.flash,
         color: AppColors.coral,
-        title: 'התאמות חמות',
-        subtitle: 'לקוחות שמחכים בדיוק לנכס שיש לך עכשיו',
+        title: l10n.brokerToolsScreenEda2e484,
+        subtitle: l10n.brokerToolsScreen3c455670,
         builder: (_) => const BrokerHotMatchesScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.task_square,
         color: AppColors.superLike,
-        title: 'פייפליין לידים',
-        subtitle: 'כל הפניות במקום אחד — שום ליד לא נופל',
+        title: l10n.brokerToolsScreen0a1cdb54,
+        subtitle: l10n.brokerToolsScreen82dc7ac7,
         builder: (_) => const BrokerPipelineScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.calendar_1,
         color: AppColors.primaryDark,
-        title: 'תיאום צפיות',
-        subtitle: 'לקבוע ולעקוב אחרי צפיות בנכסים',
+        title: l10n.brokerToolsScreenBb5dc197,
+        subtitle: l10n.brokerToolsScreen2bf80048,
         builder: (_) => const BrokerViewingsScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.chart_2,
         color: AppColors.success,
-        title: 'ניתוח שוק (CMA)',
-        subtitle: 'מחיר מומלץ לפי נכסים דומים באזור',
+        title: l10n.brokerToolsScreen85518426,
+        subtitle: l10n.brokerToolsScreen34c08639,
         builder: (_) => const BrokerCmaScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.map_1,
         color: AppColors.primary,
-        title: 'אינטליגנציית אזור',
-        subtitle: 'כתובת → כל נתוני האזור + למי הוא הכי מתאים להשקעה',
+        title: l10n.brokerToolsScreenA8bb0310,
+        subtitle: l10n.brokerToolsScreen5f85ee35,
         builder: (_) => const AreaIntelScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.shield_tick,
         color: AppColors.warning,
-        title: 'מעקב בלעדיות',
-        subtitle: 'תוקף ההסכמים — שלא תחמיץ חידוש בלעדיות',
+        title: l10n.brokerToolsScreen5ac95646,
+        subtitle: l10n.brokerToolsScreenF08ed1c1,
         builder: (_) => const BrokerExclusivityScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.wallet_money,
         color: AppColors.primary,
-        title: 'עמלות ופייפליין',
-        subtitle: 'מעקב עמלות צפויות והכנסות מהעסקאות',
+        title: l10n.brokerToolsScreenA8ea0bb8,
+        subtitle: l10n.brokerToolsScreenC384e0ce,
         builder: (_) => const BrokerCommissionScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.document_text,
         color: AppColors.navy,
-        title: 'דוח לבעל הנכס',
-        subtitle: 'דוח מסודר על הפעילות לשליחה לבעל הנכס',
+        title: l10n.brokerToolsScreen02b2074b,
+        subtitle: l10n.brokerToolsScreenFe8f7d48,
         builder: (_) => const BrokerOwnerReportScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.gallery,
         color: AppColors.primaryDark,
-        title: 'ברושור ממותג',
-        subtitle: 'דף נכס יפה עם המיתוג שלך לשיתוף',
+        title: l10n.brokerToolsScreenE14de9a0,
+        subtitle: l10n.brokerToolsScreenE45217dd,
         builder: (_) => const BrokerBrochureScreen(),
       ),
     ];
@@ -108,9 +110,9 @@ class BrokerToolsScreen extends StatelessWidget {
           foregroundColor: AppColors.navy,
           elevation: 0,
           centerTitle: true,
-          title: const Text(
-            'כלי הסוכן',
-            style: TextStyle(
+          title: Text(
+            l10n.brokerToolsScreen2074036b,
+            style: const TextStyle(
               color: AppColors.navy,
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -137,16 +139,16 @@ class BrokerToolsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.slate200),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(IconsaxPlusLinear.briefcase,
+                      const Icon(IconsaxPlusLinear.briefcase,
                           color: Colors.black, size: 24),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'כל מה שצריך לניהול העסק שלך במקום אחד — לקוחות, '
-                          'לידים, צפיות, עמלות ועוד. הקש על כלי כדי להתחיל.',
-                          style: TextStyle(
+                          '${l10n.brokerToolsScreen23d1f112}'
+                          '${l10n.brokerToolsScreenE0706866}',
+                          style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13.5,
                             height: 1.4,
@@ -275,6 +277,7 @@ class _SyncStatusBar extends StatelessWidget {
       builder: (context, ok, _) {
         // Unknown yet (no push this session) → stay quiet.
         if (ok == null) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context)!;
         final synced = ok == true;
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -290,7 +293,9 @@ class _SyncStatusBar extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                synced ? 'הנתונים מגובים בענן' : 'מקומי בלבד — אין חיבור לענן',
+                synced
+                    ? l10n.brokerToolsScreenA4809695
+                    : l10n.brokerToolsScreenE2adc4d9,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

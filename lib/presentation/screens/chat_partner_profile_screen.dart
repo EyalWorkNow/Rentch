@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/design/design_system.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
@@ -91,9 +92,10 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
 
   Future<void> _sharePartner() async {
     final p = widget.property;
+    final l10n = AppLocalizations.of(context)!;
     final text = p != null
-        ? '${widget.partnerName} · ${p.city} — דרך Rently'
-        : '${widget.partnerName} — דרך Rently';
+        ? l10n.chatPartnerProfileScreenF0d12f45(widget.partnerName, p.city)
+        : l10n.chatPartnerProfileScreen025b94a3(widget.partnerName);
     await Share.share(text, subject: widget.partnerName);
   }
 
@@ -112,6 +114,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Default luxury dark palette matching the design reference screenshot
     const bgColor = Color(0xFF0F1318);
     const cardBgColor = Color(0xFF191F28);
@@ -302,7 +305,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                         children: [
                           Expanded(
                             child: _StatCard(
-                              label: 'הודעות',
+                              label: l10n.chatPartnerProfileScreen1956aee8,
                               value: _formatNumber(widget.messageCount),
                               bgColor: cardBgColor,
                               borderColor: cardBorderColor,
@@ -311,7 +314,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _StatCard(
-                              label: 'תמונות',
+                              label: l10n.chatPartnerProfileScreenDbac683f,
                               value: widget.sharedImageUrls.length.toString(),
                               bgColor: cardBgColor,
                               borderColor: cardBorderColor,
@@ -320,7 +323,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _StatCard(
-                              label: 'הקלטות',
+                              label: l10n.chatPartnerProfileScreenB151b3b1,
                               value: widget.sharedVoiceCount.toString(),
                               bgColor: cardBgColor,
                               borderColor: cardBorderColor,
@@ -342,9 +345,9 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'מדיה בשיחה',
-                              style: TextStyle(
+                            Text(
+                              l10n.chatPartnerProfileScreen3a232c1e,
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -354,7 +357,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                             if (widget.sharedImageUrls.isEmpty &&
                                 widget.sharedVoiceCount == 0)
                               Text(
-                                'עדיין לא שותפו תמונות או הקלטות בשיחה.',
+                                l10n.chatPartnerProfileScreen78f089fd,
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w500,
@@ -402,7 +405,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      '${widget.sharedVoiceCount} הקלטות קוליות',
+                                      l10n.chatPartnerProfileScreen7c303765(
+                                          widget.sharedVoiceCount),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
@@ -429,7 +433,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                           ),
                           child: _SettingTile(
                             icon: IconsaxPlusLinear.house_2,
-                            title: 'הדירה בשיחה',
+                            title: l10n.chatPartnerProfileScreen0a303443,
                             trailing: Icon(
                               Icons.chevron_right_rounded,
                               color: Colors.white.withValues(alpha: 0.5),
@@ -455,7 +459,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                             _SettingTile(
                               icon: Icons.block_rounded,
                               iconColor: AppColors.coral,
-                              title: 'חסימת משתמש',
+                              title: l10n.chatPartnerProfileScreen00fe742b,
                               titleColor: AppColors.coral,
                               trailing: const Icon(
                                 Icons.chevron_right_rounded,
@@ -472,7 +476,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                             _SettingTile(
                               icon: IconsaxPlusLinear.trash,
                               iconColor: AppColors.coral,
-                              title: 'מחיקת היסטוריית השיחה',
+                              title: l10n.chatPartnerProfileScreen59f1446c,
                               titleColor: AppColors.coral,
                               trailing: const Icon(
                                 Icons.chevron_right_rounded,
@@ -499,6 +503,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
   }
 
   void _showActionsBottomSheet(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF191F28),
@@ -531,8 +536,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
             if (widget.property != null)
               ListTile(
                 leading: const Icon(Icons.home_rounded, color: Colors.white),
-                title: const Text('פתיחת הדירה',
-                    style: TextStyle(color: Colors.white)),
+                title: Text(l10n.chatPartnerProfileScreen45a6c3ab,
+                    style: const TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openProperty();
@@ -540,8 +545,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.share_rounded, color: Colors.white),
-              title: const Text('שיתוף',
-                  style: TextStyle(color: Colors.white)),
+              title: Text(l10n.chatPartnerProfileScreen32033594,
+                  style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
                 _sharePartner();
@@ -554,23 +559,25 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
   }
 
   void _confirmBlockUser(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF191F28),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          'חסום את "${widget.partnerName}"?',
+          l10n.chatPartnerProfileScreenB5c83bf6(widget.partnerName),
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'המשתמש לא יוכל יותר ליצור איתך קשר או לצפות במודעות שלך.',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          l10n.chatPartnerProfileScreen09fd6568,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('ביטול', style: TextStyle(color: Colors.white60)),
+            child: Text(l10n.chatPartnerProfileScreenA7c55a8d,
+                style: const TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -588,8 +595,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
               if (!context.mounted) return;
               Navigator.pop(context);
             },
-            child: const Text('חסום',
-                style: TextStyle(
+            child: Text(l10n.chatPartnerProfileScreen1257849a,
+                style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -598,23 +605,25 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
   }
 
   void _confirmClearChat(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF191F28),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'מחיקת היסטוריית השיחה',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.chatPartnerProfileScreen59f1446c,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'פעולה זו תמחק את כל ההודעות בשיחה זו. האם להמשיך?',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          l10n.chatPartnerProfileScreen887fd210,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('ביטול', style: TextStyle(color: Colors.white60)),
+            child: Text(l10n.chatPartnerProfileScreenA7c55a8d,
+                style: const TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -627,8 +636,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
               // Signal the chat screen to clear its history, then return to it.
               Navigator.pop(context, 'clear_history');
             },
-            child: const Text('מחק',
-                style: TextStyle(
+            child: Text(l10n.chatPartnerProfileScreen09b6bcca,
+                style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],

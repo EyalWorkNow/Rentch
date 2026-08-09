@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/subscription.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -62,12 +63,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 
-  String _planLabel(String? plan) => switch (plan) {
-        'annual' => 'מסלול שנתי (RENTLY PRO)',
-        'monthly' => 'מסלול חודשי (RENTLY PRO)',
-        'vip' => 'מסלול PRO MAX VIP',
-        _ => 'מסלול RENTLY PRO',
-      };
+  String _planLabel(String? plan) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (plan) {
+      'annual' => l10n.subscriptionScreenF29b6ff9,
+      'monthly' => l10n.subscriptionScreen73934490,
+      'vip' => l10n.subscriptionScreenA4257fc5,
+      _ => l10n.subscriptionScreenB18c066f,
+    };
+  }
 
   Future<void> _openInvoice(String rawUrl) async {
     final uri = Uri.tryParse(rawUrl.trim());
@@ -79,6 +83,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _cancel() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -86,24 +91,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         child: AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text(
-            'לבטל את המנוי?',
-            style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+          title: Text(
+            l10n.subscriptionScreen2b7d5edc,
+            style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
           ),
-          content: const Text(
-            'המנוי יישאר פעיל עד סוף תקופת החיוב הנוכחית, ולאחר מכן לא יחודש.',
-            style: TextStyle(color: Color(0xFF64748B), height: 1.5),
+          content: Text(
+            l10n.subscriptionScreenD9eefdcc,
+            style: const TextStyle(color: Color(0xFF64748B), height: 1.5),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('חזרה', style: TextStyle(color: Color(0xFF64748B))),
+              child: Text(l10n.subscriptionScreen10a2352b,
+                  style: const TextStyle(color: Color(0xFF64748B))),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text(
-                'ביטול מנוי',
-                style: TextStyle(color: AppColors.coral, fontWeight: FontWeight.bold),
+              child: Text(
+                l10n.subscriptionScreen00a5e771,
+                style: const TextStyle(color: AppColors.coral, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -111,11 +117,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       ),
     );
     if (confirmed != true) return;
-    await _run(AwsApiClient.instance.cancelSubscription(), 'המנוי יבוטל בסוף התקופה');
+    await _run(AwsApiClient.instance.cancelSubscription(),
+        l10n.subscriptionScreen6ca6bd18);
   }
 
   Future<void> _resume() async {
-    await _run(AwsApiClient.instance.resumeSubscription(), 'המנוי חודש בהצלחה');
+    final l10n = AppLocalizations.of(context)!;
+    await _run(
+        AwsApiClient.instance.resumeSubscription(), l10n.subscriptionScreenA3c4c747);
   }
 
   Future<void> _run(Future<void> action, String okMessage) async {
@@ -129,7 +138,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _snack(okMessage, ok: true);
     } catch (_) {
       if (!mounted) return;
-      _snack('שגיאה. נסו שוב.');
+      _snack(AppLocalizations.of(context)!.subscriptionScreenA8ba6aa6);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -222,6 +231,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildNoSubscription() {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -249,9 +259,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'אין מנוי פעיל',
-            style: TextStyle(
+          Text(
+            l10n.subscriptionScreen3c4641b6,
+            style: const TextStyle(
               color: Color(0xFF0F172A),
               fontSize: 26,
               fontWeight: FontWeight.w900,
@@ -259,9 +269,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'שלוש דירות ראשונות חינם. לפרסום דירות ללא הגבלה וגישה לכל האפשרויות — הצטרפו ל-RENTLY PRO.',
-            style: TextStyle(
+          Text(
+            l10n.subscriptionScreen1abb5cf0,
+            style: const TextStyle(
               color: Color(0xFF64748B),
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -282,13 +292,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 width: 1,
               ),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                _FeatureHighlightRow(label: 'פרסום דירות ללא הגבלה'),
-                SizedBox(height: 12),
-                _FeatureHighlightRow(label: '13-30 צילומי 360 וסיור וירטואלי'),
-                SizedBox(height: 12),
-                _FeatureHighlightRow(label: 'סינון שוכרים חכם ב-AI ובוסטים'),
+                _FeatureHighlightRow(label: l10n.subscriptionScreen74b0f662),
+                const SizedBox(height: 12),
+                _FeatureHighlightRow(label: l10n.subscriptionScreen6e6d4e06),
+                const SizedBox(height: 12),
+                _FeatureHighlightRow(label: l10n.subscriptionScreen6b0e2fd9),
               ],
             ),
           ),
@@ -318,20 +328,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'בחירת מסלול RENTLY PRO',
-                        style: TextStyle(
+                        l10n.subscriptionScreenA324e706,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.2,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(
+                      const SizedBox(width: 8),
+                      const Icon(
                         Icons.arrow_back_rounded,
                         color: Colors.white,
                         size: 20,
@@ -348,6 +358,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildActive(Subscription sub) {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -359,9 +370,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _buildAction(sub),
         if (_invoices.isNotEmpty) ...[
           const SizedBox(height: 32),
-          const Text(
-            'חשבוניות וקבלות',
-            style: TextStyle(
+          Text(
+            l10n.subscriptionScreen7aa12af9,
+            style: const TextStyle(
               color: Color(0xFF0F172A),
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -384,8 +395,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildAction(Subscription sub) {
+    final l10n = AppLocalizations.of(context)!;
     final canceling = sub.cancelAtPeriodEnd;
-    final label = canceling ? 'חידוש מנוי' : 'ביטול מנוי';
+    final label = canceling
+        ? l10n.subscriptionScreen680ede0e
+        : l10n.subscriptionScreen00a5e771;
     final color = canceling ? const Color(0xFF4F46E5) : AppColors.coral;
     return SizedBox(
       width: double.infinity,
@@ -422,11 +436,12 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final (label, color, bg) = sub.cancelAtPeriodEnd
-        ? ('מבוטל בסוף התקופה', const Color(0xFFEA580C), const Color(0xFFFFEDD5))
+        ? (l10n.subscriptionScreen6b44102c, const Color(0xFFEA580C), const Color(0xFFFFEDD5))
         : sub.entitled
-            ? ('מנוי פעיל', const Color(0xFF16A34A), const Color(0xFFDCFCE7))
-            : ('ללא מנוי', const Color(0xFF64748B), const Color(0xFFF1F5F9));
+            ? (l10n.subscriptionScreen09900e25, const Color(0xFF16A34A), const Color(0xFFDCFCE7))
+            : (l10n.subscriptionScreen98e268e7, const Color(0xFF64748B), const Color(0xFFF1F5F9));
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -471,6 +486,7 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -517,14 +533,16 @@ class _InfoCard extends StatelessWidget {
           const SizedBox(height: 16),
           _Line(
             icon: IconsaxPlusLinear.calendar_1,
-            label: sub.cancelAtPeriodEnd ? 'בתוקף עד' : 'חיוב הבא',
+            label: sub.cancelAtPeriodEnd
+                ? l10n.subscriptionScreen03baa387
+                : l10n.subscriptionScreenD4bd0d5c,
             value: date(sub.currentPeriodEnd),
           ),
           if (sub.card != null) ...[
             const SizedBox(height: 14),
             _Line(
               icon: IconsaxPlusLinear.card,
-              label: 'כרטיס',
+              label: l10n.subscriptionScreenA0d9b485,
               value: '${sub.card!.brand} •••• ${sub.card!.last4}'.trim(),
             ),
           ],

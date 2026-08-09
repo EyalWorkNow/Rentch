@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class ProfileCard extends StatefulWidget {
@@ -126,6 +127,7 @@ class _ProfileCardState extends State<ProfileCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<DatingProvider>();
     final isLiking = widget.horizontalOffsetPercentage > 10;
     final isPassing = widget.horizontalOffsetPercentage < -10;
@@ -314,7 +316,9 @@ class _ProfileCardState extends State<ProfileCard> {
                       child: Transform.scale(
                         scale: (widget.horizontalOffsetPercentage.abs() / 40.0).clamp(0.85, 1.2),
                         child: _SwipeBadge(
-                          label: widget.horizontalOffsetPercentage > 0 ? '♥ מתאים' : 'דלג',
+                          label: widget.horizontalOffsetPercentage > 0
+                              ? l10n.profileCardB9fe4671
+                              : l10n.profileCard80a413c5,
                           color: widget.horizontalOffsetPercentage > 0 ? AppColors.primary : AppColors.coral,
                         ),
                       ),
@@ -437,22 +441,23 @@ class _ProfileCardState extends State<ProfileCard> {
                           children: [
                             _StatPill(
                                 icon: IconsaxPlusLinear.building,
-                                label: '${p.roomsLabel} חדרים'),
+                                label: l10n.profileCardF0f71ca3(p.roomsLabel)),
                             const SizedBox(width: 6),
                             _StatPill(
                                 icon: IconsaxPlusLinear.maximize_3,
-                                label: '${p.sizeM2} מ"ר'),
+                                label: l10n.profileCardD8b6113c(p.sizeM2)),
                             if (p.floor.isNotEmpty) ...[
                               const SizedBox(width: 6),
                               _StatPill(
                                   icon: IconsaxPlusLinear.layer,
-                                  label: 'קומה ${p.floor}'),
+                                  label: l10n.profileCard77d9ac8f(p.floor)),
                             ],
                             if (p.sizeM2 > 0) ...[
                               const SizedBox(width: 6),
                               _StatPill(
                                 icon: IconsaxPlusLinear.moneys,
-                                label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
+                                label: l10n.profileCardF069621c(
+                                    (p.price / p.sizeM2).round()),
                               ),
                             ],
                           ],
@@ -580,7 +585,9 @@ class _AgencyBadge extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Text(
-            agencyListing ? 'תיווך מאומת' : 'בעלים פרטי',
+            agencyListing
+                ? AppLocalizations.of(context)!.profileCardEa9a5392
+                : AppLocalizations.of(context)!.profileCard6fd38fe6,
             style: const TextStyle(
               color: AppColors.navy,
               fontWeight: FontWeight.w800,
@@ -605,14 +612,14 @@ class _VerifiedListingBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(IconsaxPlusLinear.verify, color: Colors.white, size: 13),
-          SizedBox(width: 5),
+          const Icon(IconsaxPlusLinear.verify, color: Colors.white, size: 13),
+          const SizedBox(width: 5),
           Text(
-            'מאומתת',
-            style: TextStyle(
+            AppLocalizations.of(context)!.profileCard9077b7f7,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w900,
               fontSize: 11,
@@ -799,7 +806,7 @@ class _MatchScoreBadge extends StatelessWidget {
           RentlyIcon(IconsaxPlusLinear.star_1, size: 11, color: color),
           const SizedBox(width: 4),
           Text(
-            '$score% התאמה',
+            AppLocalizations.of(context)!.profileCard2af4ac1c(score),
             style: TextStyle(
               color: color,
               fontSize: 11,
@@ -836,7 +843,7 @@ class _BoostBadge extends StatelessWidget {
               size: 11, color: color),
           const SizedBox(width: 4),
           Text(
-            ultra ? 'Ultra' : 'מקודם',
+            ultra ? 'Ultra' : AppLocalizations.of(context)!.profileCard8342a66c,
             style: TextStyle(
               color: color,
               fontSize: 10,
@@ -864,12 +871,12 @@ class _SaleBadge extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          RentlyIcon(IconsaxPlusLinear.tag, size: 11, color: color),
-          SizedBox(width: 4),
+        children: [
+          const RentlyIcon(IconsaxPlusLinear.tag, size: 11, color: color),
+          const SizedBox(width: 4),
           Text(
-            'למכירה',
-            style: TextStyle(
+            AppLocalizations.of(context)!.profileCard609fac18,
+            style: const TextStyle(
               color: color,
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -898,7 +905,9 @@ class _PriceContextBadge extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
       child: Text(
-        isBelow ? 'מחיר מעולה' : 'מחיר מעל הממוצע',
+        isBelow
+            ? AppLocalizations.of(context)!.profileCard6f21a73d
+            : AppLocalizations.of(context)!.profileCard3af1f153,
         style: TextStyle(
           color: color,
           fontSize: 10,
@@ -916,6 +925,7 @@ class _MoreOptionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<DatingProvider>();
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
       decoration: BoxDecoration(
@@ -937,7 +947,7 @@ class _MoreOptionsSheet extends StatelessWidget {
           const SizedBox(height: 16),
           _OptionTile(
             icon: Icons.flag_outlined,
-            label: 'דיווח על מודעה',
+            label: l10n.profileCardE310e6a5,
             onTap: () {
               Navigator.pop(context);
               _showReportDialog(context, provider);
@@ -946,7 +956,7 @@ class _MoreOptionsSheet extends StatelessWidget {
           const Divider(color: Colors.white12, height: 1),
           _OptionTile(
             icon: Icons.block,
-            label: 'חסום משתמש זה',
+            label: l10n.profileCard90b9bf3d,
             color: AppColors.red,
             onTap: () {
               Navigator.pop(context);
@@ -960,12 +970,13 @@ class _MoreOptionsSheet extends StatelessWidget {
   }
 
   void _showReportDialog(BuildContext context, DatingProvider provider) {
+    final l10n = AppLocalizations.of(context)!;
     final reasons = [
-      'מידע שגוי',
-      'תמונות מזויפות',
-      'תוכן פוגעני',
-      'הונאה',
-      'אחר',
+      l10n.profileCard07c60eb7,
+      l10n.profileCard05a76ba7,
+      l10n.profileCard5a660a20,
+      l10n.profileCard678b6deb,
+      l10n.profileCardCdf4bce0,
     ];
     showDialog(
       context: context,
@@ -973,8 +984,8 @@ class _MoreOptionsSheet extends StatelessWidget {
         textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: AppColors.inkSoft,
-          title:
-              const Text('סיבת הדיווח', style: TextStyle(color: Colors.white)),
+          title: Text(l10n.profileCard356f7af6,
+              style: const TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: reasons.map((reason) {
@@ -986,9 +997,9 @@ class _MoreOptionsSheet extends StatelessWidget {
                   await provider.reportProperty(property.id, reason);
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        duration: Duration(milliseconds: 2500),
-                        content: Text('הדיווח נשלח. תודה.'),
+                      SnackBar(
+                        duration: const Duration(milliseconds: 2500),
+                        content: Text(l10n.profileCard30c55079),
                       ),
                     );
                   }
@@ -1002,6 +1013,7 @@ class _MoreOptionsSheet extends StatelessWidget {
   }
 
   void _showBlockConfirm(BuildContext context, DatingProvider provider) {
+    final l10n = AppLocalizations.of(context)!;
     final ownerName = property.ownerName;
     showDialog(
       context: context,
@@ -1009,17 +1021,17 @@ class _MoreOptionsSheet extends StatelessWidget {
         textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: AppColors.inkSoft,
-          title:
-              const Text('חסימת משתמש', style: TextStyle(color: Colors.white)),
+          title: Text(l10n.profileCard00fe742b,
+              style: const TextStyle(color: Colors.white)),
           content: Text(
-            'האם לחסום את "$ownerName"? כל המודעות שלהם יוסרו מהעדכון שלך.',
+            l10n.profileCard9e821d65(ownerName),
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child:
-                  const Text('ביטול', style: TextStyle(color: Colors.white54)),
+              child: Text(l10n.profileCardA7c55a8d,
+                  style: const TextStyle(color: Colors.white54)),
             ),
             TextButton(
               onPressed: () async {
@@ -1029,13 +1041,13 @@ class _MoreOptionsSheet extends StatelessWidget {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       duration: const Duration(milliseconds: 2500),
-                      content: Text('"$ownerName" נחסם בהצלחה.'),
+                      content: Text(l10n.profileCard367b7d06(ownerName)),
                     ),
                   );
                 }
               },
-              child: const Text('חסום',
-                  style: TextStyle(color: AppColors.red)),
+              child: Text(l10n.profileCard1257849a,
+                  style: const TextStyle(color: AppColors.red)),
             ),
           ],
         ),

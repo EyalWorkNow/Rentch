@@ -5,6 +5,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -77,7 +78,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
             Positioned(
               top: 14,
               left: 14,
-              child: _statusBadge(p),
+              child: _statusBadge(context, p),
             ),
 
             // Top Right Heart / Save Button
@@ -100,9 +101,12 @@ class AtiVoicePropertyCard extends StatelessWidget {
     );
   }
 
-  Widget _statusBadge(RentalProperty p) {
+  Widget _statusBadge(BuildContext context, RentalProperty p) {
     final isSale = p.transactionType == PropertyTransactionType.sale;
-    final label = isSale ? 'למכירה' : 'להשכרה';
+    final l10n = AppLocalizations.of(context)!;
+    final label = isSale
+        ? l10n.atiVoicePropertyCard609fac18
+        : l10n.atiVoicePropertyCardB336259f;
     final dotColor = isSale ? AppColors.coral : const Color(0xFF00FF66);
 
     return ClipRRect(
@@ -182,10 +186,13 @@ class AtiVoicePropertyCard extends StatelessWidget {
   }
 
   Widget _bottomOverlay(BuildContext context, RentalProperty p) {
+    final l10n = AppLocalizations.of(context)!;
     final locationText = p.neighborhood.isNotEmpty
         ? '${p.neighborhood}, ${p.city}'
         : p.city;
-    final floorText = p.floor.isNotEmpty ? 'קומה ${p.floor}' : 'קומה 0';
+    final floorText = p.floor.isNotEmpty
+        ? l10n.atiVoicePropertyCard77d9ac8f(p.floor)
+        : l10n.atiVoicePropertyCard5bf47d1e;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
@@ -303,7 +310,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 GestureDetector(
                   onTap: () => _showWhy(context),
-                  child: _whyRow(_whyText()!),
+                  child: _whyRow(context, _whyText()!),
                 ),
               ],
               const SizedBox(height: 14),
@@ -314,12 +321,12 @@ class AtiVoicePropertyCard extends StatelessWidget {
                   children: [
                     _glassPill(
                       icon: IconsaxPlusLinear.home,
-                      label: '${p.roomsLabel} חדרים',
+                      label: l10n.atiVoicePropertyCardF0f71ca3(p.roomsLabel),
                     ),
                     const SizedBox(width: 8),
                     _glassPill(
                       icon: IconsaxPlusLinear.maximize_3,
-                      label: '${p.sizeM2} מ״ר',
+                      label: l10n.atiVoicePropertyCard615d28b8(p.sizeM2),
                     ),
                     const SizedBox(width: 8),
                     _glassPill(
@@ -334,7 +341,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
                         onTap: () => _showWhy(context),
                         child: _pill(
                           icon: IconsaxPlusBold.magic_star,
-                          label: 'למה דווקא זו?',
+                          label: l10n.atiVoicePropertyCard5e3842ff,
                           accent: true,
                         ),
                       ),
@@ -387,7 +394,8 @@ class AtiVoicePropertyCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'למה אתי בחרה בדירה הזו',
+                      AppLocalizations.of(context)!
+                          .atiVoicePropertyCardDadd9f97,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 17,
@@ -428,7 +436,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
   }
 
   // The visible reason line: ✨ fit% + short "why", tappable for the full card.
-  Widget _whyRow(String why) {
+  Widget _whyRow(BuildContext context, String why) {
     final fit = scored.scorecard?.fitPct;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -448,7 +456,8 @@ class AtiVoicePropertyCard extends StatelessWidget {
               TextSpan(children: [
                 if (fit != null)
                   TextSpan(
-                    text: '$fit% התאמה — ',
+                    text: AppLocalizations.of(context)!
+                        .atiVoicePropertyCard74f4db63(fit),
                     style: const TextStyle(
                         color: Color(0xFF9BEAF0), fontWeight: FontWeight.w800),
                   ),

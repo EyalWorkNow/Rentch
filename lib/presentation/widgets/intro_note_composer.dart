@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/repositories/property_likes_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// A tiny RTL composer that lets a tenant attach a short intro note (≤140 chars)
@@ -29,10 +30,13 @@ class IntroNoteComposer extends StatefulWidget {
   final bool autofocus;
 
   /// The starter chips offered to the tenant.
-  static const List<String> starterChips = <String>[
-    'משפחה שקטה, חוזה ארוך',
-    'אישור הכנסה מוכן',
-  ];
+  static List<String> starterChips(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return <String>[
+      l10n.introNoteComposerF2616667,
+      l10n.introNoteComposer7d2e4fae,
+    ];
+  }
 
   /// The hard character limit on the note (mirrors the repository field).
   static int get maxLength => PropertyLikesRepository.introMessageMaxLength;
@@ -78,6 +82,7 @@ class _IntroNoteComposerState extends State<IntroNoteComposer> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final remaining = IntroNoteComposer.maxLength - _text.text.characters.length;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -85,25 +90,25 @@ class _IntroNoteComposerState extends State<IntroNoteComposer> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'הוסיפו מילה קצרה על עצמכם',
-            style: TextStyle(
+          Text(
+            l10n.introNoteComposerEf3d8df0,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'משפט אחד שגורם לבעל הדירה לשים לב אליכם (לא חובה).',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          Text(
+            l10n.introNoteComposer76250a91,
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final chip in IntroNoteComposer.starterChips)
+              for (final chip in IntroNoteComposer.starterChips(context))
                 ActionChip(
                   label: Text(chip),
                   labelStyle: TextStyle(
@@ -130,8 +135,8 @@ class _IntroNoteComposerState extends State<IntroNoteComposer> {
               color: AppColors.textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: 'למשל: זוג צעיר, ללא חיות, חוזה לשנתיים',
-              counterText: '$remaining תווים נותרו',
+              hintText: l10n.introNoteComposer6a9bc309,
+              counterText: l10n.introNoteComposerBec7436c(remaining),
               filled: true,
               fillColor: AppColors.surface,
               border: OutlineInputBorder(

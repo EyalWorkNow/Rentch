@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -25,14 +26,16 @@ class PanoramaSplatView extends StatefulWidget {
   const PanoramaSplatView({
     super.key,
     required this.splatUrl,
-    this.title = 'סיור תלת-מימד',
+    this.title,
     this.waypoints = const [],
     this.showChrome = true,
   });
 
   /// HTTPS URL of the reconstructed splat (`.spz` preferred, `.ply` ok).
   final String splatUrl;
-  final String title;
+
+  /// Optional title override; falls back to the localized default when null.
+  final String? title;
 
   /// When false, hides this view's own top bar (close/title) and the teleport
   /// waypoint controls — used when embedded inside a host that owns the chrome
@@ -48,7 +51,7 @@ class PanoramaSplatView extends StatefulWidget {
   static Future<void> open(
     BuildContext context,
     String splatUrl, {
-    String title = 'סיור תלת-מימד',
+    String? title,
     List<SplatWaypoint> waypoints = const [],
   }) {
     return Navigator.of(context).push(
@@ -182,19 +185,21 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final effectiveTitle = widget.title ?? l10n.panoramaSplatViewA2007314;
     if (_failed) {
       return Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
           child: Stack(
             children: [
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(32),
                   child: Text(
-                    'לא ניתן לטעון את הסיור התלת-מימדי במכשיר זה.',
+                    l10n.panoramaSplatView3b63a83c,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ),
               ),
@@ -230,7 +235,7 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          widget.title,
+                          effectiveTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -263,13 +268,13 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
                     children: [
                       _navButton(
                         icon: IconsaxPlusLinear.arrow_right_3,
-                        label: 'אחורה',
+                        label: l10n.panoramaSplatView7fa2edab,
                         onTap: () => _step(-1),
                       ),
                       const SizedBox(width: 16),
                       _navButton(
                         icon: IconsaxPlusLinear.arrow_left_2,
-                        label: 'קדימה',
+                        label: l10n.panoramaSplatView1bb60018,
                         onTap: () => _step(1),
                       ),
                     ],

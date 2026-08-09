@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -70,24 +71,26 @@ class _RemindersScreenState extends State<RemindersScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _AddReminderSheet(),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
 
     await _notifications.scheduleReminder(
       id: result.id,
-      title: 'תזכורת',
+      title: l10n.remindersScreen409fc735,
       body: result.text,
       when: result.when,
     );
     if (mounted) setState(() {});
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('התזכורת נשמרה')),
+        SnackBar(content: Text(l10n.remindersScreenF6789864)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -97,9 +100,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
           surfaceTintColor: AppColors.background,
           elevation: 0,
           centerTitle: true,
-          title: const Text(
-            'תזכורות',
-            style: TextStyle(
+          title: Text(
+            l10n.remindersScreenCa25d18a,
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -111,9 +114,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.textOnPrimary,
           icon: const Icon(Icons.add, size: 26),
-          label: const Text(
-            'תזכורת חדשה',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          label: Text(
+            l10n.remindersScreen1d935aa3,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
         ),
         body: Consumer<DatingProvider>(
@@ -123,9 +126,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
-                _intro(),
+                _intro(l10n),
                 const SizedBox(height: 20),
-                _sectionTitle('סיום חוזה'),
+                _sectionTitle(l10n.remindersScreen9d1d367d),
                 const SizedBox(height: 8),
                 if (_scheduling)
                   const Padding(
@@ -135,12 +138,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ),
                   )
                 else if (leases.isEmpty)
-                  _emptyCard('אין חוזים חתומים כרגע. כשתחתום על חוזה, '
-                      'נזכיר לך חודש ושבוע לפני שהוא מסתיים.')
+                  _emptyCard(l10n.remindersScreen3e064b53 +
+                      l10n.remindersScreen4c157f3a)
                 else
-                  ...leases.map(_leaseCard),
+                  ...leases.map((c) => _leaseCard(l10n, c)),
                 const SizedBox(height: 28),
-                _sectionTitle('תזכורות שלי'),
+                _sectionTitle(l10n.remindersScreen3c8688c4),
                 const SizedBox(height: 8),
                 _ManualRemindersList(notifications: _notifications),
               ],
@@ -151,7 +154,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Widget _intro() {
+  Widget _intro(AppLocalizations l10n) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -159,9 +162,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
         color: AppColors.primaryLight2,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Text(
-        'כאן לא שוכחים. נזכיר לך מתי חוזה עומד להסתיים ומתי לגבות שכר דירה.',
-        style: TextStyle(
+      child: Text(
+        l10n.remindersScreen4ae2e566,
+        style: const TextStyle(
           fontSize: 18,
           height: 1.5,
           color: AppColors.textPrimary,
@@ -182,22 +185,24 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Widget _leaseCard(RentalContract c) {
+  Widget _leaseCard(AppLocalizations l10n, RentalContract c) {
     final days = c.endDate.difference(DateTime.now()).inDays;
-    final title = c.propertyTitle.trim().isEmpty ? 'הדירה' : c.propertyTitle.trim();
+    final title = c.propertyTitle.trim().isEmpty
+        ? l10n.remindersScreen3b042ffd
+        : c.propertyTitle.trim();
     final String when;
     if (days < 0) {
-      when = 'החוזה כבר הסתיים';
+      when = l10n.remindersScreenBf84b357;
     } else if (days == 0) {
-      when = 'החוזה מסתיים היום';
+      when = l10n.remindersScreen9d434107;
     } else if (days == 1) {
-      when = 'מסתיים מחר';
+      when = l10n.remindersScreen4d2730e7;
     } else {
-      when = 'מסתיים בעוד $days ימים';
+      when = l10n.remindersScreenC67b1a11(days);
     }
     return _card(
       icon: Icons.event_available_outlined,
-      title: 'החוזה בדירה "$title"',
+      title: l10n.remindersScreenD66ef141(title),
       subtitle: '$when (${_fmtDate(c.endDate)})',
     );
   }
@@ -292,6 +297,9 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
   }
 
   void _reload() {
+    // NOTE: fallback only, kept as a plain literal — this runs from initState
+    // (before AppLocalizations.of(context) is safe to call) and is normally
+    // unreachable since every reminder this app schedules sets a title/body.
     _future = widget.notifications.pending().then((all) => all
         .where((p) => p.id < NotificationService.leaseIdBase)
         .map((p) => _PendingRow(id: p.id, text: p.body ?? p.title ?? 'תזכורת'))
@@ -313,10 +321,11 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
       builder: (_) => _AddReminderSheet(initialText: row.text),
     );
     if (result == null || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     await widget.notifications.cancel(row.id);
     await widget.notifications.scheduleReminder(
       id: result.id,
-      title: 'תזכורת',
+      title: l10n.remindersScreen409fc735,
       body: result.text,
       when: result.when,
     );
@@ -335,7 +344,9 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
     if (!mounted) return;
     setState(_reload);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('התזכורת הועברה לארכיון')),
+      SnackBar(
+          content:
+              Text(AppLocalizations.of(context)!.remindersScreenD0680cb9)),
     );
   }
 
@@ -343,6 +354,7 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return FutureBuilder<List<_PendingRow>>(
       future: _future,
       builder: (context, snap) {
@@ -356,9 +368,9 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.borderLight),
             ),
-            child: const Text(
-              'אין תזכורות אישיות. אפשר להוסיף, למשל: "לגבות שכר ב-10 בחודש".',
-              style: TextStyle(
+            child: Text(
+              l10n.remindersScreen0ee389c1,
+              style: const TextStyle(
                 fontSize: 16,
                 height: 1.5,
                 color: AppColors.textSecondary,
@@ -397,37 +409,38 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert,
                           color: AppColors.textSecondary),
-                      tooltip: 'פעולות',
+                      tooltip: l10n.remindersScreenC6e2f375,
                       onSelected: (v) {
                         if (v == 'edit') _edit(r);
                         if (v == 'archive') _archive(r);
                         if (v == 'delete') _delete(r.id);
                       },
-                      itemBuilder: (_) => const [
+                      itemBuilder: (_) => [
                         PopupMenuItem(
                           value: 'edit',
                           child: Row(children: [
-                            Icon(Icons.edit_outlined, size: 20),
-                            SizedBox(width: 10),
-                            Text('עריכה'),
+                            const Icon(Icons.edit_outlined, size: 20),
+                            const SizedBox(width: 10),
+                            Text(l10n.remindersScreen39fe2593),
                           ]),
                         ),
                         PopupMenuItem(
                           value: 'archive',
                           child: Row(children: [
-                            Icon(Icons.archive_outlined, size: 20),
-                            SizedBox(width: 10),
-                            Text('העברה לארכיון'),
+                            const Icon(Icons.archive_outlined, size: 20),
+                            const SizedBox(width: 10),
+                            Text(l10n.remindersScreenEd0727e5),
                           ]),
                         ),
                         PopupMenuItem(
                           value: 'delete',
                           child: Row(children: [
-                            Icon(Icons.delete_outline,
+                            const Icon(Icons.delete_outline,
                                 size: 20, color: AppColors.coral),
-                            SizedBox(width: 10),
-                            Text('מחיקה',
-                                style: TextStyle(color: AppColors.coral)),
+                            const SizedBox(width: 10),
+                            Text(l10n.remindersScreen7c8173fa,
+                                style:
+                                    const TextStyle(color: AppColors.coral)),
                           ]),
                         ),
                       ],
@@ -460,15 +473,28 @@ class _AddReminderSheet extends StatefulWidget {
 
 class _AddReminderSheetState extends State<_AddReminderSheet> {
   late final TextEditingController _text = TextEditingController(
-    text: widget.initialText ?? 'לגבות שכר דירה',
+    text: widget.initialText ?? '',
   );
   late DateTime _when = widget.initialWhen ?? _defaultWhen();
+  bool _defaultTextSet = false;
 
   /// Default to the 10th of next month at 9:00 — the common rent-due cadence.
   static DateTime _defaultWhen() {
     final now = DateTime.now();
     final base = DateTime(now.year, now.month, 10, 9);
     return base.isAfter(now) ? base : DateTime(now.year, now.month + 1, 10, 9);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Fill the localized default suggestion once, only for a brand-new
+    // (non-edit) reminder — can't do this at field-init time since it needs
+    // BuildContext, which isn't ready until after initState.
+    if (!_defaultTextSet && widget.initialText == null) {
+      _defaultTextSet = true;
+      _text.text = AppLocalizations.of(context)!.remindersScreen6ee55398;
+    }
   }
 
   @override
@@ -513,6 +539,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Directionality(
       textDirection: Directionality.of(context),
@@ -526,19 +553,19 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'תזכורת חדשה',
+            Text(
+              l10n.remindersScreen1d935aa3,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 21,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'מה להזכיר לך?',
-              style: TextStyle(
+            Text(
+              l10n.remindersScreen8dcb89b4,
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -551,7 +578,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: AppColors.cloud,
-                hintText: 'למשל: לגבות שכר ב-10 בחודש',
+                hintText: l10n.remindersScreen634d3915,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
@@ -577,7 +604,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'מתי: ${_fmt(_when)}',
+                        l10n.remindersScreenFa3782fd(_fmt(_when)),
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
@@ -602,9 +629,9 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text(
-                  'שמירת תזכורת',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                child: Text(
+                  l10n.remindersScreen276878c2,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

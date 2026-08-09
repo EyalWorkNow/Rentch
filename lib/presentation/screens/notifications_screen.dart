@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/data/models/app_notification.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -62,15 +63,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // Self-serve check: push a real notification to THIS device via the backend, so
   // the user can confirm phone pushes actually arrive.
   Future<void> _sendTest() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final res = await AwsApiClient.instance.post('/notifications/test', const {});
       final tokens = (res['tokensRegistered'] as num?)?.toInt() ?? 0;
       final pushed = (res['pushed'] as num?)?.toInt() ?? 0;
       final msg = tokens == 0
-          ? 'המכשיר עוד לא רשום להתראות 📵 סגור ופתח מחדש את האפליקציה ונסה שוב'
+          ? l10n.notificationsScreen86ed07cf
           : pushed > 0
-              ? 'שלחתי התראה 🔔 אמורה לקפוץ תוך רגע (נשלח ל-$pushed מכשירים)'
-              : 'הטוקן רשום אבל השליחה נכשלה — כנראה טוקן ישן, סגור ופתח את האפליקציה';
+              ? l10n.notificationsScreen72b5771b(pushed)
+              : l10n.notificationsScreen34803854;
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(msg)));
@@ -78,7 +80,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('לא הצלחתי לשלוח כרגע, נסה שוב')));
+            SnackBar(content: Text(l10n.notificationsScreen5c3916c3)));
       }
     }
   }
@@ -101,6 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -111,9 +114,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           surfaceTintColor: Colors.white,
           centerTitle: false,
           iconTheme: const IconThemeData(color: AppColors.textPrimary),
-          title: const Text(
-            'התראות',
-            style: TextStyle(
+          title: Text(
+            l10n.notificationsScreenA8e71c4c,
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w900,
@@ -121,7 +124,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           actions: [
             IconButton(
-              tooltip: 'שליחת התראת בדיקה',
+              tooltip: l10n.notificationsScreen972c5de2,
               icon: const Icon(Icons.notifications_active_outlined),
               onPressed: _sendTest,
             ),
@@ -129,7 +132,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               TextButton(
                 onPressed: _markAllRead,
                 child: Text(
-                  'סמן הכל כנקרא',
+                  l10n.notificationsScreenFc4def53,
                   style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 15,
@@ -149,21 +152,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildBody() {
+    final l10n = AppLocalizations.of(context)!;
     if (_loading) {
       return Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
     if (_error && _items.isEmpty) {
       return _StateMessage(
         icon: IconsaxPlusLinear.wifi_square,
-        title: 'לא הצלחנו לטעון התראות',
-        subtitle: 'משכו למטה כדי לנסות שוב',
+        title: l10n.notificationsScreen40381be4,
+        subtitle: l10n.notificationsScreenB8dcc665,
       );
     }
     if (_items.isEmpty) {
       return _StateMessage(
         icon: IconsaxPlusLinear.notification,
-        title: 'אין התראות חדשות',
-        subtitle: 'כאן יופיעו עדכונים על התאמות, הודעות ועוד',
+        title: l10n.notificationsScreen838add51,
+        subtitle: l10n.notificationsScreenD3556461,
       );
     }
     return ListView.separated(
@@ -389,7 +393,7 @@ class _NotificationTile extends StatelessWidget {
                     ],
                     const SizedBox(height: 6),
                     Text(
-                      _relativeTime(notification.createdAt),
+                      _relativeTime(AppLocalizations.of(context)!, notification.createdAt),
                       style: const TextStyle(
                         color: AppColors.textDisabled,
                         fontSize: 13,
@@ -490,13 +494,13 @@ Color _typeAccent(String type) => switch (type) {
       _ => AppColors.primary,
     };
 
-String _relativeTime(DateTime t) {
+String _relativeTime(AppLocalizations l10n, DateTime t) {
   final diff = DateTime.now().difference(t);
-  if (diff.inMinutes < 1) return 'עכשיו';
-  if (diff.inMinutes < 60) return 'לפני ${diff.inMinutes} דק׳';
-  if (diff.inHours < 24) return 'לפני ${diff.inHours} שע׳';
-  if (diff.inDays == 1) return 'אתמול';
-  if (diff.inDays < 7) return 'לפני ${diff.inDays} ימים';
-  if (diff.inDays < 14) return 'לפני שבוע';
-  return 'לפני ${(diff.inDays / 7).round()} שבועות';
+  if (diff.inMinutes < 1) return l10n.notificationsScreenA26f165a;
+  if (diff.inMinutes < 60) return l10n.notificationsScreen5fede189(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.notificationsScreen18f294e5(diff.inHours);
+  if (diff.inDays == 1) return l10n.notificationsScreenBe285a01;
+  if (diff.inDays < 7) return l10n.notificationsScreen0cfbdf39(diff.inDays);
+  if (diff.inDays < 14) return l10n.notificationsScreen3e4eb262;
+  return l10n.notificationsScreen920434a5((diff.inDays / 7).round());
 }
