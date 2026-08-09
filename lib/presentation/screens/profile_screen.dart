@@ -1850,13 +1850,13 @@ class _LandlordProfileScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => _SettingsSubPage(
-                    title: l10n.profileScreen47cfdefb,
+                    title: (l10n) => l10n.profileScreen47cfdefb,
                     items: [
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.notification,
-                        title: l10n.profileScreen48918f07,
+                        title: (l10n) => l10n.profileScreen48918f07,
                         switchKey: _SettingsSubPageState.kNotifSwitchKey,
-                        subtitle: l10n.profileScreen8b61b51f,
+                        subtitle: (l10n) => l10n.profileScreen8b61b51f,
                         isSwitch: true,
                       ),
                       // (Removed the "email notifications" and "tenant-inquiries"
@@ -1865,8 +1865,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       // toggle above is the real FCM push control.)
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.trash,
-                        title: l10n.profileScreenC157595f,
-                        subtitle: l10n.profileScreen0d9638f2,
+                        title: (l10n) => l10n.profileScreenC157595f,
+                        subtitle: (l10n) => l10n.profileScreen0d9638f2,
                         color: Colors.red.shade700,
                         onTap: onDeleteAccount,
                       ),
@@ -1888,12 +1888,12 @@ class _LandlordProfileScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => _SettingsSubPage(
-                    title: l10n.profileScreen69129dd5,
+                    title: (l10n) => l10n.profileScreen69129dd5,
                     items: [
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.message_question,
-                        title: l10n.profileScreenA6866ac6,
-                        subtitle: l10n.profileScreenB2dfd8d3,
+                        title: (l10n) => l10n.profileScreenA6866ac6,
+                        subtitle: (l10n) => l10n.profileScreenB2dfd8d3,
                         onTap: () => launchUrl(
                           Uri.parse('https://rently.app/help'),
                           mode: LaunchMode.externalApplication,
@@ -1901,8 +1901,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.call_calling,
-                        title: l10n.profileScreen2d8ad04f,
-                        subtitle: l10n.profileScreen3a95de8e,
+                        title: (l10n) => l10n.profileScreen2d8ad04f,
+                        subtitle: (l10n) => l10n.profileScreen3a95de8e,
                         onTap: () => launchUrl(
                           Uri.parse('mailto:support@rently.app'),
                           mode: LaunchMode.externalApplication,
@@ -1910,8 +1910,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.document_text,
-                        title: l10n.profileScreenE3467f8d,
-                        subtitle: l10n.profileScreenC281b27a,
+                        title: (l10n) => l10n.profileScreenE3467f8d,
+                        subtitle: (l10n) => l10n.profileScreenC281b27a,
                         onTap: () => launchUrl(
                           Uri.parse('https://rently.app/privacy'),
                           mode: LaunchMode.externalApplication,
@@ -3111,7 +3111,11 @@ class _SettingsSubPage extends StatefulWidget {
     required this.items,
   });
 
-  final String title;
+  // Resolved with the CURRENT AppLocalizations inside build() (not captured
+  // once when this route was pushed), so switching the app language while
+  // already on this screen — or on a screen above it in the nav stack —
+  // updates the text immediately instead of staying stale.
+  final String Function(AppLocalizations) title;
   final List<_SubPageSettingItem> items;
 
   @override
@@ -3219,6 +3223,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.cloud,
       body: SafeArea(
@@ -3234,7 +3239,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                 children: [
                   const SizedBox(width: 44), // Balancer
                   Text(
-                    widget.title,
+                    widget.title(l10n),
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 20,
@@ -3319,7 +3324,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      item.title,
+                                      item.title(l10n),
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
@@ -3329,7 +3334,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                                     if (item.subtitle != null) ...[
                                       const SizedBox(height: 2),
                                       Text(
-                                        item.subtitle!,
+                                        item.subtitle!(l10n),
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: AppColors.textSecondary,
@@ -3570,8 +3575,8 @@ class _SubPageSettingItem {
   }) : _switchKey = switchKey;
 
   final IconData icon;
-  final String title;
-  final String? subtitle;
+  final String Function(AppLocalizations) title;
+  final String Function(AppLocalizations)? subtitle;
   final bool isSwitch;
   final bool initialSwitchValue;
   final VoidCallback? onTap;
@@ -3579,9 +3584,9 @@ class _SubPageSettingItem {
   final String? _switchKey;
 
   // A stable, locale-independent identity for switch persistence/matching.
-  // Falls back to [title] for items that don't pass one explicitly (fine as
-  // long as that title isn't localized/variable).
-  String get switchKey => _switchKey ?? title;
+  // Falls back to the icon's identity for items that don't pass one
+  // explicitly (title is now a localized builder, not a stable string).
+  String get switchKey => _switchKey ?? 'icon_${icon.codePoint}';
 }
 
 class _SettingsTile extends StatelessWidget {
