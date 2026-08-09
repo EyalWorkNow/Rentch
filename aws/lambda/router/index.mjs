@@ -1083,6 +1083,42 @@ function stampOwner(tableKey, body, uid) {
   // two creation paths this actually is.
 }
 
+// No server-side validation existed at all for property create/update — the
+// client's JSON body was trusted completely (required fields, numeric
+// sanity, status enum). A malformed/garbage price or size doesn't corrupt
+// DynamoDB itself (schemaless), but it DOES corrupt sort/filter/ranking logic
+// downstream, and an unrecognized 'status' value could slip a listing past
+// every status-based visibility filter in the app. Returns an error json
+// response if invalid, else null (proceed). Deliberately loose — this closes
+// real correctness bugs, not a strict schema; existing legitimate writes
+// (e.g. drafts with price 0) must keep working.
+const _VALID_PROPERTY_STATUSES = new Set(['draft', 'active', 'paused', 'rented', 'removed']);
+function validatePropertyPayload(body) {
+  const numField = (key, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) => {
+    if (body[key] === undefined || body[key] === null) return null;
+    const n = Number(body[key]);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      return `${key} must be a finite number between ${min} and ${max}`;
+    }
+    return null;
+  };
+  const errors = [
+    numField('price', { max: 100_000_000 }),
+    numField('rooms', { max: 100 }),
+    numField('sizeM2', { max: 100_000 }),
+    numField('lat', { min: -90, max: 90 }),
+    numField('lon', { min: -180, max: 180 }),
+  ].filter(Boolean);
+  if (body.status !== undefined && body.status !== null &&
+      !_VALID_PROPERTY_STATUSES.has(String(body.status))) {
+    errors.push(`status must be one of ${[..._VALID_PROPERTY_STATUSES].join('|')}`);
+  }
+  if (errors.length) {
+    return json(400, { message: 'Invalid property payload', errors });
+  }
+  return null;
+}
+
 const json = (status, body) => ({
   statusCode: status,
   headers: {
@@ -1731,6 +1767,10 @@ export const handler = async (event) => {
           return listed;
         }
       case 'POST': {
+        if (tableKey === 'properties') {
+          const invalid = validatePropertyPayload(body);
+          if (invalid) return invalid;
+        }
         stampOwner(tableKey, body, callerUid);
         // A match row is created two ways: (1) the landlord accepting a liker
         // — the caller must own the property; or (2) a tenant self-creating a
@@ -1844,6 +1884,10 @@ export const handler = async (event) => {
         return written;
       }
       case 'PUT': {
+        if (tableKey === 'properties') {
+          const invalid = validatePropertyPayload(body);
+          if (invalid) return invalid;
+        }
         // Unlike DELETE (which already checked this), a PUT to an existing
         // property id had no ownership check at all — and stampOwner (next
         // line) unconditionally forces body.ownerUserId to the CALLER, so an
@@ -1870,6 +1914,24 @@ export const handler = async (event) => {
             body.status = 'paused';
             body.pausedByBilling = existingProperty.pausedByBilling;
           }
+          // OPTIMISTIC LOCKING: no version/conflict check existed at all — two
+          // devices editing the same property near-simultaneously silently
+          // clobbered each other via this full-item PutCommand, the later
+          // write always winning with no error to either party. A client that
+          // knows the row's last-seen updatedAt can now opt in by sending
+          // expectedUpdatedAt; if the stored row has since changed, reject
+          // with 409 instead of silently overwriting newer changes. Optional
+          // (older clients that don't send it keep today's last-write-wins
+          // behavior) — see PropertyRepository.saveProperty/
+          // updateLandlordProperty on the client for the opted-in caller.
+          if (body.expectedUpdatedAt && existingProperty?.updatedAt &&
+              body.expectedUpdatedAt !== existingProperty.updatedAt) {
+            return json(409, {
+              message: 'This property was edited elsewhere since you loaded it.',
+              currentUpdatedAt: existingProperty.updatedAt,
+            });
+          }
+          delete body.expectedUpdatedAt; // never persisted as a real field
         }
         stampOwner(tableKey, body, callerUid);
         // For users & persona the row id IS the uid — never let a caller PUT to
@@ -1881,8 +1943,17 @@ export const handler = async (event) => {
         if (tableKey === 'persona') {
           return await putPersonaVersioned(table, writeId, body);
         }
-        return await putItem(table, writeId, body,
+        const putResult = await putItem(table, writeId, body,
           tableKey === 'properties' ? { preserveFrom: existingProperty } : undefined);
+        // Removing a single photo/video during an edit never deleted its S3
+        // object (only a full property delete did) — every "swap out a bad
+        // photo" leaked storage. Best-effort: whatever media URLs existed on
+        // the OLD row but are gone from the NEW one get cleaned up. Never
+        // blocks/fails the response on an S3 hiccup.
+        if (tableKey === 'properties' && existingProperty && putResult.statusCode === 200) {
+          await cleanupRemovedPropertyMedia(existingProperty, body).catch(() => {});
+        }
+        return putResult;
       }
       case 'DELETE':
         return await deleteItem(table, tableKey, id, callerUid);
@@ -3424,11 +3495,10 @@ function tryParseJson(raw) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-// Best-effort S3 cleanup for a deleted property: media/virtualTour/
-// panoramaTour/model3d are stored as JSON-blob strings (property_repository.
-// dart's _propertyToRow) — parse each, pull out every URL, resolve it to an
-// S3 key, and delete. Never throws (caller treats this as fire-and-forget).
-async function cleanupPropertyMedia(item) {
+// media/virtualTour/panoramaTour/model3d are stored as JSON-blob strings
+// (property_repository.dart's _propertyToRow) — parse each and pull out
+// every URL. Shared by the full-delete and edit-diff cleanup paths below.
+function collectPropertyMediaUrls(item) {
   const urls = new Set();
   for (const field of ['media', 'virtualTour', 'panoramaTour', 'model3d']) {
     const parsed = tryParseJson(item[field]);
@@ -3437,14 +3507,40 @@ async function cleanupPropertyMedia(item) {
   if (typeof item.verificationVideoUrl === 'string' && item.verificationVideoUrl) {
     urls.add(item.verificationVideoUrl);
   }
-  const keys = new Set();
-  for (const url of urls) {
-    const key = ourS3KeyFromUrl(url);
-    if (key) keys.add(key);
-  }
+  return urls;
+}
+
+async function deleteS3Keys(keys) {
   await Promise.all([...keys].map((key) =>
     s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key })).catch(() => {}),
   ));
+}
+
+// Best-effort S3 cleanup for a deleted property. Never throws (caller treats
+// this as fire-and-forget).
+async function cleanupPropertyMedia(item) {
+  const keys = new Set();
+  for (const url of collectPropertyMediaUrls(item)) {
+    const key = ourS3KeyFromUrl(url);
+    if (key) keys.add(key);
+  }
+  await deleteS3Keys(keys);
+}
+
+// Best-effort S3 cleanup for an EDIT: whatever media URLs existed on the OLD
+// row but are no longer present on the NEW one (e.g. the landlord swapped out
+// or removed a photo) get deleted — previously only a full property delete
+// ever cleaned up S3, so this leaked storage on every ordinary media edit.
+async function cleanupRemovedPropertyMedia(oldItem, newItem) {
+  const oldUrls = collectPropertyMediaUrls(oldItem);
+  const newUrls = collectPropertyMediaUrls(newItem);
+  const keys = new Set();
+  for (const url of oldUrls) {
+    if (newUrls.has(url)) continue;
+    const key = ourS3KeyFromUrl(url);
+    if (key) keys.add(key);
+  }
+  await deleteS3Keys(keys);
 }
 
 function castFilter(v) {

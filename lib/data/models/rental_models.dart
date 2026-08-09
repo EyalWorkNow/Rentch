@@ -924,6 +924,7 @@ class RentalProperty {
     this.eligibility = const EligibilityConfig(),
     this.rankFeatures,
     this.abVariant,
+    this.serverUpdatedAt,
   })  : audienceCohorts =
             List.unmodifiable(audienceCohorts ?? const <String>[]),
         audienceSuggested =
@@ -990,6 +991,15 @@ class RentalProperty {
   final String designTemplate;
   final int designAccent;
   final DateTime? createdAt;
+
+  /// The server's raw `updatedAt` string as of the last fetch — used ONLY as
+  /// an optimistic-locking token (see PropertyRepository.saveProperty's
+  /// expectedUpdatedAt): if the stored row has changed since, the server
+  /// rejects the write instead of silently letting a stale edit clobber
+  /// newer changes (e.g. from another device). Kept as the raw string (not
+  /// parsed) so it round-trips byte-for-byte with whatever the server sent.
+  /// Never serialized in toJson as a real field — only threaded explicitly.
+  final String? serverUpdatedAt;
 
   /// Paid "הקפצה" (boost): while this is in the future the listing floats to the
   /// top of the tenant feed. Set server-side by POST /billing/boost.
@@ -1145,6 +1155,7 @@ class RentalProperty {
     EligibilityConfig? eligibility,
     Map<String, dynamic>? rankFeatures,
     String? abVariant,
+    String? serverUpdatedAt,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -1192,6 +1203,7 @@ class RentalProperty {
       eligibility: eligibility ?? this.eligibility,
       rankFeatures: rankFeatures ?? this.rankFeatures,
       abVariant: abVariant ?? this.abVariant,
+      serverUpdatedAt: serverUpdatedAt ?? this.serverUpdatedAt,
     );
   }
 
@@ -1336,6 +1348,9 @@ class RentalProperty {
           : null,
       abVariant: (json['abVariant']?.toString().isNotEmpty ?? false)
           ? json['abVariant'].toString()
+          : null,
+      serverUpdatedAt: (json['updatedAt']?.toString().isNotEmpty ?? false)
+          ? json['updatedAt'].toString()
           : null,
     );
   }

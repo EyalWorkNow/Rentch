@@ -16,7 +16,10 @@ enum PropertySaveRejection {
   notConfigured,
   consentMissing,
   consentStale,
-  writeFailed
+  writeFailed,
+  // The server rejected an optimistic-locked edit because the row changed
+  // since this device last fetched it (see saveProperty's expectedUpdatedAt).
+  conflict,
 }
 
 class PropertySaveResult {
@@ -46,6 +49,8 @@ class PropertySaveResult {
       PropertySaveRejection.consentStale =>
         'תנאי השימוש עודכנו. יש לאשר מחדש לפני פרסום.',
       PropertySaveRejection.writeFailed => 'שגיאה בשמירת הנכס, נסה שוב.',
+      PropertySaveRejection.conflict =>
+        'הנכס נערך במקום אחר. רענן ונסה שוב.',
     };
   }
 }
@@ -68,6 +73,11 @@ class PropertyRepository {
     RentalProperty property, {
     required String ownerUserId,
     PropertyRecordStatus status = PropertyRecordStatus.active,
+    // Optimistic-locking token: pass property.serverUpdatedAt (the value
+    // fetched when this edit started) on a genuine UPDATE, never on a fresh
+    // CREATE (there's nothing to conflict with yet). The server rejects with
+    // 409/conflict if the stored row has changed since.
+    String? expectedUpdatedAt,
   }) async {
     if (!isConfigured) {
       return const PropertySaveResult.rejected(
@@ -104,6 +114,7 @@ class PropertyRepository {
               property,
               ownerUserId: ownerUserId,
               status: status,
+              expectedUpdatedAt: expectedUpdatedAt,
             ),
           ),
         ),
@@ -112,6 +123,11 @@ class PropertyRepository {
     } on CircuitOpenException {
       return const PropertySaveResult.rejected(
           PropertySaveRejection.writeFailed);
+    } on AwsApiException catch (error) {
+      _log('save', property.id, error);
+      return PropertySaveResult.rejected(error.statusCode == 409
+          ? PropertySaveRejection.conflict
+          : PropertySaveRejection.writeFailed);
     } catch (error) {
       _log('save', property.id, error);
       return const PropertySaveResult.rejected(
@@ -212,6 +228,7 @@ class PropertyRepository {
     RentalProperty property, {
     required String ownerUserId,
     required PropertyRecordStatus status,
+    String? expectedUpdatedAt,
   }) {
     final tour = property.virtualTour;
     final model3d = property.model3d;
@@ -223,6 +240,7 @@ class PropertyRepository {
       'propertyId': property.id,
       'ownerUserId': ownerUserId,
       'sourceUrl': property.sourceUrl,
+      if (expectedUpdatedAt != null) 'expectedUpdatedAt': expectedUpdatedAt,
 
       // ── Physical attributes ────────────────────────────────────────────────
       'price': property.price,

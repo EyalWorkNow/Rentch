@@ -3295,6 +3295,11 @@ class DatingProvider extends ChangeNotifier {
       status: ownedProperty.isActive
           ? PropertyRecordStatus.active
           : PropertyRecordStatus.paused,
+      // Optimistic-locking token — see PropertyRepository.saveProperty. If
+      // another device edited this property since `existing` was last
+      // fetched, the server rejects with 409/conflict instead of silently
+      // letting this stale edit clobber the newer changes.
+      expectedUpdatedAt: existing.serverUpdatedAt,
     );
     if (result.isRealFailure) {
       if (kDebugMode) {

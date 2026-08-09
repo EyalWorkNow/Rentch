@@ -6466,6 +6466,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         exclusiveToAudience: _exclusiveToAudience,
         eligibility: _eligibility,
         createdAt: widget.property.createdAt,
+        // Carries the optimistic-locking token forward from the property this
+        // screen was opened with — see PropertyRepository.saveProperty and
+        // updateLandlordProperty.
+        serverUpdatedAt: widget.property.serverUpdatedAt,
       );
 
       final saved =
