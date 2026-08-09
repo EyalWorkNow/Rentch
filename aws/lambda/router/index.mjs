@@ -31,6 +31,12 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 // Pure-JS zip reader (bundled in node_modules) — KIRI returns the finished model
 // as a single ZIP, so we unzip it in-process to extract the .glb mesh / .ply splat.
 import AdmZip from 'adm-zip';
+// Pure-JS image lib (bundled in node_modules, same package already deployed in
+// the img-resize Lambda) — used to composite the two AI-360 source photos onto
+// one canvas + build a protective alpha mask before calling gpt-image-2, so the
+// model can ONLY repaint the seam gap and never touch the real photographed
+// pixels (see buildAiPanoComposite below).
+import Jimp from 'jimp';
 // Node built-ins only — used to mint a Google OAuth token from the Firebase
 // service account (sign a JWT with RS256) and to load that account off disk.
 import crypto from 'node:crypto';
@@ -4225,6 +4231,94 @@ function validatePoses(raw, frameCount) {
   return out;
 }
 
+// Build ONE composite canvas from exactly 2 source panoramas (placed side by
+// side, left/right) + a companion alpha mask that PROTECTS every real
+// photographed pixel and only opens a thin seam strip between them for
+// gpt-image-2 to fill. This is the actual fix for "the AI repaints the whole
+// room": OpenAI's images/edits treats transparent mask pixels as editable and
+// COPIES opaque ones through untouched — so unlike the old no-mask call, the
+// model can no longer hallucinate/relight/restyle anything outside that seam,
+// no matter what the prompt says. Returns null for anything other than
+// exactly 2 images (single-photo / variant / enhance jobs keep the old,
+// simpler multi-reference call — there's no seam to protect around there).
+const AI_PANO_CANVAS_W = 1536;
+const AI_PANO_CANVAS_H = 1024;
+const AI_PANO_SEAM_FEATHER = 40; // px of editable blend on EACH side of a seam
+async function buildAiPanoComposite(imgBuffers) {
+  if (imgBuffers.length !== 2) return null;
+  const w = AI_PANO_CANVAS_W;
+  const h = AI_PANO_CANVAS_H;
+  const halfW = Math.round(w / 2);
+  const seams = [halfW, 0]; // internal seam at the middle; wrap seam at x=0/x=w
+  const canvas = new Jimp(w, h, 0x000000ff);
+  const mask = new Jimp(w, h, 0xffffffff); // opaque = protect (keep) by default
+  const cols = [{ x: 0, cw: halfW }, { x: halfW, cw: w - halfW }];
+  for (let i = 0; i < 2; i++) {
+    const src = await Jimp.read(imgBuffers[i]);
+    src.cover(cols[i].cw, h); // fill the half exactly, crop (never distort/stretch)
+    canvas.composite(src, cols[i].x, 0);
+  }
+  // Feather the mask to 0 (fully editable) exactly AT each seam, ramping back
+  // up to fully opaque (protected) a few dozen px either side — a thin,
+  // symmetric strip the model can blend across without ever being allowed to
+  // touch pixels further from the seam.
+  const alphaNear = (x, seamX) => {
+    let d = Math.abs(x - seamX);
+    d = Math.min(d, w - d); // the x=0 / x=w seam wraps around
+    if (d >= AI_PANO_SEAM_FEATHER) return 255;
+    return Math.round((d / AI_PANO_SEAM_FEATHER) * 255);
+  };
+  mask.scan(0, 0, w, h, (x, y, idx) => {
+    const a = Math.min(...seams.map((s) => alphaNear(x, s)));
+    mask.bitmap.data[idx] = 255;
+    mask.bitmap.data[idx + 1] = 255;
+    mask.bitmap.data[idx + 2] = 255;
+    mask.bitmap.data[idx + 3] = a;
+  });
+  const [base, maskPng] = await Promise.all([
+    canvas.getBufferAsync(Jimp.MIME_PNG),
+    mask.getBufferAsync(Jimp.MIME_PNG),
+  ]);
+  return { base, mask: maskPng };
+}
+
+// Prompt for the mask-protected 2-photo composite above: the model is told
+// EXACTLY what's happening (a real composite + a protective mask) instead of
+// being asked to "merge photos" from scratch, and that everything outside the
+// editable strip is already final — it only has to blend across ~80px seams.
+const AI_PANO_COMPOSITE_PROMPT = [
+  'You are given a COMPOSITE image: two real photos of the SAME room, already',
+  'placed side by side on a 1536×1024 canvas (left photo = left half, right',
+  'photo = right half), plus a MASK. The mask makes every pixel OUTSIDE a thin',
+  'vertical seam strip FINAL and PROTECTED — you cannot see it, but those pixels',
+  'will be copied through unchanged no matter what you output there. Only the',
+  'narrow editable seam strips (at the boundary between the two photos, and at',
+  'the far-left/far-right wrap edge) are yours to fill.',
+  '',
+  'YOUR ONLY JOB: make each editable seam strip a SEAMLESS, photorealistic',
+  'continuation of the real geometry, wall/floor/ceiling color, texture,',
+  'lighting, exposure and white balance already visible on BOTH sides of it —',
+  'as if the camera panned smoothly from one photo to the other. Auto-detect',
+  'where each photo\'s content logically ends and continue it naturally (a wall',
+  'continues as the same wall, a floor line continues at the same depth, a',
+  'ceiling line continues at the same height) so the two halves read as ONE',
+  'continuous space with no visible cut, band, or mismatch.',
+  '',
+  'DO NOT invent new furniture, windows, doors, artwork, or decorations in the',
+  'seam — if both sides show plain wall approaching the seam, keep the seam',
+  'plain wall too. If a real object (door frame, corner, window) is genuinely',
+  'split across the seam, complete IT naturally; never fabricate a NEW object',
+  'that is not implied by either side. Preserve any text, signage, labels or',
+  'markings visible near the seam on either photo exactly as shown — do not',
+  'blur, remove, or alter them.',
+  '',
+  'The final image (after your edits are merged back with the protected',
+  'pixels) must be a single equirectangular 360°×180° panorama: horizon on the',
+  'vertical middle, ceiling converging to the top edge, floor to the bottom',
+  'edge, straight vertical wall lines near center. High quality, sharp, no',
+  'watermark, no people.',
+].join('\n');
+
 // Hardened super-prompt for gpt-image-2: a viewer-ready, seamless, faithful 360.
 // Priority #1 is FAITHFULNESS — the model must reproduce only what the photos
 // show and never invent furniture/rooms, because that is the landlord's main
@@ -4349,6 +4443,18 @@ async function runAiGenerate(jobId) {
       const obj = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
       imgs.push(await streamToBuffer(obj.Body));
     }
+    // Fresh 2-photo AI jobs (not a variant/enhance of an existing pano) get the
+    // mask-protected composite path — see buildAiPanoComposite for why: it's
+    // the difference between "the model can repaint anything" and "the model
+    // can only touch a thin seam strip." Anything else (1 photo, 3+ photos, or
+    // a variant/enhance srcUrl job) keeps the old loose multi-reference call —
+    // there's no seam to protect when there's nothing to stitch.
+    const composite = (!meta.variant && imgs.length === 2)
+      ? await buildAiPanoComposite(imgs).catch((e) => {
+          console.error('buildAiPanoComposite failed, falling back:', e);
+          return null;
+        })
+      : null;
     // Try quality:high first; if OpenAI returns a 5xx / non-JSON gateway blip
     // (the slow high-quality call can hit an 'upstream connect error'), retry
     // once at default quality (faster + more reliable) so the job still succeeds.
@@ -4362,9 +4468,18 @@ async function runAiGenerate(jobId) {
         const form = new FormData();
         form.append('model', 'gpt-image-2');
         form.append('size', '1536x1024');
-        form.append('prompt', promptForVariant(meta.variant));
-        for (const bytes of imgs) {
-          form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
+        // Bias the model toward reusing input pixels rather than reimagining
+        // them — cheap, structural improvement on top of the mask itself.
+        form.append('input_fidelity', 'high');
+        if (composite) {
+          form.append('prompt', AI_PANO_COMPOSITE_PROMPT);
+          form.append('image[]', new Blob([composite.base], { type: 'image/png' }), 'composite.png');
+          form.append('mask', new Blob([composite.mask], { type: 'image/png' }), 'mask.png');
+        } else {
+          form.append('prompt', promptForVariant(meta.variant));
+          for (const bytes of imgs) {
+            form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
+          }
         }
         const r = await fetch('https://api.openai.com/v1/images/edits', {
           method: 'POST',

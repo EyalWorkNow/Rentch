@@ -11506,4 +11506,22 @@ class AppLocalizationsHe extends AppLocalizations {
   @override
   String get datingProviderDefaultContactMessage =>
       'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoButton =>
+      'צור 360° מ-2 תמונות ✨ AI';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoHint =>
+      'העלו 2 תמונות פנורמה של אותו חדר מזוויות שונות — ה-AI ישלים את הפער ביניהן לכדי 360° מלא, בלי לשנות את מה שבתמונות';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoProgress => 'יוצר את ה-360° המלא…';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoNeedTwo =>
+      'צריך לבחור בדיוק 2 תמונות פנורמה';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoFailed => 'היצירה נכשלה, נסו שוב';
 }

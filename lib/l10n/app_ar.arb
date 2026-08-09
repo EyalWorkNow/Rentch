@@ -3372,5 +3372,10 @@
   "datingProviderDemoMatchMessage1": "تم إنشاء تطابق — وافق الطرفان على المضي قدمًا.",
   "datingProviderDemoMatchMessage2": "تم إنشاء تطابق — كلا الطرفين مهتم.",
   "datingProviderDemoMatchMessage3": "تطابق جديد! أبدى الطرفان اهتمامًا.",
-  "datingProviderDefaultContactMessage": "مرحبًا، يسعدني معرفة المزيد من التفاصيل عن الشقة 🙂"
+  "datingProviderDefaultContactMessage": "مرحبًا، يسعدني معرفة المزيد من التفاصيل عن الشقة 🙂",
+  "panoramaCaptureScreenAiTwoPhotoButton": "إنشاء 360° من صورتين ✨ AI",
+  "panoramaCaptureScreenAiTwoPhotoHint": "ارفع صورتين بانوراميتين لنفس الغرفة من زاويتين مختلفتين — يكمل الذكاء الاصطناعي الفجوة بينهما لإنشاء صورة 360° كاملة، دون تغيير ما هو موجود في الصور",
+  "panoramaCaptureScreenAiTwoPhotoProgress": "جارٍ إنشاء صورة 360° الكاملة…",
+  "panoramaCaptureScreenAiTwoPhotoNeedTwo": "الرجاء اختيار صورتين بانوراميتين بالضبط",
+  "panoramaCaptureScreenAiTwoPhotoFailed": "فشل الإنشاء، يرجى المحاولة مرة أخرى"
 }

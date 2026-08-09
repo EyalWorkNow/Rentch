@@ -11726,4 +11726,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get datingProviderDefaultContactMessage =>
       'Hi, I\'d love to hear more details about the apartment 🙂';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoButton =>
+      'Create 360° from 2 photos ✨ AI';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoHint =>
+      'Upload 2 panorama photos of the same room from different angles — AI completes the gap between them into a full 360°, without changing what\'s in the photos';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoProgress =>
+      'Generating the full 360°…';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoNeedTwo =>
+      'Please pick exactly 2 panorama photos';
+
+  @override
+  String get panoramaCaptureScreenAiTwoPhotoFailed =>
+      'Generation failed, please try again';
 }

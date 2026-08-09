@@ -20350,6 +20350,36 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂'**
   String get datingProviderDefaultContactMessage;
+
+  /// No description provided for @panoramaCaptureScreenAiTwoPhotoButton.
+  ///
+  /// In he, this message translates to:
+  /// **'צור 360° מ-2 תמונות ✨ AI'**
+  String get panoramaCaptureScreenAiTwoPhotoButton;
+
+  /// No description provided for @panoramaCaptureScreenAiTwoPhotoHint.
+  ///
+  /// In he, this message translates to:
+  /// **'העלו 2 תמונות פנורמה של אותו חדר מזוויות שונות — ה-AI ישלים את הפער ביניהן לכדי 360° מלא, בלי לשנות את מה שבתמונות'**
+  String get panoramaCaptureScreenAiTwoPhotoHint;
+
+  /// No description provided for @panoramaCaptureScreenAiTwoPhotoProgress.
+  ///
+  /// In he, this message translates to:
+  /// **'יוצר את ה-360° המלא…'**
+  String get panoramaCaptureScreenAiTwoPhotoProgress;
+
+  /// No description provided for @panoramaCaptureScreenAiTwoPhotoNeedTwo.
+  ///
+  /// In he, this message translates to:
+  /// **'צריך לבחור בדיוק 2 תמונות פנורמה'**
+  String get panoramaCaptureScreenAiTwoPhotoNeedTwo;
+
+  /// No description provided for @panoramaCaptureScreenAiTwoPhotoFailed.
+  ///
+  /// In he, this message translates to:
+  /// **'היצירה נכשלה, נסו שוב'**
+  String get panoramaCaptureScreenAiTwoPhotoFailed;
 }
 
 class _AppLocalizationsDelegate

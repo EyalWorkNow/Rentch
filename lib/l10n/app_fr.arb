@@ -3372,5 +3372,10 @@
   "datingProviderDemoMatchMessage1": "Match créé — les deux parties ont accepté d'avancer.",
   "datingProviderDemoMatchMessage2": "Match créé — les deux parties sont intéressées.",
   "datingProviderDemoMatchMessage3": "Nouveau match ! Les deux parties ont montré de l'intérêt.",
-  "datingProviderDefaultContactMessage": "Bonjour, j'aimerais en savoir plus sur l'appartement 🙂"
+  "datingProviderDefaultContactMessage": "Bonjour, j'aimerais en savoir plus sur l'appartement 🙂",
+  "panoramaCaptureScreenAiTwoPhotoButton": "Créer une 360° à partir de 2 photos ✨ IA",
+  "panoramaCaptureScreenAiTwoPhotoHint": "Importez 2 photos panoramiques de la même pièce sous des angles différents — l'IA comble l'écart entre elles pour créer une 360° complète, sans modifier le contenu des photos",
+  "panoramaCaptureScreenAiTwoPhotoProgress": "Génération de la 360° complète…",
+  "panoramaCaptureScreenAiTwoPhotoNeedTwo": "Veuillez choisir exactement 2 photos panoramiques",
+  "panoramaCaptureScreenAiTwoPhotoFailed": "Échec de la génération, veuillez réessayer"
 }

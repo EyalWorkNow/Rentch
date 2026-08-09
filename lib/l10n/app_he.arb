@@ -3420,5 +3420,10 @@
   "datingProviderDemoMatchMessage1": "נוצר מאצ׳ — שני הצדדים הסכימו להתקדם.",
   "datingProviderDemoMatchMessage2": "נוצר מאצ׳ — שני הצדדים מעוניינים.",
   "datingProviderDemoMatchMessage3": "התאמה חדשה! שני הצדדים הראו עניין.",
-  "datingProviderDefaultContactMessage": "שלום, אשמח לשמוע עוד פרטים על הדירה 🙂"
+  "datingProviderDefaultContactMessage": "שלום, אשמח לשמוע עוד פרטים על הדירה 🙂",
+  "panoramaCaptureScreenAiTwoPhotoButton": "צור 360° מ-2 תמונות ✨ AI",
+  "panoramaCaptureScreenAiTwoPhotoHint": "העלו 2 תמונות פנורמה של אותו חדר מזוויות שונות — ה-AI ישלים את הפער ביניהן לכדי 360° מלא, בלי לשנות את מה שבתמונות",
+  "panoramaCaptureScreenAiTwoPhotoProgress": "יוצר את ה-360° המלא…",
+  "panoramaCaptureScreenAiTwoPhotoNeedTwo": "צריך לבחור בדיוק 2 תמונות פנורמה",
+  "panoramaCaptureScreenAiTwoPhotoFailed": "היצירה נכשלה, נסו שוב"
 }

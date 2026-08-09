@@ -158,6 +158,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         await _composeFromPanoramas();
       case _CaptureChoice.gallery:
         await _importFromGallery();
+      case _CaptureChoice.aiTwoPhotos:
+        await _createAiFromTwoPhotos();
     }
   }
 
@@ -300,6 +302,84 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         contentType: 'image/jpeg',
         haov: fov.haov,
         vaov: fov.vaov);
+  }
+
+  // AI 360 FROM 2 PHOTOS: the landlord picks exactly 2 panorama/wide photos of
+  // the same room shot from different directions. The server composites them
+  // onto one canvas with a mask that PROTECTS every real photographed pixel —
+  // gpt-image-2 only fills the thin seam between them, so the result can't
+  // repaint/hallucinate the room (see buildAiPanoComposite server-side).
+  Future<void> _createAiFromTwoPhotos() async {
+    if (_busy) return;
+    final picks = await _picker.pickMultiImage(
+      limit: 2,
+      maxWidth: _maxPanoWidth,
+      imageQuality: 90,
+    );
+    if (!mounted) return;
+    if (picks.length != 2) {
+      if (picks.isNotEmpty) {
+        _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoNeedTwo);
+      }
+      return;
+    }
+
+    final label = await _askLabel(AppLocalizations.of(context)!
+        .panoramaCaptureScreen697a231c(_nodes.length + 1));
+    if (label == null || !mounted) return;
+
+    final msg = ValueNotifier<String>(
+        AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoProgress);
+    _showAiProgress(msg);
+    var modalOpen = true;
+    void closeModal() {
+      if (modalOpen && mounted) {
+        modalOpen = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    setState(() => _busy = true);
+    try {
+      final job = await AwsApiClient.instance.createAiPanoramaJob(
+        propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+        imageCount: 2,
+      );
+      if (job == null) {
+        _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
+        return;
+      }
+      for (var i = 0; i < 2; i++) {
+        final ok = await AwsApiClient.instance
+            .uploadToPresignedUrl(job.uploadUrls[i], picks[i].path);
+        if (!ok) {
+          _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
+          return;
+        }
+      }
+      await AwsApiClient.instance.startAiPanoramaGenerate(job.jobId);
+      // Poll to a terminal state (mirrors _pollEnhanceJob's cadence/timeout),
+      // but adds a brand-new node on success instead of versioning one.
+      for (var t = 0; t < 150; t++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        final s = await AwsApiClient.instance.getPanorama(job.jobId);
+        if (s == null) continue;
+        if (s.status == 'ready' && s.imageUrl.isNotEmpty) {
+          await _addNode(url: s.imageUrl, label: label, haov: 360, vaov: 180);
+          return;
+        }
+        if (s.status == 'failed') {
+          _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
+          return;
+        }
+      }
+    } catch (_) {
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
+    } finally {
+      closeModal();
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showAiProgress(ValueNotifier<String> msg) {
@@ -1413,7 +1493,7 @@ class _VersionChip extends StatelessWidget {
 /// [photo] = guided 10-photo 360° capture (PRIMARY default), [sweep] = the
 /// frame-by-frame guided sweep (advanced), [arranged] = compose from native
 /// panos, [gallery] = import a native pano.
-enum _CaptureChoice { photo, sweep, arranged, gallery }
+enum _CaptureChoice { photo, sweep, arranged, gallery, aiTwoPhotos }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -1586,11 +1666,40 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ]),
             ),
-            // NOTE: the "generate a 360 from flat photos with AI" path was
-            // removed — gpt-image-2 can't produce a faithful, seamless 360 and
-            // invented/repainted rooms (the landlord's main complaint). AI now
-            // only ENHANCES a REAL captured/uploaded panorama (pole-fill, cleanup,
-            // lighting variants) — offered per-node after a real 360 exists.
+            // AI-FROM-2-PHOTOS: re-added once the server switched to a
+            // mask-protected composite call (buildAiPanoComposite) — gpt-image-2
+            // can now only repaint the thin seam between the two real photos,
+            // not the whole room, which was the old failure mode here.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary, width: 1.3),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).pop(_CaptureChoice.aiTwoPhotos),
+                  icon: const Icon(IconsaxPlusBold.magic_star, size: 19),
+                  label: Text(
+                      AppLocalizations.of(context)!
+                          .panoramaCaptureScreenAiTwoPhotoButton,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14.5)),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                  AppLocalizations.of(context)!
+                      .panoramaCaptureScreenAiTwoPhotoHint,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ),
             const SizedBox(height: 6),
           ],
         ),
