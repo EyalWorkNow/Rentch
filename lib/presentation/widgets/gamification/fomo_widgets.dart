@@ -365,14 +365,18 @@ class _MatchExpiryTimerState extends State<MatchExpiryTimer> {
           color: color,
         ),
         const SizedBox(width: 3),
-        Text(
-          expiringSoon
-              ? AppLocalizations.of(context)!.fomoWidgetsC646d563(label)
-              : AppLocalizations.of(context)!.fomoWidgetsF3d9f53a(label),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: expiringSoon ? FontWeight.w700 : FontWeight.w500,
-            color: color,
+        Flexible(
+          child: Text(
+            expiringSoon
+                ? AppLocalizations.of(context)!.fomoWidgetsC646d563(label)
+                : AppLocalizations.of(context)!.fomoWidgetsF3d9f53a(label),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: expiringSoon ? FontWeight.w700 : FontWeight.w500,
+              color: color,
+            ),
           ),
         ),
       ],

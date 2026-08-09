@@ -3214,27 +3214,33 @@ class _VirtualTourScreen extends StatelessWidget {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.view_in_ar_rounded,
-                            size: 16, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          l10n.propertyDetailScreen5f699c03,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.view_in_ar_rounded,
+                              size: 16, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              l10n.propertyDetailScreen5f699c03,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -3496,25 +3502,31 @@ class _InteractiveTourScreen extends StatelessWidget {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.auto_awesome_rounded,
-                            size: 16, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(l10n.propertyDetailScreenEef6e71b,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12)),
-                      ],
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded,
+                              size: 16, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(l10n.propertyDetailScreenEef6e71b,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

@@ -137,7 +137,7 @@ class _ScorecardViewState extends State<ScorecardView> {
         Row(children: [
           if (c.tier.isNotEmpty) _tierChip(c.tier),
           if (c.tier.isNotEmpty) const SizedBox(width: 8),
-          if (c.confidence > 0) _confidenceLabel(c.confidence),
+          if (c.confidence > 0) Flexible(child: _confidenceLabel(c.confidence)),
         ]),
         if (c.explanation.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -360,11 +360,15 @@ class _ScorecardViewState extends State<ScorecardView> {
       Icon(IconsaxPlusLinear.shield_tick,
           size: 13, color: AppColors.textSecondary),
       const SizedBox(width: 4),
-      Text(AppLocalizations.of(context)!.scorecardViewA33028e6(pct),
-          style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600)),
+      Flexible(
+        child: Text(AppLocalizations.of(context)!.scorecardViewA33028e6(pct),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+      ),
     ]);
   }
 

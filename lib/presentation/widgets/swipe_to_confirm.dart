@@ -235,13 +235,17 @@ class _SwipeToConfirmSheetState extends State<SwipeToConfirmSheet>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      widget.confirmLabel ??
-                          AppLocalizations.of(context)!.swipeToConfirm55ebef41,
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        widget.confirmLabel ??
+                            AppLocalizations.of(context)!.swipeToConfirm55ebef41,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

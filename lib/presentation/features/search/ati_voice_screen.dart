@@ -537,13 +537,17 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           children: [
             Icon(icon, size: 16, color: AppColors.primary),
             const SizedBox(width: 8),
-            Text(
-              _statusLabel,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
+            Flexible(
+              child: Text(
+                _statusLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
           ],
@@ -832,11 +836,15 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
             children: [
               const Icon(IconsaxPlusLinear.gps, color: Colors.white, size: 20),
               const SizedBox(width: 10),
-              Text(AppLocalizations.of(context)!.atiVoiceScreen7ddcbdea,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800)),
+              Flexible(
+                child: Text(AppLocalizations.of(context)!.atiVoiceScreen7ddcbdea,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800)),
+              ),
             ],
           ),
         ),

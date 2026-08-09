@@ -293,11 +293,15 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
             color: AppColors.primary,
           ),
           const SizedBox(width: 8),
-          Text(_statusLabel,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700)),
+          Flexible(
+            child: Text(_statusLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );

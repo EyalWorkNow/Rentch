@@ -467,30 +467,36 @@ class _MonthRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.35), width: 1.2),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (paid) ...[
-                      Icon(Icons.check_circle_rounded, color: statusColor, size: 16),
-                      const SizedBox(width: 5),
-                    ],
-                    Text(
-                      paid ? paidLabel : unpaidLabel,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.35), width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (paid) ...[
+                        Icon(Icons.check_circle_rounded, color: statusColor, size: 16),
+                        const SizedBox(width: 5),
+                      ],
+                      Flexible(
+                        child: Text(
+                          paid ? paidLabel : unpaidLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               if (onEditNote != null) ...[

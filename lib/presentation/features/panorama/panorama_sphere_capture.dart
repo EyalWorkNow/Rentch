@@ -740,11 +740,15 @@ class _PanoramaSphereCaptureScreenState
           children: [
             const Icon(IconsaxPlusLinear.camera, color: Colors.white, size: 20),
             const SizedBox(width: 8),
-            Text(l10n.panoramaSphereCaptureC1c39e62,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800)),
+            Flexible(
+              child: Text(l10n.panoramaSphereCaptureC1c39e62,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800)),
+            ),
           ],
         ),
       ),

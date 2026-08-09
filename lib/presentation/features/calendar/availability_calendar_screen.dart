@@ -441,12 +441,16 @@ class _AvailabilityCalendarScreenState
                   children: [
                     const Icon(IconsaxPlusLinear.calendar, size: 16, color: AppColors.navy),
                     const SizedBox(width: 6),
-                    Text(
-                      '${_monthNames(context)[_stripStart.month]} ${_stripStart.year}',
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        '${_monthNames(context)[_stripStart.month]} ${_stripStart.year}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),

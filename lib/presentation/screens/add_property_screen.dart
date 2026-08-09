@@ -5545,7 +5545,13 @@ class _DropdownRow extends StatelessWidget {
                 Icon(itemIcon, size: 18, color: AppColors.primary),
                 const SizedBox(width: 10),
               ],
-              Text(_optionLabel(o, l10n)),
+              Flexible(
+                child: Text(
+                  _optionLabel(o, l10n),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         );

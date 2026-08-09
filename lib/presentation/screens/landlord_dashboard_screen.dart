@@ -263,7 +263,7 @@ class _DashboardHeader extends StatelessWidget {
             // landlords.
             // NOT const: its gradient is the swappable accent; a const widget
             // never rebuilds and would freeze on the first-build accent.
-            _AssistantChip(),
+            Flexible(child: _AssistantChip()),
           ],
         ),
       ],
@@ -317,12 +317,16 @@ class _AssistantChip extends StatelessWidget {
           children: [
             const Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 20),
             const SizedBox(width: 7),
-            Text(
-              l10n.landlordDashboardScreenCce14f4f,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                l10n.landlordDashboardScreenCce14f4f,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],

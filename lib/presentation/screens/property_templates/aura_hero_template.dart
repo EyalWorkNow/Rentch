@@ -198,22 +198,26 @@ class _AcidHeroOverlay extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _AuraGlowChip(
-                    icon: IconsaxPlusBold.star_1,
-                    label: avgRating > 0
-                        ? avgRating.toStringAsFixed(1)
-                        : AppLocalizations.of(context)!
-                            .auraHeroTemplate08bca18d,
-                    aura: aura,
-                    secondary: branding.secondaryColor,
+                  Flexible(
+                    child: _AuraGlowChip(
+                      icon: IconsaxPlusBold.star_1,
+                      label: avgRating > 0
+                          ? avgRating.toStringAsFixed(1)
+                          : AppLocalizations.of(context)!
+                              .auraHeroTemplate08bca18d,
+                      aura: aura,
+                      secondary: branding.secondaryColor,
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  _AuraGlowChip(
-                    icon: IconsaxPlusLinear.maximize_3,
-                    label: AppLocalizations.of(context)!
-                        .auraHeroTemplateFdb4eac7(property.sizeM2),
-                    aura: aura,
-                    secondary: branding.secondaryColor,
+                  Flexible(
+                    child: _AuraGlowChip(
+                      icon: IconsaxPlusLinear.maximize_3,
+                      label: AppLocalizations.of(context)!
+                          .auraHeroTemplateFdb4eac7(property.sizeM2),
+                      aura: aura,
+                      secondary: branding.secondaryColor,
+                    ),
                   ),
                 ],
               ),
@@ -308,12 +312,16 @@ class _AuraGlowChip extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: Colors.white),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],

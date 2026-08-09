@@ -1849,12 +1849,16 @@ class _LoginTabState extends State<_LoginTab> {
                         children: [
                           Icon(IconsaxPlusLinear.eye, size: 14, color: Colors.white.withOpacity(0.7)),
                           const SizedBox(width: 6),
-                          Text(l10n.authScreen7e02b34c,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      Colors.white.withOpacity(0.7))),
+                          Flexible(
+                            child: Text(l10n.authScreen7e02b34c,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        Colors.white.withOpacity(0.7))),
+                          ),
                         ],
                       ),
                     ),
@@ -1866,14 +1870,20 @@ class _LoginTabState extends State<_LoginTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(l10n.authScreen20f9f23f,
-                            style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500)),
+                        Flexible(
+                          child: Text(l10n.authScreen20f9f23f,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500)),
+                        ),
                         GestureDetector(
                           onTap: widget.onSwitchToRegister,
                           child: Text(l10n.authScreen070f0a6c,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   color: _kBrandTeal,
                                   fontSize: 14,
@@ -2312,14 +2322,20 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(l10n.authScreenE0c41b8a,
-                                  style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500)),
+                              Flexible(
+                                child: Text(l10n.authScreenE0c41b8a,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500)),
+                              ),
                               GestureDetector(
                                 onTap: widget.onSwitchToLogin,
                                 child: Text(l10n.authScreen254e07f0,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                         color: _kBrandTeal,
                                         fontSize: 14,

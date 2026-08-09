@@ -462,40 +462,46 @@ class _MarketBoardHeader extends StatelessWidget {
           ),
         ),
         if (live)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-            decoration: BoxDecoration(
-              color: _MarketBoardTemplate._up.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: _MarketBoardTemplate._up.withValues(alpha: 0.32),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                color: _MarketBoardTemplate._up.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: _MarketBoardTemplate._up.withValues(alpha: 0.32),
+                ),
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SignalStripPulse(
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: _MarketBoardTemplate._up,
-                      shape: BoxShape.circle,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SignalStripPulse(
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: _MarketBoardTemplate._up,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  liveViewers == 1
-                      ? l10n.marketBoardTemplate636e854d
-                      : l10n.marketBoardTemplate9b8e10c5(liveViewers),
-                  style: const TextStyle(
-                    color: _MarketBoardTemplate._up,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      liveViewers == 1
+                          ? l10n.marketBoardTemplate636e854d
+                          : l10n.marketBoardTemplate9b8e10c5(liveViewers),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _MarketBoardTemplate._up,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
       ],

@@ -345,34 +345,39 @@ class _ProfileCardState extends State<ProfileCard> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (p.isUltraBoosted) ...[
-                                  const _BoostBadge(ultra: true),
-                                  const SizedBox(width: 6),
-                                ] else if (p.isBoosted) ...[
-                                  const _BoostBadge(ultra: false),
-                                  const SizedBox(width: 6),
+                            Flexible(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (p.isUltraBoosted) ...[
+                                    const _BoostBadge(ultra: true),
+                                    const SizedBox(width: 6),
+                                  ] else if (p.isBoosted) ...[
+                                    const _BoostBadge(ultra: false),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  if (isSale) ...[
+                                    const _SaleBadge(),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  if (p.isVerifiedListing) ...[
+                                    Flexible(
+                                      child: GestureDetector(
+                                        onTap: () =>
+                                            VerificationInfoSheet.show(
+                                                context),
+                                        child: _VerifiedListingBadge(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  if (priceCtx != PriceContext.average)
+                                    _PriceContextBadge(ctx: priceCtx),
                                 ],
-                                if (isSale) ...[
-                                  const _SaleBadge(),
-                                  const SizedBox(width: 6),
-                                ],
-                                if (p.isVerifiedListing) ...[
-                                  GestureDetector(
-                                    onTap: () =>
-                                        VerificationInfoSheet.show(context),
-                                    child: _VerifiedListingBadge(),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                if (priceCtx != PriceContext.average)
-                                  _PriceContextBadge(ctx: priceCtx),
-                              ],
+                              ),
                             ),
                             if (score != null)
-                              _MatchScoreBadge(score: score)
+                              Flexible(child: _MatchScoreBadge(score: score))
                             else
                               const SizedBox.shrink(),
                           ],
@@ -617,12 +622,16 @@ class _VerifiedListingBadge extends StatelessWidget {
         children: [
           const Icon(IconsaxPlusLinear.verify, color: Colors.white, size: 13),
           const SizedBox(width: 5),
-          Text(
-            AppLocalizations.of(context)!.profileCard9077b7f7,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 11,
+          Flexible(
+            child: Text(
+              AppLocalizations.of(context)!.profileCard9077b7f7,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
             ),
           ),
         ],
@@ -805,12 +814,16 @@ class _MatchScoreBadge extends StatelessWidget {
         children: [
           RentlyIcon(IconsaxPlusLinear.star_1, size: 11, color: color),
           const SizedBox(width: 4),
-          Text(
-            AppLocalizations.of(context)!.profileCard2af4ac1c(score),
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              AppLocalizations.of(context)!.profileCard2af4ac1c(score),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -842,12 +855,18 @@ class _BoostBadge extends StatelessWidget {
           RentlyIcon(ultra ? IconsaxPlusBold.crown_1 : IconsaxPlusBold.flash_1,
               size: 11, color: color),
           const SizedBox(width: 4),
-          Text(
-            ultra ? 'Ultra' : AppLocalizations.of(context)!.profileCard8342a66c,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+          Flexible(
+            child: Text(
+              ultra
+                  ? 'Ultra'
+                  : AppLocalizations.of(context)!.profileCard8342a66c,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -874,12 +893,16 @@ class _SaleBadge extends StatelessWidget {
         children: [
           const RentlyIcon(IconsaxPlusLinear.tag, size: 11, color: color),
           const SizedBox(width: 4),
-          Text(
-            AppLocalizations.of(context)!.profileCard609fac18,
-            style: const TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              AppLocalizations.of(context)!.profileCard609fac18,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

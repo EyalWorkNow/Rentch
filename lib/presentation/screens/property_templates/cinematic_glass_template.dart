@@ -307,13 +307,17 @@ class _TransactionKicker extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.2,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ),
             ],

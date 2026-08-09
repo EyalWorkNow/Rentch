@@ -226,13 +226,17 @@ class ErikOrbStage extends StatelessWidget {
         children: [
           _BreathingDot(color: dotColor, clock: clock, on: live || connecting),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: ErikTokens.inkSoft,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: ErikTokens.inkSoft,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ],

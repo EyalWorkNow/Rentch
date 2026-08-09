@@ -795,13 +795,17 @@ class _AssistantScreenState extends State<AssistantScreen>
           children: [
             Icon(icon, size: 16, color: _kAccent),
             const SizedBox(width: 8),
-            Text(
-              _statusLine,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
+            Flexible(
+              child: Text(
+                _statusLine,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
           ],

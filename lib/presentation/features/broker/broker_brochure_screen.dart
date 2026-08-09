@@ -373,12 +373,16 @@ class _Facts extends StatelessWidget {
               children: [
                 Icon(fact.icon, size: 18, color: accent),
                 const SizedBox(width: 6),
-                Text(
-                  fact.label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.navy,
+                Flexible(
+                  child: Text(
+                    fact.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navy,
+                    ),
                   ),
                 ),
               ],

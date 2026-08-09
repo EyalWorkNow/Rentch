@@ -182,11 +182,15 @@ class _MapStylePropertyCardState extends State<MapStylePropertyCard> {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, color: Colors.white, size: 12),
             const SizedBox(width: 4),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700)),
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700)),
+            ),
           ]),
         ),
       ),

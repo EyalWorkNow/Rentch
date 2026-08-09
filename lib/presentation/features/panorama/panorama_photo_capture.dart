@@ -467,7 +467,8 @@ class _PanoramaPhotoCaptureScreenState
                       child: _circle(IconsaxPlusLinear.close_circle),
                     ),
                     const Spacer(),
-                    if (_minZoom != null && !_building) _zoomToggle(),
+                    if (_minZoom != null && !_building)
+                      Flexible(child: _zoomToggle()),
                   ],
                 ),
               ),
@@ -752,14 +753,18 @@ class _PanoramaPhotoCaptureScreenState
                   fontWeight: FontWeight.w900),
             ),
             const SizedBox(width: 8),
-            Text(
-              _ultraWide
-                  ? AppLocalizations.of(context)!.panoramaPhotoCaptureA9e4f107
-                  : AppLocalizations.of(context)!.panoramaPhotoCapture3e20e30e,
-              style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700),
+            Flexible(
+              child: Text(
+                _ultraWide
+                    ? AppLocalizations.of(context)!.panoramaPhotoCaptureA9e4f107
+                    : AppLocalizations.of(context)!.panoramaPhotoCapture3e20e30e,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),

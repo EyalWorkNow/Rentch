@@ -531,12 +531,16 @@ class _EstateFactChips extends StatelessWidget {
                 children: [
                   Icon(fact.icon, size: 17, color: branding.primaryColor),
                   const SizedBox(width: 7),
-                  Text(
-                    fact.label,
-                    style: TextStyle(
-                      color: branding.secondaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                  Flexible(
+                    child: Text(
+                      fact.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: branding.secondaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ],

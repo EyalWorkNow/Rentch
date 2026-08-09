@@ -267,16 +267,20 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _navButton(
-                        icon: IconsaxPlusLinear.arrow_right_3,
-                        label: l10n.panoramaSplatView7fa2edab,
-                        onTap: () => _step(-1),
+                      Flexible(
+                        child: _navButton(
+                          icon: IconsaxPlusLinear.arrow_right_3,
+                          label: l10n.panoramaSplatView7fa2edab,
+                          onTap: () => _step(-1),
+                        ),
                       ),
                       const SizedBox(width: 16),
-                      _navButton(
-                        icon: IconsaxPlusLinear.arrow_left_2,
-                        label: l10n.panoramaSplatView1bb60018,
-                        onTap: () => _step(1),
+                      Flexible(
+                        child: _navButton(
+                          icon: IconsaxPlusLinear.arrow_left_2,
+                          label: l10n.panoramaSplatView1bb60018,
+                          onTap: () => _step(1),
+                        ),
                       ),
                     ],
                   ),
@@ -325,12 +329,16 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
           children: [
             Icon(icon, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],

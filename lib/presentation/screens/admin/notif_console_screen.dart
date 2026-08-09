@@ -315,11 +315,15 @@ class _NotifConsoleScreenState extends State<NotifConsoleScreen> {
               children: [
                 Text(t.emoji, style: const TextStyle(fontSize: 18)),
                 const SizedBox(width: 8),
-                Text(
-                  t.label,
-                  style: TextStyle(
-                    color: selected ? Colors.white : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    t.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

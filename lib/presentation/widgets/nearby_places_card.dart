@@ -305,7 +305,12 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     children: [
                       const Icon(Icons.arrow_forward_ios_rounded, size: 13),
                       const SizedBox(width: 4),
-                      Text(l10n.nearbyPlacesCard7e6e0fb1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      Flexible(
+                        child: Text(l10n.nearbyPlacesCard7e6e0fb1,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
                     ],
                   ),
                 ),
@@ -333,7 +338,12 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(l10n.nearbyPlacesCard5f9edf6e, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      Flexible(
+                        child: Text(l10n.nearbyPlacesCard5f9edf6e,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
                       const SizedBox(width: 4),
                       const Icon(Icons.arrow_back_ios_rounded, size: 13),
                     ],
@@ -359,11 +369,15 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   border: Border.all(color: AppColors.primary),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(l10n.nearbyPlacesCard4745b1e9,
-                      style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary)),
+                  Flexible(
+                    child: Text(l10n.nearbyPlacesCard4745b1e9,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary)),
+                  ),
                   const SizedBox(width: 4),
                   Icon(IconsaxPlusLinear.discover_1,
                       size: 17, color: AppColors.primary),
@@ -444,11 +458,15 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           border: Border.all(color: AppColors.primary),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(collapsed
-                  ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
-                  : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
-              style: TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+          Flexible(
+            child: Text(collapsed
+                    ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
+                    : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+          ),
           const SizedBox(width: 4),
           Icon(collapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded,
               size: 18, color: AppColors.primary),
@@ -477,14 +495,18 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 16, color: on ? Colors.white : AppColors.primary),
           const SizedBox(width: 6),
-          Text(
-              title
-                  .replaceAll(l10n.nearbyPlacesCardChipSuffixMasc, '')
-                  .replaceAll(l10n.nearbyPlacesCardChipSuffixFem, ''),
-              style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: on ? Colors.white : AppColors.navy)),
+          Flexible(
+            child: Text(
+                title
+                    .replaceAll(l10n.nearbyPlacesCardChipSuffixMasc, '')
+                    .replaceAll(l10n.nearbyPlacesCardChipSuffixFem, ''),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: on ? Colors.white : AppColors.navy)),
+          ),
           const SizedBox(width: 6),
           Text('$n${n >= 12 ? '+' : ''}',
               style: TextStyle(

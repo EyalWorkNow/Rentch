@@ -606,12 +606,16 @@ class _RequestsToggle extends StatelessWidget {
               color: active ? Colors.white : AppColors.primary,
             ),
             const SizedBox(width: 8),
-            Text(
-              AppLocalizations.of(context)!.matchesScreenPaidInquiries,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: active ? Colors.white : AppColors.navy,
+            Flexible(
+              child: Text(
+                AppLocalizations.of(context)!.matchesScreenPaidInquiries,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: active ? Colors.white : AppColors.navy,
+                ),
               ),
             ),
             const SizedBox(width: 7),
@@ -1094,11 +1098,15 @@ class _MatchCardState extends State<_MatchCard> {
                                 const Icon(IconsaxPlusBold.tag,
                                     color: Colors.white, size: 12),
                                 const SizedBox(width: 4),
-                                Text(widget.label!.text,
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 11)),
+                                Flexible(
+                                  child: Text(widget.label!.text,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11)),
+                                ),
                               ],
                             ),
                           ),
@@ -1400,12 +1408,16 @@ class _StatusChip extends StatelessWidget {
             Icon(icon, size: 11, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontSize: 10,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 10,
+              ),
             ),
           ),
         ],

@@ -410,12 +410,16 @@ class _ClassicTemplate extends StatelessWidget {
                           const RentlyIcon(IconsaxPlusBold.flash_1,
                               color: Colors.white, size: 22),
                           const SizedBox(width: 8),
-                          Text(
-                            l10n.classicTemplate88aea894,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
+                          Flexible(
+                            child: Text(
+                              l10n.classicTemplate88aea894,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ],

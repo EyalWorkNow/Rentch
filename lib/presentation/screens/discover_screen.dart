@@ -1989,12 +1989,16 @@ class _SaveSearchButton extends StatelessWidget {
               RentlyIcon(IconsaxPlusLinear.save_2,
                   size: 16, color: AppColors.primary),
               const SizedBox(width: 6),
-              Text(
-                AppLocalizations.of(context)!.discoverScreenF50251bc,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
+              Flexible(
+                child: Text(
+                  AppLocalizations.of(context)!.discoverScreenF50251bc,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -3622,8 +3626,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     child: Row(
                       children: [
                         if (!provider.isLandlord) ...[
-                          _SaveSearchButton(
-                            onTap: () => _saveCurrentSearch(context),
+                          Flexible(
+                            child: _SaveSearchButton(
+                              onTap: () => _saveCurrentSearch(context),
+                            ),
                           ),
                           const SizedBox(width: 12),
                         ],
@@ -3780,12 +3786,16 @@ class _PriorityLegend extends StatelessWidget {
           icon: Icons.priority_high_rounded,
         ),
         const SizedBox(width: 10),
-        Text(
-          AppLocalizations.of(context)!.discoverScreen4b54025b,
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            AppLocalizations.of(context)!.discoverScreen4b54025b,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -3817,12 +3827,16 @@ class _LegendChip extends StatelessWidget {
         children: [
           Icon(icon, size: 10, color: Colors.white),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -3972,12 +3986,16 @@ class _SliderField extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        displayValue,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                      Flexible(
+                        child: Text(
+                          displayValue,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -4067,12 +4085,16 @@ class _RangeSliderField extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        displayValue,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                      Flexible(
+                        child: Text(
+                          displayValue,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -5005,16 +5027,20 @@ class _PropertyPreviewCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            isRent
-                                ? AppLocalizations.of(context)!
-                                    .discoverScreenB336259f
-                                : AppLocalizations.of(context)!
-                                    .discoverScreen609fac18,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                          Flexible(
+                            child: Text(
+                              isRent
+                                  ? AppLocalizations.of(context)!
+                                      .discoverScreenB336259f
+                                  : AppLocalizations.of(context)!
+                                      .discoverScreen609fac18,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
@@ -5196,12 +5222,16 @@ class _PropertyPreviewCard extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 11),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

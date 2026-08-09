@@ -1300,11 +1300,16 @@ class _MessageScreenState extends State<MessageScreen> {
                           strokeWidth: 2, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
-                    Text(AppLocalizations.of(context)!.messageScreen686a53ea,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
+                    Flexible(
+                      child: Text(
+                          AppLocalizations.of(context)!.messageScreen686a53ea,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                    ),
                   ],
                 ),
               ),
@@ -2033,12 +2038,16 @@ class _MessageBubble extends StatelessWidget {
                   ),
                   if (isTenant && message.failed) ...[
                     const SizedBox(width: 4),
-                    Text(
-                      AppLocalizations.of(context)!.messageScreen9e6a373e,
-                      style: const TextStyle(
-                        color: Color(0xFFFFE0E0),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                    Flexible(
+                      child: Text(
+                        AppLocalizations.of(context)!.messageScreen9e6a373e,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFFFE0E0),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 3),
@@ -3419,7 +3428,7 @@ class _SlotOptionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            _trailing(context),
+            Flexible(child: _trailing(context)),
           ],
         ),
       ),
@@ -3435,11 +3444,15 @@ class _SlotOptionRow extends StatelessWidget {
           const Icon(Icons.check_circle_rounded,
               color: AppColors.success, size: 16),
           const SizedBox(width: 4),
-          Text(l10n.messageScreen8270663e,
-              style: const TextStyle(
-                  color: AppColors.success,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w900)),
+          Flexible(
+            child: Text(l10n.messageScreen8270663e,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: AppColors.success,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900)),
+          ),
         ],
       );
     }

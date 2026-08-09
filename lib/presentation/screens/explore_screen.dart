@@ -249,12 +249,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    l10n.exploreScreenEb3c6f60,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                  Flexible(
+                    child: Text(
+                      l10n.exploreScreenEb3c6f60,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                   if (total > 0) ...[
@@ -1400,14 +1404,18 @@ class _CandidateTopBar extends StatelessWidget {
         child: Row(
           children: [
             if (showFilters)
-              _FiltersIconButton(
-                count: activeFilterCount,
-                onTap: onOpenFilters,
+              Flexible(
+                child: _FiltersIconButton(
+                  count: activeFilterCount,
+                  onTap: onOpenFilters,
+                ),
               ),
             const Spacer(),
-            _AutoLikeToggle(
-              enabled: autoLikeEnabled,
-              onToggle: onToggleAutoLike,
+            Flexible(
+              child: _AutoLikeToggle(
+                enabled: autoLikeEnabled,
+                onToggle: onToggleAutoLike,
+              ),
             ),
           ],
         ),
@@ -1454,12 +1462,16 @@ class _FiltersIconButton extends StatelessWidget {
               color: active ? Colors.white : AppColors.navy,
             ),
             const SizedBox(width: 6),
-            Text(
-              AppLocalizations.of(context)!.exploreScreenEde0a5bb,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: active ? Colors.white : AppColors.navy,
+            Flexible(
+              child: Text(
+                AppLocalizations.of(context)!.exploreScreenEde0a5bb,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: active ? Colors.white : AppColors.navy,
+                ),
               ),
             ),
             if (active) ...[
@@ -1507,12 +1519,16 @@ class _AutoLikeToggle extends StatelessWidget {
           color: enabled ? AppColors.primary : AppColors.slate400,
         ),
         const SizedBox(width: 5),
-        Text(
-          AppLocalizations.of(context)!.exploreScreenB803dad3,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: enabled ? AppColors.primary : AppColors.textSecondary,
+        Flexible(
+          child: Text(
+            AppLocalizations.of(context)!.exploreScreenB803dad3,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: enabled ? AppColors.primary : AppColors.textSecondary,
+            ),
           ),
         ),
         const SizedBox(width: 4),
@@ -1568,12 +1584,16 @@ class _QuickChip extends StatelessWidget {
                   size: 14, color: selected ? Colors.white : AppColors.navy),
               const SizedBox(width: 5),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : AppColors.navy,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppColors.navy,
+                ),
               ),
             ),
           ],

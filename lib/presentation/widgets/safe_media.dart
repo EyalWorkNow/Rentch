@@ -245,12 +245,16 @@ class _VideoOverlayBadge extends StatelessWidget {
             size: compact ? 12 : 15,
           ),
           SizedBox(width: compact ? 4 : 6),
-          Text(
-            AppLocalizations.of(context)!.safeMedia773c5c3a,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: compact ? 10 : 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              AppLocalizations.of(context)!.safeMedia773c5c3a,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: compact ? 10 : 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

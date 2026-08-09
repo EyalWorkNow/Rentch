@@ -709,12 +709,16 @@ class _SelectChip extends StatelessWidget {
               color: selected ? Colors.white : AppColors.textSecondary,
             ),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : AppColors.textSecondary,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                ),
               ),
             ),
           ],

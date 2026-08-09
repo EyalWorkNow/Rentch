@@ -430,16 +430,20 @@ class _ClientCard extends StatelessWidget {
                           : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
-                    Text(
+                    Flexible(
+                      child: Text(
                       matchCount > 0
                           ? l10n.brokerClientsScreenMatchingProperties(matchCount)
                           : l10n.brokerClientsScreenNoMatchingPropertiesNow,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: matchCount > 0
                             ? AppColors.primaryDark
                             : AppColors.textSecondary,
+                      ),
                       ),
                     ),
                   ],

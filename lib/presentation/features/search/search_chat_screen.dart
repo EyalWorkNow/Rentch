@@ -535,18 +535,26 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2)),
                       const SizedBox(width: 8),
-                      Text(l10n.searchChatScreen6f6b921d,
-                          style: TextStyle(
-                              color: AppColors.primaryDark,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13)),
+                      Flexible(
+                        child: Text(l10n.searchChatScreen6f6b921d,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13)),
+                      ),
                     ])
                   : Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(_showMoreLabel(m, l10n),
-                          style: TextStyle(
-                              color: AppColors.primaryDark,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13)),
+                      Flexible(
+                        child: Text(_showMoreLabel(m, l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13)),
+                      ),
                       const SizedBox(width: 4),
                       Icon(IconsaxPlusLinear.arrow_down_1,
                           size: 18, color: AppColors.primaryDark),
@@ -2572,17 +2580,25 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                     Icon(Icons.auto_awesome,
                         size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
-                    Text(ifs[i].label,
-                        style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14)),
+                    Flexible(
+                      child: Text(ifs[i].label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: AppColors.primaryDark,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14)),
+                    ),
                     const SizedBox(width: 6),
-                    Text('· ${ifs[i].gainText}',
-                        style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12.5)),
+                    Flexible(
+                      child: Text('· ${ifs[i].gainText}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5)),
+                    ),
                   ]),
                 ),
               ),

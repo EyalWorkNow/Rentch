@@ -1642,12 +1642,16 @@ class _LandlordProfileScreen extends StatelessWidget {
                         Icon(IconsaxPlusLinear.briefcase,
                             size: 12, color: BrandPalette.broker.primary),
                         const SizedBox(width: 4),
-                        Text(
-                          l10n.profileScreen4343d576,
-                          style: TextStyle(
-                            color: BrandPalette.broker.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: Text(
+                            l10n.profileScreen4343d576,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: BrandPalette.broker.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
