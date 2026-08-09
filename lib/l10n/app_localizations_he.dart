@@ -4483,7 +4483,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String landlordDashboardScreen9c8fa644(Object pendingCount) {
-    return '\$pendingCount מועמדים ממתינים לאישורך';
+    return '$pendingCount מועמדים ממתינים לאישורך';
   }
 
   @override
@@ -4512,7 +4512,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String landlordDashboardScreenEd3747d9(Object pendingCount) {
-    return '\$pendingCount ממתינים לאישור שלך';
+    return '$pendingCount ממתינים לאישור שלך';
   }
 
   @override
@@ -4629,7 +4629,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String landlordDashboardScreenE8a3f079(Object totalInquiries) {
-    return '\$totalInquiries פניות';
+    return '$totalInquiries פניות';
   }
 
   @override
@@ -4736,7 +4736,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String landlordDashboardScreen6db621c3(Object who) {
-    return 'צפייה הבאה · \$who';
+    return 'צפייה הבאה · $who';
   }
 
   @override
@@ -4769,7 +4769,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreenA8bb36b3(Object caveat) {
-    return 'לשים לב: \$caveat';
+    return 'לשים לב: $caveat';
   }
 
   @override
@@ -4787,7 +4787,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreen08920749(Object city) {
-    return ' ב\$city';
+    return ' ב$city';
   }
 
   @override
@@ -4795,7 +4795,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreenE97266c1(Object pct, Object where) {
-    return 'כ-\$pct% מתחת למחיר השוק\$where — מחיר טוב';
+    return 'כ-$pct% מתחת למחיר השוק$where — מחיר טוב';
   }
 
   @override
@@ -4803,7 +4803,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreenE036fa5f(Object where) {
-    return 'בדיוק במחיר השוק\$where';
+    return 'בדיוק במחיר השוק$where';
   }
 
   @override
@@ -4863,22 +4863,22 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreenD46b7e4d(Object d) {
-    return 'זולה ב-₪\$d בחודש';
+    return 'זולה ב-₪$d בחודש';
   }
 
   @override
   String compareScreenF17583c1(Object d) {
-    return 'יקרה ב-₪\$d בחודש';
+    return 'יקרה ב-₪$d בחודש';
   }
 
   @override
   String compareScreenF1897440(Object d) {
-    return 'גדולה ב-\$d מ\"ר';
+    return 'גדולה ב-$d מ\"ר';
   }
 
   @override
   String compareScreenE791ef57(Object d) {
-    return 'קטנה ב-\$d מ\"ר';
+    return 'קטנה ב-$d מ\"ר';
   }
 
   @override
@@ -4903,22 +4903,22 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String compareScreen56d02b30(Object pct) {
-    return 'מחיר טוב יותר יחסית לשוק (ב-\$pct%)';
+    return 'מחיר טוב יותר יחסית לשוק (ב-$pct%)';
   }
 
   @override
   String compareScreen3bce9322(Object pct) {
-    return 'מחיר פחות טוב יחסית לשוק (ב-\$pct%)';
+    return 'מחיר פחות טוב יחסית לשוק (ב-$pct%)';
   }
 
   @override
   String compareScreen7f897f38(Object mo) {
-    return 'התאמה גבוהה יותר לך (\$mo%)';
+    return 'התאמה גבוהה יותר לך ($mo%)';
   }
 
   @override
   String compareScreen95af2d2f(Object mo) {
-    return 'התאמה נמוכה יותר (\$mo%)';
+    return 'התאמה נמוכה יותר ($mo%)';
   }
 
   @override
@@ -5474,7 +5474,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String nearbyPlacesCard9197afde(Object hidden) {
-    return 'צפה בכולם (+\$hidden)';
+    return 'צפה בכולם (+$hidden)';
   }
 
   @override
@@ -5566,7 +5566,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String nearbyPlacesCardE927ed2c(Object name) {
-    return 'נחפש את «\$name» בגוגל.';
+    return 'נחפש את «$name» בגוגל.';
   }
 
   @override
@@ -5654,7 +5654,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String panoramaSweepCapture28da4336(Object msg) {
-    return '\$_stitchMsg\\n\\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.';
+    return '$msg\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.';
   }
 
   @override
@@ -5884,7 +5884,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String contractFormScreenBf1cf58d(Object m) {
-    return '\$m חודשים';
+    return '$m חודשים';
   }
 
   @override
@@ -5911,7 +5911,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String contractFormScreen311875d1(Object price) {
-    return 'פיצ׳ר בתשלום · \$priceShekel₪';
+    return 'פיצ׳ר בתשלום · $price₪';
   }
 
   @override
@@ -5937,7 +5937,7 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String contractFormScreenFa001394(Object price) {
-    return 'המשך לתשלום \$priceShekel ₪';
+    return 'המשך לתשלום $price ₪';
   }
 
   @override

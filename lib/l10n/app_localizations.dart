@@ -8120,7 +8120,7 @@ abstract class AppLocalizations {
   /// No description provided for @landlordDashboardScreen9c8fa644.
   ///
   /// In he, this message translates to:
-  /// **'\$pendingCount מועמדים ממתינים לאישורך'**
+  /// **'{pendingCount} מועמדים ממתינים לאישורך'**
   String landlordDashboardScreen9c8fa644(Object pendingCount);
 
   /// No description provided for @landlordDashboardScreen99884c14.
@@ -8174,7 +8174,7 @@ abstract class AppLocalizations {
   /// No description provided for @landlordDashboardScreenEd3747d9.
   ///
   /// In he, this message translates to:
-  /// **'\$pendingCount ממתינים לאישור שלך'**
+  /// **'{pendingCount} ממתינים לאישור שלך'**
   String landlordDashboardScreenEd3747d9(Object pendingCount);
 
   /// No description provided for @landlordDashboardScreen8a106a06.
@@ -8396,7 +8396,7 @@ abstract class AppLocalizations {
   /// No description provided for @landlordDashboardScreenE8a3f079.
   ///
   /// In he, this message translates to:
-  /// **'\$totalInquiries פניות'**
+  /// **'{totalInquiries} פניות'**
   String landlordDashboardScreenE8a3f079(Object totalInquiries);
 
   /// No description provided for @landlordDashboardScreen66b405bd.
@@ -8583,7 +8583,7 @@ abstract class AppLocalizations {
   /// No description provided for @landlordDashboardScreen6db621c3.
   ///
   /// In he, this message translates to:
-  /// **'צפייה הבאה · \$who'**
+  /// **'צפייה הבאה · {who}'**
   String landlordDashboardScreen6db621c3(Object who);
 
   /// No description provided for @landlordDashboardScreen7dec25c8.
@@ -8637,7 +8637,7 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreenA8bb36b3.
   ///
   /// In he, this message translates to:
-  /// **'לשים לב: \$caveat'**
+  /// **'לשים לב: {caveat}'**
   String compareScreenA8bb36b3(Object caveat);
 
   /// No description provided for @compareScreenC25ab447.
@@ -8661,7 +8661,7 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreen08920749.
   ///
   /// In he, this message translates to:
-  /// **' ב\$city'**
+  /// **' ב{city}'**
   String compareScreen08920749(Object city);
 
   /// No description provided for @compareScreen651fe4ea.
@@ -8673,7 +8673,7 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreenE97266c1.
   ///
   /// In he, this message translates to:
-  /// **'כ-\$pct% מתחת למחיר השוק\$where — מחיר טוב'**
+  /// **'כ-{pct}% מתחת למחיר השוק{where} — מחיר טוב'**
   String compareScreenE97266c1(Object pct, Object where);
 
   /// No description provided for @compareScreen2514977c.
@@ -8685,7 +8685,7 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreenE036fa5f.
   ///
   /// In he, this message translates to:
-  /// **'בדיוק במחיר השוק\$where'**
+  /// **'בדיוק במחיר השוק{where}'**
   String compareScreenE036fa5f(Object where);
 
   /// No description provided for @compareScreen41c2e13a.
@@ -8775,25 +8775,25 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreenD46b7e4d.
   ///
   /// In he, this message translates to:
-  /// **'זולה ב-₪\$d בחודש'**
+  /// **'זולה ב-₪{d} בחודש'**
   String compareScreenD46b7e4d(Object d);
 
   /// No description provided for @compareScreenF17583c1.
   ///
   /// In he, this message translates to:
-  /// **'יקרה ב-₪\$d בחודש'**
+  /// **'יקרה ב-₪{d} בחודש'**
   String compareScreenF17583c1(Object d);
 
   /// No description provided for @compareScreenF1897440.
   ///
   /// In he, this message translates to:
-  /// **'גדולה ב-\$d מ\"ר'**
+  /// **'גדולה ב-{d} מ\"ר'**
   String compareScreenF1897440(Object d);
 
   /// No description provided for @compareScreenE791ef57.
   ///
   /// In he, this message translates to:
-  /// **'קטנה ב-\$d מ\"ר'**
+  /// **'קטנה ב-{d} מ\"ר'**
   String compareScreenE791ef57(Object d);
 
   /// No description provided for @compareScreen5d0daead.
@@ -8823,25 +8823,25 @@ abstract class AppLocalizations {
   /// No description provided for @compareScreen56d02b30.
   ///
   /// In he, this message translates to:
-  /// **'מחיר טוב יותר יחסית לשוק (ב-\$pct%)'**
+  /// **'מחיר טוב יותר יחסית לשוק (ב-{pct}%)'**
   String compareScreen56d02b30(Object pct);
 
   /// No description provided for @compareScreen3bce9322.
   ///
   /// In he, this message translates to:
-  /// **'מחיר פחות טוב יחסית לשוק (ב-\$pct%)'**
+  /// **'מחיר פחות טוב יחסית לשוק (ב-{pct}%)'**
   String compareScreen3bce9322(Object pct);
 
   /// No description provided for @compareScreen7f897f38.
   ///
   /// In he, this message translates to:
-  /// **'התאמה גבוהה יותר לך (\$mo%)'**
+  /// **'התאמה גבוהה יותר לך ({mo}%)'**
   String compareScreen7f897f38(Object mo);
 
   /// No description provided for @compareScreen95af2d2f.
   ///
   /// In he, this message translates to:
-  /// **'התאמה נמוכה יותר (\$mo%)'**
+  /// **'התאמה נמוכה יותר ({mo}%)'**
   String compareScreen95af2d2f(Object mo);
 
   /// No description provided for @compareScreenE33e9eb9.
@@ -9795,7 +9795,7 @@ abstract class AppLocalizations {
   /// No description provided for @nearbyPlacesCard9197afde.
   ///
   /// In he, this message translates to:
-  /// **'צפה בכולם (+\$hidden)'**
+  /// **'צפה בכולם (+{hidden})'**
   String nearbyPlacesCard9197afde(Object hidden);
 
   /// No description provided for @nearbyPlacesCard6192614d.
@@ -9963,7 +9963,7 @@ abstract class AppLocalizations {
   /// No description provided for @nearbyPlacesCardE927ed2c.
   ///
   /// In he, this message translates to:
-  /// **'נחפש את «\$name» בגוגל.'**
+  /// **'נחפש את «{name}» בגוגל.'**
   String nearbyPlacesCardE927ed2c(Object name);
 
   /// No description provided for @nearbyPlacesCardA7c55a8d.
@@ -10107,7 +10107,7 @@ abstract class AppLocalizations {
   /// No description provided for @panoramaSweepCapture28da4336.
   ///
   /// In he, this message translates to:
-  /// **'\$_stitchMsg\\n\\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.'**
+  /// **'{msg}\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.'**
   String panoramaSweepCapture28da4336(Object msg);
 
   /// No description provided for @panoramaSweepCaptureC5ffac09.
@@ -10491,7 +10491,7 @@ abstract class AppLocalizations {
   /// No description provided for @contractFormScreenBf1cf58d.
   ///
   /// In he, this message translates to:
-  /// **'\$m חודשים'**
+  /// **'{m} חודשים'**
   String contractFormScreenBf1cf58d(Object m);
 
   /// No description provided for @contractFormScreenB7cdc163.
@@ -10539,7 +10539,7 @@ abstract class AppLocalizations {
   /// No description provided for @contractFormScreen311875d1.
   ///
   /// In he, this message translates to:
-  /// **'פיצ׳ר בתשלום · \$priceShekel₪'**
+  /// **'פיצ׳ר בתשלום · {price}₪'**
   String contractFormScreen311875d1(Object price);
 
   /// No description provided for @contractFormScreen82a64993.
@@ -10581,7 +10581,7 @@ abstract class AppLocalizations {
   /// No description provided for @contractFormScreenFa001394.
   ///
   /// In he, this message translates to:
-  /// **'המשך לתשלום \$priceShekel ₪'**
+  /// **'המשך לתשלום {price} ₪'**
   String contractFormScreenFa001394(Object price);
 
   /// No description provided for @contractFormScreen98c8a5b8.
