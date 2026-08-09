@@ -10747,4 +10747,763 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get roomScanFlow463d28e8 => 'חדר';
+
+  @override
+  String get addPropertyScreenSectionPropertyDetails => 'פרטי הנכס';
+
+  @override
+  String get addPropertyScreenTypeApartment => 'דירה';
+
+  @override
+  String get addPropertyScreenTypePenthouse => 'דירת גג';
+
+  @override
+  String get addPropertyScreenTypeGardenApartment => 'דירת גן';
+
+  @override
+  String get addPropertyScreenTypeStudio => 'סטודיו';
+
+  @override
+  String get addPropertyScreenTypeCottage => 'קוטג׳';
+
+  @override
+  String get addPropertyScreenTypePrivateHouse => 'בית פרטי';
+
+  @override
+  String get addPropertyScreenTypeOffice => 'משרד';
+
+  @override
+  String get addPropertyScreenConditionNew => 'חדש מקבלן';
+
+  @override
+  String get addPropertyScreenConditionRenovated => 'משופץ';
+
+  @override
+  String get addPropertyScreenConditionGood => 'תקין';
+
+  @override
+  String get addPropertyScreenConditionOld => 'ישן';
+
+  @override
+  String get addPropertyScreenFloorBasement => 'מרתף';
+
+  @override
+  String get addPropertyScreenFloorGround => 'קרקע';
+
+  @override
+  String get addPropertyScreenFeatureBalcony => 'מרפסת';
+
+  @override
+  String get addPropertyScreenFeatureParking => 'חניה';
+
+  @override
+  String get addPropertyScreenFeatureStorage => 'מחסן';
+
+  @override
+  String get addPropertyScreenFeatureAc => 'מזגן';
+
+  @override
+  String get addPropertyScreenFeatureMamad => 'ממ\"ד';
+
+  @override
+  String get addPropertyScreenFeatureSunBalcony => 'מרפסת שמש';
+
+  @override
+  String get addPropertyScreenFeatureGarden => 'גינה';
+
+  @override
+  String get addPropertyScreenFeatureElevator => 'מעלית';
+
+  @override
+  String get addPropertyScreenFeatureFurniture => 'ריהוט';
+
+  @override
+  String get addPropertyScreenFeatureInternetIncluded => 'אינטרנט כלול';
+
+  @override
+  String get addPropertyScreenFeatureEquippedKitchen => 'מטבח מאובזר';
+
+  @override
+  String get addPropertyScreenFeaturePetsAllowed => 'חיות מחמד מותר';
+
+  @override
+  String get addPropertyScreenFeatureLaundryIncluded => 'כביסה כלולה';
+
+  @override
+  String get addPropertyScreenFeatureSecurity => 'שומר/אבטחה';
+
+  @override
+  String get addPropertyScreenFeatureAccessibility => 'נגישות לנכים';
+
+  @override
+  String get addPropertyScreenFeatureSharedRoof => 'גג משותף';
+
+  @override
+  String get addPropertyScreenFeaturePool => 'בריכה';
+
+  @override
+  String get addPropertyScreenFeatureGym => 'חדר כושר';
+
+  @override
+  String get addPropertyScreenFeatureBars => 'סורגים';
+
+  @override
+  String get addPropertyScreenFeatureRenovated => 'משופצת';
+
+  @override
+  String get addPropertyScreenFeatureRoommateFriendly => 'מתאימה לשותפים';
+
+  @override
+  String get addPropertyScreenFeatureShelter => 'מקלט';
+
+  @override
+  String get addPropertyScreenFeatureFloorProtectedSpace => 'מרחב מוגן קומתי';
+
+  @override
+  String get addPropertyScreenFeatureBasement => 'מרתף';
+
+  @override
+  String get addPropertyScreenFeatureCentralHeating => 'חימום מרכזי';
+
+  @override
+  String get addPropertyScreenFeatureBedroomAc => 'מזגן בחדרי שינה';
+
+  @override
+  String get addPropertyScreenFeatureWashingMachine => 'מכונת כביסה';
+
+  @override
+  String get addPropertyScreenFeatureFridge => 'מקרר';
+
+  @override
+  String get addPropertyScreenFeatureOven => 'תנור';
+
+  @override
+  String get addPropertyScreenFeatureDishwasher => 'מדיח כלים';
+
+  @override
+  String get addPropertyScreenFeatureSmartHome => 'בקרה חכמה בבית';
+
+  @override
+  String get addPropertyScreenFeatureUndergroundParking => 'חניה תת קרקעית';
+
+  @override
+  String get addPropertyScreenFeatureSoundSystem => 'מערכת סאונד';
+
+  @override
+  String get addPropertyScreenFeaturePrivateEntrance => 'כניסה פרטית';
+
+  @override
+  String get authScreenFeatureBalcony => 'מרפסת';
+
+  @override
+  String get authScreenFeatureParking => 'חניה';
+
+  @override
+  String get authScreenFeatureElevator => 'מעלית';
+
+  @override
+  String get authScreenFeatureAc => 'מיזוג';
+
+  @override
+  String get authScreenFeatureSafeRoom => 'ממ\"ד';
+
+  @override
+  String get authScreenFeatureStorage => 'מחסן';
+
+  @override
+  String get authScreenFeatureGarden => 'גינה';
+
+  @override
+  String get authScreenFeatureFurnished => 'ריהוט';
+
+  @override
+  String get authScreenFeaturePets => 'מחמדים';
+
+  @override
+  String get authScreenFeatureInternet => 'אינטרנט';
+
+  @override
+  String get profileTagsCategoryHouseholdStatus => 'סטטוס ומשק בית';
+
+  @override
+  String get profileTagsCategoryLifestyle => 'אורח חיים';
+
+  @override
+  String get profileTagsCategoryApartmentRequirements => 'דרישות מהדירה';
+
+  @override
+  String get profileTagsCategoryContractPayment => 'חוזה ותשלום';
+
+  @override
+  String get profileTagsCategoryAboutMyProperty => 'על הנכס שלי';
+
+  @override
+  String get profileTagsCategorySuitableFor => 'מתאים ל';
+
+  @override
+  String get profileTagsCategoryContractRequirements => 'חוזה ודרישות';
+
+  @override
+  String get profileTagsCategoryService => 'שירות';
+
+  @override
+  String get profileTagsSingle => 'יחיד/ה';
+
+  @override
+  String get profileTagsCouple => 'זוג';
+
+  @override
+  String get profileTagsFamilyWithKids => 'משפחה עם ילדים';
+
+  @override
+  String get profileTagsSeekingRoommates => 'מחפש/ת שותפים';
+
+  @override
+  String get profileTagsStudent => 'סטודנט/ית';
+
+  @override
+  String get profileTagsWorkingProfessionals => 'אנשי מקצוע עובדים';
+
+  @override
+  String get profileTagsWorksFromHome => 'עובד/ת מהבית';
+
+  @override
+  String get profileTagsNonSmoker => 'לא מעשן/ת';
+
+  @override
+  String get profileTagsHasPets => 'יש לי חיות מחמד';
+
+  @override
+  String get profileTagsNoPets => 'ללא חיות מחמד';
+
+  @override
+  String get profileTagsQuietTidy => 'שקט/ה ומסודר/ת';
+
+  @override
+  String get profileTagsVegetarian => 'צמחוני/ת';
+
+  @override
+  String get profileTagsReligiousLifestyle => 'אורח חיים דתי';
+
+  @override
+  String get profileTagsShabbatObservant => 'שומר/ת שבת';
+
+  @override
+  String get profileTagsMustHaveParking => 'חייב/ת חניה';
+
+  @override
+  String get profileTagsFurnished => 'מרוהטת';
+
+  @override
+  String get profileTagsElevator => 'מעלית';
+
+  @override
+  String get profileTagsBalcony => 'מרפסת';
+
+  @override
+  String get profileTagsShelter => 'ממ\"ד / מקלט';
+
+  @override
+  String get profileTagsAc => 'מיזוג אוויר';
+
+  @override
+  String get profileTagsAccessibleForDisabled => 'נגישות לנכים';
+
+  @override
+  String get profileTagsPetFriendly => 'מתאים לחיות מחמד';
+
+  @override
+  String get profileTagsPrivateShelter => 'ממ\"ד פרטי';
+
+  @override
+  String get profileTagsIncomeProofReady => 'אישור הכנסה מוכן';
+
+  @override
+  String get profileTagsHasGuarantors => 'יש לי ערבים';
+
+  @override
+  String get profileTagsLongTermRental => 'שכירות ארוכת טווח';
+
+  @override
+  String get profileTagsShortTermRental => 'שכירות לטווח קצר';
+
+  @override
+  String get profileTagsImmediateMoveIn => 'כניסה מיידית';
+
+  @override
+  String get profileTagsFlexibleMoveInDate => 'גמיש/ה במועד הכניסה';
+
+  @override
+  String get profileTagsAdvancePaymentPossible => 'תשלום מראש אפשרי';
+
+  @override
+  String get profileTagsExperiencedTenantWithReferences =>
+      'שוכר/ת ותיק/ה עם המלצות';
+
+  @override
+  String get profileTagsApartmentFurnished => 'הדירה מרוהטת';
+
+  @override
+  String get profileTagsHasParking => 'יש חניה';
+
+  @override
+  String get profileTagsHasElevator => 'יש מעלית';
+
+  @override
+  String get profileTagsHasBalcony => 'יש מרפסת';
+
+  @override
+  String get profileTagsAccessibleApartment => 'דירה נגישה';
+
+  @override
+  String get profileTagsRenovatedProperty => 'נכס משופץ';
+
+  @override
+  String get profileTagsAllowsPets => 'מאפשר בעלי חיים';
+
+  @override
+  String get profileTagsSuitableForCouples => 'מתאים לזוגות';
+
+  @override
+  String get profileTagsSuitableForFamilies => 'מתאים למשפחות';
+
+  @override
+  String get profileTagsSuitableForRoommates => 'מתאים לשותפים';
+
+  @override
+  String get profileTagsSuitableForStudents => 'מתאים לסטודנטים';
+
+  @override
+  String get profileTagsPrefersNonSmokingTenants => 'מעדיף שוכרים לא מעשנים';
+
+  @override
+  String get profileTagsSeeksQuietTenants => 'מחפש שוכרים שקטים';
+
+  @override
+  String get profileTagsProperContract => 'חוזה מסודר';
+
+  @override
+  String get profileTagsLongTermContract => 'חוזה ארוך טווח';
+
+  @override
+  String get profileTagsAllowsShortTerm => 'מאפשר טווח קצר';
+
+  @override
+  String get profileTagsRequiresIncomeProof => 'דורש אישור הכנסה';
+
+  @override
+  String get profileTagsRequiresGuarantors => 'דורש ערבים';
+
+  @override
+  String get profileTagsPriceFlexibility => 'גמישות במחיר';
+
+  @override
+  String get profileTagsNoBroker => 'ללא תיווך';
+
+  @override
+  String get profileTagsQuickResponse => 'תגובה מהירה';
+
+  @override
+  String get profileTagsPropertyManagementExperience => 'ניסיון בניהול נכסים';
+
+  @override
+  String get profileTagsAvailableForEveningTours => 'זמין לסיורים גם בערב';
+
+  @override
+  String get profileTagsPersonalizedTenantService => 'יחס אישי לשוכרים';
+
+  @override
+  String get rentalModelsLifestyleChiloni => 'חילוני/ת';
+
+  @override
+  String get rentalModelsLifestyleMasorti => 'מסורתי/ת';
+
+  @override
+  String get rentalModelsLifestyleDati => 'דתי/ה';
+
+  @override
+  String get rentalModelsLifestyleCharedi => 'חרדי/ת';
+
+  @override
+  String get rentalModelsPetTypeNone => 'אין';
+
+  @override
+  String get rentalModelsPetTypeCat => 'חתול';
+
+  @override
+  String get rentalModelsPetTypeDogSmall => 'כלב קטן';
+
+  @override
+  String get rentalModelsPetTypeDogLarge => 'כלב גדול';
+
+  @override
+  String get rentalModelsPetTypeOther => 'אחר';
+
+  @override
+  String get rentalModelsMoveInImmediate => 'מיידי';
+
+  @override
+  String get rentalModelsMoveInMonth => 'עד חודש';
+
+  @override
+  String get rentalModelsMoveInQuarter => 'עד 3 חודשים';
+
+  @override
+  String get rentalModelsMoveInFlexible => 'גמיש';
+
+  @override
+  String get rentalModelsUrgencyNow => 'מחפש/ת לעכשיו';
+
+  @override
+  String get rentalModelsUrgencySoon => 'לא דחוף';
+
+  @override
+  String get rentalModelsUrgencyBrowsing => 'רק מתעניין/ת';
+
+  @override
+  String get rentalModelsFeatureBalcony => 'מרפסת';
+
+  @override
+  String get rentalModelsFeatureParking => 'חניה';
+
+  @override
+  String get rentalModelsFeatureStorage => 'מחסן';
+
+  @override
+  String get rentalModelsFeatureAirConditioning => 'מזגן';
+
+  @override
+  String get rentalModelsFeatureMamad => 'ממ\"ד';
+
+  @override
+  String get rentalModelsFeatureSunBalcony => 'מרפסת שמש';
+
+  @override
+  String get rentalModelsFeatureGarden => 'גינה';
+
+  @override
+  String get rentalModelsFeatureElevator => 'מעלית';
+
+  @override
+  String get rentalModelsFeatureFurnished => 'ריהוט';
+
+  @override
+  String get rentalModelsFeatureInternetIncluded => 'אינטרנט כלול';
+
+  @override
+  String get rentalModelsFeatureEquippedKitchen => 'מטבח מאובזר';
+
+  @override
+  String get rentalModelsFeaturePetsAllowed => 'חיות מחמד מותר';
+
+  @override
+  String get rentalModelsFeatureLaundryIncluded => 'כביסה כלולה';
+
+  @override
+  String get rentalModelsFeatureSecurity => 'שומר/אבטחה';
+
+  @override
+  String get rentalModelsFeatureAccessible => 'נגישות לנכים';
+
+  @override
+  String get rentalModelsFeatureSharedRoof => 'גג משותף';
+
+  @override
+  String get rentalModelsFeaturePool => 'בריכה';
+
+  @override
+  String get rentalModelsFeatureGym => 'חדר כושר';
+
+  @override
+  String get rentalModelsFeatureBars => 'סורגים';
+
+  @override
+  String get rentalModelsFeatureRenovated => 'משופצת';
+
+  @override
+  String get rentalModelsFeatureRoommates => 'מתאימה לשותפים';
+
+  @override
+  String get rentalModelsFeatureBombShelter => 'מקלט';
+
+  @override
+  String get rentalModelsFeatureSafeFloorSpace => 'מרחב מוגן קומתי';
+
+  @override
+  String get rentalModelsFeatureBasement => 'מרתף';
+
+  @override
+  String get rentalModelsFeatureCentralHeating => 'חימום מרכזי';
+
+  @override
+  String get rentalModelsFeatureBedroomAc => 'מזגן בחדרי שינה';
+
+  @override
+  String get rentalModelsFeatureWashingMachine => 'מכונת כביסה';
+
+  @override
+  String get rentalModelsFeatureRefrigerator => 'מקרר';
+
+  @override
+  String get rentalModelsFeatureOven => 'תנור';
+
+  @override
+  String get rentalModelsFeatureDishwasher => 'מדיח כלים';
+
+  @override
+  String get rentalModelsFeatureSmartHome => 'בקרה חכמה בבית';
+
+  @override
+  String get rentalModelsFeatureUndergroundParking => 'חניה תת קרקעית';
+
+  @override
+  String get rentalModelsFeatureSoundSystem => 'מערכת סאונד';
+
+  @override
+  String get rentalModelsFeaturePrivateEntrance => 'כניסה פרטית';
+
+  @override
+  String get rentalModelsFeatureCctv => 'מצלמות אבטחה';
+
+  @override
+  String get rentalModelsFeatureAlarmSystem => 'מערכת אזעקה';
+
+  @override
+  String get rentalModelsFeatureIntercom => 'אינטרקום';
+
+  @override
+  String get rentalModelsFeatureElectricity => 'חשמל כלול';
+
+  @override
+  String get rentalModelsFeatureWater => 'מים כלולים';
+
+  @override
+  String get rentalModelsFeatureNaturalLight => 'אור טבעי';
+
+  @override
+  String get rentalModelsFeatureQuietArea => 'אזור שקט';
+
+  @override
+  String get rentalModelsFeaturePetFriendly => 'מתאים לחיות מחמד';
+
+  @override
+  String get rentalModelsFeatureAttachedParking => 'חניה מוצמדת';
+
+  @override
+  String get rentalModelsFeatureSecureEntrance => 'כניסה מאובטחת';
+
+  @override
+  String get rentalModelsFeatureNearPublicTransport => 'קרוב לתחבורה ציבורית';
+
+  @override
+  String get rentalModelsFeatureOptionalFurnished => 'ריהוט אופציונלי';
+
+  @override
+  String get rentalModelsFeatureNearSea => 'קרוב לים';
+
+  @override
+  String get rentalModelsFeatureNearPark => 'קרוב לפארק';
+
+  @override
+  String get brokerPipelineScreenSourcePhone => 'טלפון';
+
+  @override
+  String get brokerPipelineScreenSourceWalkIn => 'הגיע למשרד';
+
+  @override
+  String get brokerPipelineScreenSourceOther => 'אחר';
+
+  @override
+  String get nearbyPlacesCardChipSuffixMasc => ' קרובים';
+
+  @override
+  String get nearbyPlacesCardChipSuffixFem => ' קרובות';
+
+  @override
+  String get panoramaSplatViewWaypointEntrance => 'כניסה';
+
+  @override
+  String get panoramaSplatViewWaypointCenter => 'מרכז';
+
+  @override
+  String get panoramaSplatViewWaypointInterior => 'פנים';
+
+  @override
+  String get taxHelperScreenAnnualReportNote =>
+      ' בסכומים גבוהים (מעל ₪375,000 בשנה) צריך גם להגיש דוח שנתי.';
+
+  @override
+  String brokerCmaScreenPerSqm(Object money) {
+    return ' · $money/מ״ר';
+  }
+
+  @override
+  String askRentlySheetFloorWithTotal(Object floor, Object total) {
+    return 'הדירה בקומה $floor מתוך $total.';
+  }
+
+  @override
+  String askRentlySheetFloorNoTotal(Object floor) {
+    return 'הדירה בקומה $floor.';
+  }
+
+  @override
+  String askRentlySheetRoomsAnswer(Object rooms) {
+    return 'בדירה $rooms חדרים.';
+  }
+
+  @override
+  String askRentlySheetSizeAnswer(Object size) {
+    return 'שטח הדירה כ-$size מ״ר.';
+  }
+
+  @override
+  String askRentlySheetPriceAnswer(Object price) {
+    return 'שכר הדירה $price ₪ לחודש.';
+  }
+
+  @override
+  String get askRentlySheetParkingYes => 'כן, יש חניה לדירה.';
+
+  @override
+  String get askRentlySheetParkingNo =>
+      'לא צוינה חניה בפרטי הדירה — כדאי לוודא מול בעל הנכס.';
+
+  @override
+  String get askRentlySheetPetsYes => 'כן, מותר להחזיק חיות מחמד.';
+
+  @override
+  String get askRentlySheetPetsNo =>
+      'לא צוין שמותר להחזיק חיות — עדיף לשאול את בעל הנכס ישירות.';
+
+  @override
+  String get askRentlySheetElevatorYes => 'כן, יש מעלית בבניין.';
+
+  @override
+  String get askRentlySheetElevatorNo => 'לא צוינה מעלית בפרטי הדירה.';
+
+  @override
+  String get askRentlySheetBalconyYes => 'כן, יש מרפסת.';
+
+  @override
+  String get askRentlySheetBalconyNo => 'לא צוינה מרפסת בפרטי הדירה.';
+
+  @override
+  String get askRentlySheetMamadYes => 'כן, יש ממ״ד.';
+
+  @override
+  String get askRentlySheetMamadNo => 'לא צוין ממ״ד בפרטי הדירה.';
+
+  @override
+  String get askRentlySheetAcYes => 'כן, יש מיזוג אוויר.';
+
+  @override
+  String get askRentlySheetAcNo => 'לא צוין מיזוג בפרטי הדירה.';
+
+  @override
+  String get askRentlySheetFurnishedYes => 'כן, הדירה מרוהטת.';
+
+  @override
+  String get askRentlySheetFurnishedNo => 'לא צוין ריהוט בפרטי הדירה.';
+
+  @override
+  String askRentlySheetEntryAnswer(Object date) {
+    return 'תאריך הכניסה: $date.';
+  }
+
+  @override
+  String get askRentlySheetEntryUnknown =>
+      'לא צוין תאריך כניסה — כדאי לתאם עם בעל הנכס.';
+
+  @override
+  String get askRentlySheetTransitNone =>
+      'לא נמצאה תחנת רכבת/רק״ל במרחק הליכה (עד 2 ק״מ).';
+
+  @override
+  String askRentlySheetDistMeters(Object m) {
+    return '$m מ׳';
+  }
+
+  @override
+  String askRentlySheetDistKm(Object km) {
+    return '$km ק״מ';
+  }
+
+  @override
+  String askRentlySheetTransitFound(Object dist, Object name) {
+    return 'התחנה הקרובה: $name — כ-$dist מהדירה.';
+  }
+
+  @override
+  String askRentlySheetLocationAnswer(Object loc) {
+    return 'הדירה נמצאת ב$loc.';
+  }
+
+  @override
+  String datingProviderFitPercentLabel(Object percent) {
+    return '$percent% התאמה';
+  }
+
+  @override
+  String get datingProviderLeadReasonBudgetFits => 'התקציב מתאים למחיר';
+
+  @override
+  String get datingProviderLeadReasonTimingFits => 'כניסה בזמן שמתאים לך';
+
+  @override
+  String roomScanFlowDefaultRoomName(Object n) {
+    return 'חדר $n';
+  }
+
+  @override
+  String get datingProviderTenantFallbackName => 'השוכר/ת';
+
+  @override
+  String get datingProviderPropertyFallbackName => 'הנכס';
+
+  @override
+  String get datingProviderViewingReminderTitle => 'צפייה בדירה בעוד שעה';
+
+  @override
+  String datingProviderViewingReminderBody(
+      Object address, Object time, Object who) {
+    return 'צפייה עם $who ב$address בשעה $time';
+  }
+
+  @override
+  String get datingProviderLandlordFallbackName => 'בעל הדירה';
+
+  @override
+  String datingProviderContractSentMessage(Object months, Object rent) {
+    return 'שלחתי חוזה שכירות דיגיטלי לחתימה: ₪$rent לחודש, ל-$months חודשים.';
+  }
+
+  @override
+  String get datingProviderSignedAsLandlord => 'חתמתי על החוזה כבעל הדירה. ✍️';
+
+  @override
+  String get datingProviderSignedAsTenant => 'חתמתי על החוזה כשוכר/ת. ✍️';
+
+  @override
+  String get datingProviderSystemSenderName => 'מערכת';
+
+  @override
+  String get datingProviderMatchCreatedMessage =>
+      'נוצר מאצ׳. אפשר לפתוח צ׳אט, לשלוח חוזה ולנהל חתימות.';
+
+  @override
+  String get datingProviderDemoMatchMessage1 =>
+      'נוצר מאצ׳ — שני הצדדים הסכימו להתקדם.';
+
+  @override
+  String get datingProviderDemoMatchMessage2 =>
+      'נוצר מאצ׳ — שני הצדדים מעוניינים.';
+
+  @override
+  String get datingProviderDemoMatchMessage3 =>
+      'התאמה חדשה! שני הצדדים הראו עניין.';
+
+  @override
+  String get datingProviderDefaultContactMessage =>
+      'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂';
 }

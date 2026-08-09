@@ -351,7 +351,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        lead.source,
+                        _sourceLabel(lead.source, l10n),
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -558,6 +558,23 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   }
 }
 
+/// Display label for a lead source value. The underlying value stays as the
+/// canonical Hebrew/English string stored on [BrokerLead.source] (compared
+/// against `_source == s` in [_AddLeadSheetState] and persisted as-is); only
+/// the rendered text is localized.
+String _sourceLabel(String value, AppLocalizations l10n) {
+  switch (value) {
+    case 'טלפון':
+      return l10n.brokerPipelineScreenSourcePhone;
+    case 'הגיע למשרד':
+      return l10n.brokerPipelineScreenSourceWalkIn;
+    case 'אחר':
+      return l10n.brokerPipelineScreenSourceOther;
+    default:
+      return value;
+  }
+}
+
 /// Bottom sheet that collects a new lead. Returns a [BrokerLead] on save.
 class _AddLeadSheet extends StatefulWidget {
   _AddLeadSheet({required this.properties});
@@ -645,7 +662,8 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                 children: [
                   for (final s in _sources)
                     ChoiceChip(
-                      label: Text(s, style: const TextStyle(fontSize: 15)),
+                      label: Text(_sourceLabel(s, l10n),
+                          style: const TextStyle(fontSize: 15)),
                       selected: _source == s,
                       selectedColor: AppColors.primaryLight2,
                       onSelected: (_) => setState(() => _source = s),

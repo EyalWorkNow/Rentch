@@ -18915,6 +18915,1441 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'חדר'**
   String get roomScanFlow463d28e8;
+
+  /// No description provided for @addPropertyScreenSectionPropertyDetails.
+  ///
+  /// In he, this message translates to:
+  /// **'פרטי הנכס'**
+  String get addPropertyScreenSectionPropertyDetails;
+
+  /// No description provided for @addPropertyScreenTypeApartment.
+  ///
+  /// In he, this message translates to:
+  /// **'דירה'**
+  String get addPropertyScreenTypeApartment;
+
+  /// No description provided for @addPropertyScreenTypePenthouse.
+  ///
+  /// In he, this message translates to:
+  /// **'דירת גג'**
+  String get addPropertyScreenTypePenthouse;
+
+  /// No description provided for @addPropertyScreenTypeGardenApartment.
+  ///
+  /// In he, this message translates to:
+  /// **'דירת גן'**
+  String get addPropertyScreenTypeGardenApartment;
+
+  /// No description provided for @addPropertyScreenTypeStudio.
+  ///
+  /// In he, this message translates to:
+  /// **'סטודיו'**
+  String get addPropertyScreenTypeStudio;
+
+  /// No description provided for @addPropertyScreenTypeCottage.
+  ///
+  /// In he, this message translates to:
+  /// **'קוטג׳'**
+  String get addPropertyScreenTypeCottage;
+
+  /// No description provided for @addPropertyScreenTypePrivateHouse.
+  ///
+  /// In he, this message translates to:
+  /// **'בית פרטי'**
+  String get addPropertyScreenTypePrivateHouse;
+
+  /// No description provided for @addPropertyScreenTypeOffice.
+  ///
+  /// In he, this message translates to:
+  /// **'משרד'**
+  String get addPropertyScreenTypeOffice;
+
+  /// No description provided for @addPropertyScreenConditionNew.
+  ///
+  /// In he, this message translates to:
+  /// **'חדש מקבלן'**
+  String get addPropertyScreenConditionNew;
+
+  /// No description provided for @addPropertyScreenConditionRenovated.
+  ///
+  /// In he, this message translates to:
+  /// **'משופץ'**
+  String get addPropertyScreenConditionRenovated;
+
+  /// No description provided for @addPropertyScreenConditionGood.
+  ///
+  /// In he, this message translates to:
+  /// **'תקין'**
+  String get addPropertyScreenConditionGood;
+
+  /// No description provided for @addPropertyScreenConditionOld.
+  ///
+  /// In he, this message translates to:
+  /// **'ישן'**
+  String get addPropertyScreenConditionOld;
+
+  /// No description provided for @addPropertyScreenFloorBasement.
+  ///
+  /// In he, this message translates to:
+  /// **'מרתף'**
+  String get addPropertyScreenFloorBasement;
+
+  /// No description provided for @addPropertyScreenFloorGround.
+  ///
+  /// In he, this message translates to:
+  /// **'קרקע'**
+  String get addPropertyScreenFloorGround;
+
+  /// No description provided for @addPropertyScreenFeatureBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת'**
+  String get addPropertyScreenFeatureBalcony;
+
+  /// No description provided for @addPropertyScreenFeatureParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה'**
+  String get addPropertyScreenFeatureParking;
+
+  /// No description provided for @addPropertyScreenFeatureStorage.
+  ///
+  /// In he, this message translates to:
+  /// **'מחסן'**
+  String get addPropertyScreenFeatureStorage;
+
+  /// No description provided for @addPropertyScreenFeatureAc.
+  ///
+  /// In he, this message translates to:
+  /// **'מזגן'**
+  String get addPropertyScreenFeatureAc;
+
+  /// No description provided for @addPropertyScreenFeatureMamad.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד'**
+  String get addPropertyScreenFeatureMamad;
+
+  /// No description provided for @addPropertyScreenFeatureSunBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת שמש'**
+  String get addPropertyScreenFeatureSunBalcony;
+
+  /// No description provided for @addPropertyScreenFeatureGarden.
+  ///
+  /// In he, this message translates to:
+  /// **'גינה'**
+  String get addPropertyScreenFeatureGarden;
+
+  /// No description provided for @addPropertyScreenFeatureElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלית'**
+  String get addPropertyScreenFeatureElevator;
+
+  /// No description provided for @addPropertyScreenFeatureFurniture.
+  ///
+  /// In he, this message translates to:
+  /// **'ריהוט'**
+  String get addPropertyScreenFeatureFurniture;
+
+  /// No description provided for @addPropertyScreenFeatureInternetIncluded.
+  ///
+  /// In he, this message translates to:
+  /// **'אינטרנט כלול'**
+  String get addPropertyScreenFeatureInternetIncluded;
+
+  /// No description provided for @addPropertyScreenFeatureEquippedKitchen.
+  ///
+  /// In he, this message translates to:
+  /// **'מטבח מאובזר'**
+  String get addPropertyScreenFeatureEquippedKitchen;
+
+  /// No description provided for @addPropertyScreenFeaturePetsAllowed.
+  ///
+  /// In he, this message translates to:
+  /// **'חיות מחמד מותר'**
+  String get addPropertyScreenFeaturePetsAllowed;
+
+  /// No description provided for @addPropertyScreenFeatureLaundryIncluded.
+  ///
+  /// In he, this message translates to:
+  /// **'כביסה כלולה'**
+  String get addPropertyScreenFeatureLaundryIncluded;
+
+  /// No description provided for @addPropertyScreenFeatureSecurity.
+  ///
+  /// In he, this message translates to:
+  /// **'שומר/אבטחה'**
+  String get addPropertyScreenFeatureSecurity;
+
+  /// No description provided for @addPropertyScreenFeatureAccessibility.
+  ///
+  /// In he, this message translates to:
+  /// **'נגישות לנכים'**
+  String get addPropertyScreenFeatureAccessibility;
+
+  /// No description provided for @addPropertyScreenFeatureSharedRoof.
+  ///
+  /// In he, this message translates to:
+  /// **'גג משותף'**
+  String get addPropertyScreenFeatureSharedRoof;
+
+  /// No description provided for @addPropertyScreenFeaturePool.
+  ///
+  /// In he, this message translates to:
+  /// **'בריכה'**
+  String get addPropertyScreenFeaturePool;
+
+  /// No description provided for @addPropertyScreenFeatureGym.
+  ///
+  /// In he, this message translates to:
+  /// **'חדר כושר'**
+  String get addPropertyScreenFeatureGym;
+
+  /// No description provided for @addPropertyScreenFeatureBars.
+  ///
+  /// In he, this message translates to:
+  /// **'סורגים'**
+  String get addPropertyScreenFeatureBars;
+
+  /// No description provided for @addPropertyScreenFeatureRenovated.
+  ///
+  /// In he, this message translates to:
+  /// **'משופצת'**
+  String get addPropertyScreenFeatureRenovated;
+
+  /// No description provided for @addPropertyScreenFeatureRoommateFriendly.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאימה לשותפים'**
+  String get addPropertyScreenFeatureRoommateFriendly;
+
+  /// No description provided for @addPropertyScreenFeatureShelter.
+  ///
+  /// In he, this message translates to:
+  /// **'מקלט'**
+  String get addPropertyScreenFeatureShelter;
+
+  /// No description provided for @addPropertyScreenFeatureFloorProtectedSpace.
+  ///
+  /// In he, this message translates to:
+  /// **'מרחב מוגן קומתי'**
+  String get addPropertyScreenFeatureFloorProtectedSpace;
+
+  /// No description provided for @addPropertyScreenFeatureBasement.
+  ///
+  /// In he, this message translates to:
+  /// **'מרתף'**
+  String get addPropertyScreenFeatureBasement;
+
+  /// No description provided for @addPropertyScreenFeatureCentralHeating.
+  ///
+  /// In he, this message translates to:
+  /// **'חימום מרכזי'**
+  String get addPropertyScreenFeatureCentralHeating;
+
+  /// No description provided for @addPropertyScreenFeatureBedroomAc.
+  ///
+  /// In he, this message translates to:
+  /// **'מזגן בחדרי שינה'**
+  String get addPropertyScreenFeatureBedroomAc;
+
+  /// No description provided for @addPropertyScreenFeatureWashingMachine.
+  ///
+  /// In he, this message translates to:
+  /// **'מכונת כביסה'**
+  String get addPropertyScreenFeatureWashingMachine;
+
+  /// No description provided for @addPropertyScreenFeatureFridge.
+  ///
+  /// In he, this message translates to:
+  /// **'מקרר'**
+  String get addPropertyScreenFeatureFridge;
+
+  /// No description provided for @addPropertyScreenFeatureOven.
+  ///
+  /// In he, this message translates to:
+  /// **'תנור'**
+  String get addPropertyScreenFeatureOven;
+
+  /// No description provided for @addPropertyScreenFeatureDishwasher.
+  ///
+  /// In he, this message translates to:
+  /// **'מדיח כלים'**
+  String get addPropertyScreenFeatureDishwasher;
+
+  /// No description provided for @addPropertyScreenFeatureSmartHome.
+  ///
+  /// In he, this message translates to:
+  /// **'בקרה חכמה בבית'**
+  String get addPropertyScreenFeatureSmartHome;
+
+  /// No description provided for @addPropertyScreenFeatureUndergroundParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה תת קרקעית'**
+  String get addPropertyScreenFeatureUndergroundParking;
+
+  /// No description provided for @addPropertyScreenFeatureSoundSystem.
+  ///
+  /// In he, this message translates to:
+  /// **'מערכת סאונד'**
+  String get addPropertyScreenFeatureSoundSystem;
+
+  /// No description provided for @addPropertyScreenFeaturePrivateEntrance.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה פרטית'**
+  String get addPropertyScreenFeaturePrivateEntrance;
+
+  /// No description provided for @authScreenFeatureBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת'**
+  String get authScreenFeatureBalcony;
+
+  /// No description provided for @authScreenFeatureParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה'**
+  String get authScreenFeatureParking;
+
+  /// No description provided for @authScreenFeatureElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלית'**
+  String get authScreenFeatureElevator;
+
+  /// No description provided for @authScreenFeatureAc.
+  ///
+  /// In he, this message translates to:
+  /// **'מיזוג'**
+  String get authScreenFeatureAc;
+
+  /// No description provided for @authScreenFeatureSafeRoom.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד'**
+  String get authScreenFeatureSafeRoom;
+
+  /// No description provided for @authScreenFeatureStorage.
+  ///
+  /// In he, this message translates to:
+  /// **'מחסן'**
+  String get authScreenFeatureStorage;
+
+  /// No description provided for @authScreenFeatureGarden.
+  ///
+  /// In he, this message translates to:
+  /// **'גינה'**
+  String get authScreenFeatureGarden;
+
+  /// No description provided for @authScreenFeatureFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'ריהוט'**
+  String get authScreenFeatureFurnished;
+
+  /// No description provided for @authScreenFeaturePets.
+  ///
+  /// In he, this message translates to:
+  /// **'מחמדים'**
+  String get authScreenFeaturePets;
+
+  /// No description provided for @authScreenFeatureInternet.
+  ///
+  /// In he, this message translates to:
+  /// **'אינטרנט'**
+  String get authScreenFeatureInternet;
+
+  /// No description provided for @profileTagsCategoryHouseholdStatus.
+  ///
+  /// In he, this message translates to:
+  /// **'סטטוס ומשק בית'**
+  String get profileTagsCategoryHouseholdStatus;
+
+  /// No description provided for @profileTagsCategoryLifestyle.
+  ///
+  /// In he, this message translates to:
+  /// **'אורח חיים'**
+  String get profileTagsCategoryLifestyle;
+
+  /// No description provided for @profileTagsCategoryApartmentRequirements.
+  ///
+  /// In he, this message translates to:
+  /// **'דרישות מהדירה'**
+  String get profileTagsCategoryApartmentRequirements;
+
+  /// No description provided for @profileTagsCategoryContractPayment.
+  ///
+  /// In he, this message translates to:
+  /// **'חוזה ותשלום'**
+  String get profileTagsCategoryContractPayment;
+
+  /// No description provided for @profileTagsCategoryAboutMyProperty.
+  ///
+  /// In he, this message translates to:
+  /// **'על הנכס שלי'**
+  String get profileTagsCategoryAboutMyProperty;
+
+  /// No description provided for @profileTagsCategorySuitableFor.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים ל'**
+  String get profileTagsCategorySuitableFor;
+
+  /// No description provided for @profileTagsCategoryContractRequirements.
+  ///
+  /// In he, this message translates to:
+  /// **'חוזה ודרישות'**
+  String get profileTagsCategoryContractRequirements;
+
+  /// No description provided for @profileTagsCategoryService.
+  ///
+  /// In he, this message translates to:
+  /// **'שירות'**
+  String get profileTagsCategoryService;
+
+  /// No description provided for @profileTagsSingle.
+  ///
+  /// In he, this message translates to:
+  /// **'יחיד/ה'**
+  String get profileTagsSingle;
+
+  /// No description provided for @profileTagsCouple.
+  ///
+  /// In he, this message translates to:
+  /// **'זוג'**
+  String get profileTagsCouple;
+
+  /// No description provided for @profileTagsFamilyWithKids.
+  ///
+  /// In he, this message translates to:
+  /// **'משפחה עם ילדים'**
+  String get profileTagsFamilyWithKids;
+
+  /// No description provided for @profileTagsSeekingRoommates.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש/ת שותפים'**
+  String get profileTagsSeekingRoommates;
+
+  /// No description provided for @profileTagsStudent.
+  ///
+  /// In he, this message translates to:
+  /// **'סטודנט/ית'**
+  String get profileTagsStudent;
+
+  /// No description provided for @profileTagsWorkingProfessionals.
+  ///
+  /// In he, this message translates to:
+  /// **'אנשי מקצוע עובדים'**
+  String get profileTagsWorkingProfessionals;
+
+  /// No description provided for @profileTagsWorksFromHome.
+  ///
+  /// In he, this message translates to:
+  /// **'עובד/ת מהבית'**
+  String get profileTagsWorksFromHome;
+
+  /// No description provided for @profileTagsNonSmoker.
+  ///
+  /// In he, this message translates to:
+  /// **'לא מעשן/ת'**
+  String get profileTagsNonSmoker;
+
+  /// No description provided for @profileTagsHasPets.
+  ///
+  /// In he, this message translates to:
+  /// **'יש לי חיות מחמד'**
+  String get profileTagsHasPets;
+
+  /// No description provided for @profileTagsNoPets.
+  ///
+  /// In he, this message translates to:
+  /// **'ללא חיות מחמד'**
+  String get profileTagsNoPets;
+
+  /// No description provided for @profileTagsQuietTidy.
+  ///
+  /// In he, this message translates to:
+  /// **'שקט/ה ומסודר/ת'**
+  String get profileTagsQuietTidy;
+
+  /// No description provided for @profileTagsVegetarian.
+  ///
+  /// In he, this message translates to:
+  /// **'צמחוני/ת'**
+  String get profileTagsVegetarian;
+
+  /// No description provided for @profileTagsReligiousLifestyle.
+  ///
+  /// In he, this message translates to:
+  /// **'אורח חיים דתי'**
+  String get profileTagsReligiousLifestyle;
+
+  /// No description provided for @profileTagsShabbatObservant.
+  ///
+  /// In he, this message translates to:
+  /// **'שומר/ת שבת'**
+  String get profileTagsShabbatObservant;
+
+  /// No description provided for @profileTagsMustHaveParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חייב/ת חניה'**
+  String get profileTagsMustHaveParking;
+
+  /// No description provided for @profileTagsFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'מרוהטת'**
+  String get profileTagsFurnished;
+
+  /// No description provided for @profileTagsElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלית'**
+  String get profileTagsElevator;
+
+  /// No description provided for @profileTagsBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת'**
+  String get profileTagsBalcony;
+
+  /// No description provided for @profileTagsShelter.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד / מקלט'**
+  String get profileTagsShelter;
+
+  /// No description provided for @profileTagsAc.
+  ///
+  /// In he, this message translates to:
+  /// **'מיזוג אוויר'**
+  String get profileTagsAc;
+
+  /// No description provided for @profileTagsAccessibleForDisabled.
+  ///
+  /// In he, this message translates to:
+  /// **'נגישות לנכים'**
+  String get profileTagsAccessibleForDisabled;
+
+  /// No description provided for @profileTagsPetFriendly.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים לחיות מחמד'**
+  String get profileTagsPetFriendly;
+
+  /// No description provided for @profileTagsPrivateShelter.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד פרטי'**
+  String get profileTagsPrivateShelter;
+
+  /// No description provided for @profileTagsIncomeProofReady.
+  ///
+  /// In he, this message translates to:
+  /// **'אישור הכנסה מוכן'**
+  String get profileTagsIncomeProofReady;
+
+  /// No description provided for @profileTagsHasGuarantors.
+  ///
+  /// In he, this message translates to:
+  /// **'יש לי ערבים'**
+  String get profileTagsHasGuarantors;
+
+  /// No description provided for @profileTagsLongTermRental.
+  ///
+  /// In he, this message translates to:
+  /// **'שכירות ארוכת טווח'**
+  String get profileTagsLongTermRental;
+
+  /// No description provided for @profileTagsShortTermRental.
+  ///
+  /// In he, this message translates to:
+  /// **'שכירות לטווח קצר'**
+  String get profileTagsShortTermRental;
+
+  /// No description provided for @profileTagsImmediateMoveIn.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה מיידית'**
+  String get profileTagsImmediateMoveIn;
+
+  /// No description provided for @profileTagsFlexibleMoveInDate.
+  ///
+  /// In he, this message translates to:
+  /// **'גמיש/ה במועד הכניסה'**
+  String get profileTagsFlexibleMoveInDate;
+
+  /// No description provided for @profileTagsAdvancePaymentPossible.
+  ///
+  /// In he, this message translates to:
+  /// **'תשלום מראש אפשרי'**
+  String get profileTagsAdvancePaymentPossible;
+
+  /// No description provided for @profileTagsExperiencedTenantWithReferences.
+  ///
+  /// In he, this message translates to:
+  /// **'שוכר/ת ותיק/ה עם המלצות'**
+  String get profileTagsExperiencedTenantWithReferences;
+
+  /// No description provided for @profileTagsApartmentFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה מרוהטת'**
+  String get profileTagsApartmentFurnished;
+
+  /// No description provided for @profileTagsHasParking.
+  ///
+  /// In he, this message translates to:
+  /// **'יש חניה'**
+  String get profileTagsHasParking;
+
+  /// No description provided for @profileTagsHasElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'יש מעלית'**
+  String get profileTagsHasElevator;
+
+  /// No description provided for @profileTagsHasBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'יש מרפסת'**
+  String get profileTagsHasBalcony;
+
+  /// No description provided for @profileTagsAccessibleApartment.
+  ///
+  /// In he, this message translates to:
+  /// **'דירה נגישה'**
+  String get profileTagsAccessibleApartment;
+
+  /// No description provided for @profileTagsRenovatedProperty.
+  ///
+  /// In he, this message translates to:
+  /// **'נכס משופץ'**
+  String get profileTagsRenovatedProperty;
+
+  /// No description provided for @profileTagsAllowsPets.
+  ///
+  /// In he, this message translates to:
+  /// **'מאפשר בעלי חיים'**
+  String get profileTagsAllowsPets;
+
+  /// No description provided for @profileTagsSuitableForCouples.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים לזוגות'**
+  String get profileTagsSuitableForCouples;
+
+  /// No description provided for @profileTagsSuitableForFamilies.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים למשפחות'**
+  String get profileTagsSuitableForFamilies;
+
+  /// No description provided for @profileTagsSuitableForRoommates.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים לשותפים'**
+  String get profileTagsSuitableForRoommates;
+
+  /// No description provided for @profileTagsSuitableForStudents.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים לסטודנטים'**
+  String get profileTagsSuitableForStudents;
+
+  /// No description provided for @profileTagsPrefersNonSmokingTenants.
+  ///
+  /// In he, this message translates to:
+  /// **'מעדיף שוכרים לא מעשנים'**
+  String get profileTagsPrefersNonSmokingTenants;
+
+  /// No description provided for @profileTagsSeeksQuietTenants.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש שוכרים שקטים'**
+  String get profileTagsSeeksQuietTenants;
+
+  /// No description provided for @profileTagsProperContract.
+  ///
+  /// In he, this message translates to:
+  /// **'חוזה מסודר'**
+  String get profileTagsProperContract;
+
+  /// No description provided for @profileTagsLongTermContract.
+  ///
+  /// In he, this message translates to:
+  /// **'חוזה ארוך טווח'**
+  String get profileTagsLongTermContract;
+
+  /// No description provided for @profileTagsAllowsShortTerm.
+  ///
+  /// In he, this message translates to:
+  /// **'מאפשר טווח קצר'**
+  String get profileTagsAllowsShortTerm;
+
+  /// No description provided for @profileTagsRequiresIncomeProof.
+  ///
+  /// In he, this message translates to:
+  /// **'דורש אישור הכנסה'**
+  String get profileTagsRequiresIncomeProof;
+
+  /// No description provided for @profileTagsRequiresGuarantors.
+  ///
+  /// In he, this message translates to:
+  /// **'דורש ערבים'**
+  String get profileTagsRequiresGuarantors;
+
+  /// No description provided for @profileTagsPriceFlexibility.
+  ///
+  /// In he, this message translates to:
+  /// **'גמישות במחיר'**
+  String get profileTagsPriceFlexibility;
+
+  /// No description provided for @profileTagsNoBroker.
+  ///
+  /// In he, this message translates to:
+  /// **'ללא תיווך'**
+  String get profileTagsNoBroker;
+
+  /// No description provided for @profileTagsQuickResponse.
+  ///
+  /// In he, this message translates to:
+  /// **'תגובה מהירה'**
+  String get profileTagsQuickResponse;
+
+  /// No description provided for @profileTagsPropertyManagementExperience.
+  ///
+  /// In he, this message translates to:
+  /// **'ניסיון בניהול נכסים'**
+  String get profileTagsPropertyManagementExperience;
+
+  /// No description provided for @profileTagsAvailableForEveningTours.
+  ///
+  /// In he, this message translates to:
+  /// **'זמין לסיורים גם בערב'**
+  String get profileTagsAvailableForEveningTours;
+
+  /// No description provided for @profileTagsPersonalizedTenantService.
+  ///
+  /// In he, this message translates to:
+  /// **'יחס אישי לשוכרים'**
+  String get profileTagsPersonalizedTenantService;
+
+  /// No description provided for @rentalModelsLifestyleChiloni.
+  ///
+  /// In he, this message translates to:
+  /// **'חילוני/ת'**
+  String get rentalModelsLifestyleChiloni;
+
+  /// No description provided for @rentalModelsLifestyleMasorti.
+  ///
+  /// In he, this message translates to:
+  /// **'מסורתי/ת'**
+  String get rentalModelsLifestyleMasorti;
+
+  /// No description provided for @rentalModelsLifestyleDati.
+  ///
+  /// In he, this message translates to:
+  /// **'דתי/ה'**
+  String get rentalModelsLifestyleDati;
+
+  /// No description provided for @rentalModelsLifestyleCharedi.
+  ///
+  /// In he, this message translates to:
+  /// **'חרדי/ת'**
+  String get rentalModelsLifestyleCharedi;
+
+  /// No description provided for @rentalModelsPetTypeNone.
+  ///
+  /// In he, this message translates to:
+  /// **'אין'**
+  String get rentalModelsPetTypeNone;
+
+  /// No description provided for @rentalModelsPetTypeCat.
+  ///
+  /// In he, this message translates to:
+  /// **'חתול'**
+  String get rentalModelsPetTypeCat;
+
+  /// No description provided for @rentalModelsPetTypeDogSmall.
+  ///
+  /// In he, this message translates to:
+  /// **'כלב קטן'**
+  String get rentalModelsPetTypeDogSmall;
+
+  /// No description provided for @rentalModelsPetTypeDogLarge.
+  ///
+  /// In he, this message translates to:
+  /// **'כלב גדול'**
+  String get rentalModelsPetTypeDogLarge;
+
+  /// No description provided for @rentalModelsPetTypeOther.
+  ///
+  /// In he, this message translates to:
+  /// **'אחר'**
+  String get rentalModelsPetTypeOther;
+
+  /// No description provided for @rentalModelsMoveInImmediate.
+  ///
+  /// In he, this message translates to:
+  /// **'מיידי'**
+  String get rentalModelsMoveInImmediate;
+
+  /// No description provided for @rentalModelsMoveInMonth.
+  ///
+  /// In he, this message translates to:
+  /// **'עד חודש'**
+  String get rentalModelsMoveInMonth;
+
+  /// No description provided for @rentalModelsMoveInQuarter.
+  ///
+  /// In he, this message translates to:
+  /// **'עד 3 חודשים'**
+  String get rentalModelsMoveInQuarter;
+
+  /// No description provided for @rentalModelsMoveInFlexible.
+  ///
+  /// In he, this message translates to:
+  /// **'גמיש'**
+  String get rentalModelsMoveInFlexible;
+
+  /// No description provided for @rentalModelsUrgencyNow.
+  ///
+  /// In he, this message translates to:
+  /// **'מחפש/ת לעכשיו'**
+  String get rentalModelsUrgencyNow;
+
+  /// No description provided for @rentalModelsUrgencySoon.
+  ///
+  /// In he, this message translates to:
+  /// **'לא דחוף'**
+  String get rentalModelsUrgencySoon;
+
+  /// No description provided for @rentalModelsUrgencyBrowsing.
+  ///
+  /// In he, this message translates to:
+  /// **'רק מתעניין/ת'**
+  String get rentalModelsUrgencyBrowsing;
+
+  /// No description provided for @rentalModelsFeatureBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת'**
+  String get rentalModelsFeatureBalcony;
+
+  /// No description provided for @rentalModelsFeatureParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה'**
+  String get rentalModelsFeatureParking;
+
+  /// No description provided for @rentalModelsFeatureStorage.
+  ///
+  /// In he, this message translates to:
+  /// **'מחסן'**
+  String get rentalModelsFeatureStorage;
+
+  /// No description provided for @rentalModelsFeatureAirConditioning.
+  ///
+  /// In he, this message translates to:
+  /// **'מזגן'**
+  String get rentalModelsFeatureAirConditioning;
+
+  /// No description provided for @rentalModelsFeatureMamad.
+  ///
+  /// In he, this message translates to:
+  /// **'ממ\"ד'**
+  String get rentalModelsFeatureMamad;
+
+  /// No description provided for @rentalModelsFeatureSunBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'מרפסת שמש'**
+  String get rentalModelsFeatureSunBalcony;
+
+  /// No description provided for @rentalModelsFeatureGarden.
+  ///
+  /// In he, this message translates to:
+  /// **'גינה'**
+  String get rentalModelsFeatureGarden;
+
+  /// No description provided for @rentalModelsFeatureElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'מעלית'**
+  String get rentalModelsFeatureElevator;
+
+  /// No description provided for @rentalModelsFeatureFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'ריהוט'**
+  String get rentalModelsFeatureFurnished;
+
+  /// No description provided for @rentalModelsFeatureInternetIncluded.
+  ///
+  /// In he, this message translates to:
+  /// **'אינטרנט כלול'**
+  String get rentalModelsFeatureInternetIncluded;
+
+  /// No description provided for @rentalModelsFeatureEquippedKitchen.
+  ///
+  /// In he, this message translates to:
+  /// **'מטבח מאובזר'**
+  String get rentalModelsFeatureEquippedKitchen;
+
+  /// No description provided for @rentalModelsFeaturePetsAllowed.
+  ///
+  /// In he, this message translates to:
+  /// **'חיות מחמד מותר'**
+  String get rentalModelsFeaturePetsAllowed;
+
+  /// No description provided for @rentalModelsFeatureLaundryIncluded.
+  ///
+  /// In he, this message translates to:
+  /// **'כביסה כלולה'**
+  String get rentalModelsFeatureLaundryIncluded;
+
+  /// No description provided for @rentalModelsFeatureSecurity.
+  ///
+  /// In he, this message translates to:
+  /// **'שומר/אבטחה'**
+  String get rentalModelsFeatureSecurity;
+
+  /// No description provided for @rentalModelsFeatureAccessible.
+  ///
+  /// In he, this message translates to:
+  /// **'נגישות לנכים'**
+  String get rentalModelsFeatureAccessible;
+
+  /// No description provided for @rentalModelsFeatureSharedRoof.
+  ///
+  /// In he, this message translates to:
+  /// **'גג משותף'**
+  String get rentalModelsFeatureSharedRoof;
+
+  /// No description provided for @rentalModelsFeaturePool.
+  ///
+  /// In he, this message translates to:
+  /// **'בריכה'**
+  String get rentalModelsFeaturePool;
+
+  /// No description provided for @rentalModelsFeatureGym.
+  ///
+  /// In he, this message translates to:
+  /// **'חדר כושר'**
+  String get rentalModelsFeatureGym;
+
+  /// No description provided for @rentalModelsFeatureBars.
+  ///
+  /// In he, this message translates to:
+  /// **'סורגים'**
+  String get rentalModelsFeatureBars;
+
+  /// No description provided for @rentalModelsFeatureRenovated.
+  ///
+  /// In he, this message translates to:
+  /// **'משופצת'**
+  String get rentalModelsFeatureRenovated;
+
+  /// No description provided for @rentalModelsFeatureRoommates.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאימה לשותפים'**
+  String get rentalModelsFeatureRoommates;
+
+  /// No description provided for @rentalModelsFeatureBombShelter.
+  ///
+  /// In he, this message translates to:
+  /// **'מקלט'**
+  String get rentalModelsFeatureBombShelter;
+
+  /// No description provided for @rentalModelsFeatureSafeFloorSpace.
+  ///
+  /// In he, this message translates to:
+  /// **'מרחב מוגן קומתי'**
+  String get rentalModelsFeatureSafeFloorSpace;
+
+  /// No description provided for @rentalModelsFeatureBasement.
+  ///
+  /// In he, this message translates to:
+  /// **'מרתף'**
+  String get rentalModelsFeatureBasement;
+
+  /// No description provided for @rentalModelsFeatureCentralHeating.
+  ///
+  /// In he, this message translates to:
+  /// **'חימום מרכזי'**
+  String get rentalModelsFeatureCentralHeating;
+
+  /// No description provided for @rentalModelsFeatureBedroomAc.
+  ///
+  /// In he, this message translates to:
+  /// **'מזגן בחדרי שינה'**
+  String get rentalModelsFeatureBedroomAc;
+
+  /// No description provided for @rentalModelsFeatureWashingMachine.
+  ///
+  /// In he, this message translates to:
+  /// **'מכונת כביסה'**
+  String get rentalModelsFeatureWashingMachine;
+
+  /// No description provided for @rentalModelsFeatureRefrigerator.
+  ///
+  /// In he, this message translates to:
+  /// **'מקרר'**
+  String get rentalModelsFeatureRefrigerator;
+
+  /// No description provided for @rentalModelsFeatureOven.
+  ///
+  /// In he, this message translates to:
+  /// **'תנור'**
+  String get rentalModelsFeatureOven;
+
+  /// No description provided for @rentalModelsFeatureDishwasher.
+  ///
+  /// In he, this message translates to:
+  /// **'מדיח כלים'**
+  String get rentalModelsFeatureDishwasher;
+
+  /// No description provided for @rentalModelsFeatureSmartHome.
+  ///
+  /// In he, this message translates to:
+  /// **'בקרה חכמה בבית'**
+  String get rentalModelsFeatureSmartHome;
+
+  /// No description provided for @rentalModelsFeatureUndergroundParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה תת קרקעית'**
+  String get rentalModelsFeatureUndergroundParking;
+
+  /// No description provided for @rentalModelsFeatureSoundSystem.
+  ///
+  /// In he, this message translates to:
+  /// **'מערכת סאונד'**
+  String get rentalModelsFeatureSoundSystem;
+
+  /// No description provided for @rentalModelsFeaturePrivateEntrance.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה פרטית'**
+  String get rentalModelsFeaturePrivateEntrance;
+
+  /// No description provided for @rentalModelsFeatureCctv.
+  ///
+  /// In he, this message translates to:
+  /// **'מצלמות אבטחה'**
+  String get rentalModelsFeatureCctv;
+
+  /// No description provided for @rentalModelsFeatureAlarmSystem.
+  ///
+  /// In he, this message translates to:
+  /// **'מערכת אזעקה'**
+  String get rentalModelsFeatureAlarmSystem;
+
+  /// No description provided for @rentalModelsFeatureIntercom.
+  ///
+  /// In he, this message translates to:
+  /// **'אינטרקום'**
+  String get rentalModelsFeatureIntercom;
+
+  /// No description provided for @rentalModelsFeatureElectricity.
+  ///
+  /// In he, this message translates to:
+  /// **'חשמל כלול'**
+  String get rentalModelsFeatureElectricity;
+
+  /// No description provided for @rentalModelsFeatureWater.
+  ///
+  /// In he, this message translates to:
+  /// **'מים כלולים'**
+  String get rentalModelsFeatureWater;
+
+  /// No description provided for @rentalModelsFeatureNaturalLight.
+  ///
+  /// In he, this message translates to:
+  /// **'אור טבעי'**
+  String get rentalModelsFeatureNaturalLight;
+
+  /// No description provided for @rentalModelsFeatureQuietArea.
+  ///
+  /// In he, this message translates to:
+  /// **'אזור שקט'**
+  String get rentalModelsFeatureQuietArea;
+
+  /// No description provided for @rentalModelsFeaturePetFriendly.
+  ///
+  /// In he, this message translates to:
+  /// **'מתאים לחיות מחמד'**
+  String get rentalModelsFeaturePetFriendly;
+
+  /// No description provided for @rentalModelsFeatureAttachedParking.
+  ///
+  /// In he, this message translates to:
+  /// **'חניה מוצמדת'**
+  String get rentalModelsFeatureAttachedParking;
+
+  /// No description provided for @rentalModelsFeatureSecureEntrance.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה מאובטחת'**
+  String get rentalModelsFeatureSecureEntrance;
+
+  /// No description provided for @rentalModelsFeatureNearPublicTransport.
+  ///
+  /// In he, this message translates to:
+  /// **'קרוב לתחבורה ציבורית'**
+  String get rentalModelsFeatureNearPublicTransport;
+
+  /// No description provided for @rentalModelsFeatureOptionalFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'ריהוט אופציונלי'**
+  String get rentalModelsFeatureOptionalFurnished;
+
+  /// No description provided for @rentalModelsFeatureNearSea.
+  ///
+  /// In he, this message translates to:
+  /// **'קרוב לים'**
+  String get rentalModelsFeatureNearSea;
+
+  /// No description provided for @rentalModelsFeatureNearPark.
+  ///
+  /// In he, this message translates to:
+  /// **'קרוב לפארק'**
+  String get rentalModelsFeatureNearPark;
+
+  /// No description provided for @brokerPipelineScreenSourcePhone.
+  ///
+  /// In he, this message translates to:
+  /// **'טלפון'**
+  String get brokerPipelineScreenSourcePhone;
+
+  /// No description provided for @brokerPipelineScreenSourceWalkIn.
+  ///
+  /// In he, this message translates to:
+  /// **'הגיע למשרד'**
+  String get brokerPipelineScreenSourceWalkIn;
+
+  /// No description provided for @brokerPipelineScreenSourceOther.
+  ///
+  /// In he, this message translates to:
+  /// **'אחר'**
+  String get brokerPipelineScreenSourceOther;
+
+  /// No description provided for @nearbyPlacesCardChipSuffixMasc.
+  ///
+  /// In he, this message translates to:
+  /// **' קרובים'**
+  String get nearbyPlacesCardChipSuffixMasc;
+
+  /// No description provided for @nearbyPlacesCardChipSuffixFem.
+  ///
+  /// In he, this message translates to:
+  /// **' קרובות'**
+  String get nearbyPlacesCardChipSuffixFem;
+
+  /// No description provided for @panoramaSplatViewWaypointEntrance.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה'**
+  String get panoramaSplatViewWaypointEntrance;
+
+  /// No description provided for @panoramaSplatViewWaypointCenter.
+  ///
+  /// In he, this message translates to:
+  /// **'מרכז'**
+  String get panoramaSplatViewWaypointCenter;
+
+  /// No description provided for @panoramaSplatViewWaypointInterior.
+  ///
+  /// In he, this message translates to:
+  /// **'פנים'**
+  String get panoramaSplatViewWaypointInterior;
+
+  /// No description provided for @taxHelperScreenAnnualReportNote.
+  ///
+  /// In he, this message translates to:
+  /// **' בסכומים גבוהים (מעל ₪375,000 בשנה) צריך גם להגיש דוח שנתי.'**
+  String get taxHelperScreenAnnualReportNote;
+
+  /// No description provided for @brokerCmaScreenPerSqm.
+  ///
+  /// In he, this message translates to:
+  /// **' · {money}/מ״ר'**
+  String brokerCmaScreenPerSqm(Object money);
+
+  /// No description provided for @askRentlySheetFloorWithTotal.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה בקומה {floor} מתוך {total}.'**
+  String askRentlySheetFloorWithTotal(Object floor, Object total);
+
+  /// No description provided for @askRentlySheetFloorNoTotal.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה בקומה {floor}.'**
+  String askRentlySheetFloorNoTotal(Object floor);
+
+  /// No description provided for @askRentlySheetRoomsAnswer.
+  ///
+  /// In he, this message translates to:
+  /// **'בדירה {rooms} חדרים.'**
+  String askRentlySheetRoomsAnswer(Object rooms);
+
+  /// No description provided for @askRentlySheetSizeAnswer.
+  ///
+  /// In he, this message translates to:
+  /// **'שטח הדירה כ-{size} מ״ר.'**
+  String askRentlySheetSizeAnswer(Object size);
+
+  /// No description provided for @askRentlySheetPriceAnswer.
+  ///
+  /// In he, this message translates to:
+  /// **'שכר הדירה {price} ₪ לחודש.'**
+  String askRentlySheetPriceAnswer(Object price);
+
+  /// No description provided for @askRentlySheetParkingYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, יש חניה לדירה.'**
+  String get askRentlySheetParkingYes;
+
+  /// No description provided for @askRentlySheetParkingNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוינה חניה בפרטי הדירה — כדאי לוודא מול בעל הנכס.'**
+  String get askRentlySheetParkingNo;
+
+  /// No description provided for @askRentlySheetPetsYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, מותר להחזיק חיות מחמד.'**
+  String get askRentlySheetPetsYes;
+
+  /// No description provided for @askRentlySheetPetsNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוין שמותר להחזיק חיות — עדיף לשאול את בעל הנכס ישירות.'**
+  String get askRentlySheetPetsNo;
+
+  /// No description provided for @askRentlySheetElevatorYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, יש מעלית בבניין.'**
+  String get askRentlySheetElevatorYes;
+
+  /// No description provided for @askRentlySheetElevatorNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוינה מעלית בפרטי הדירה.'**
+  String get askRentlySheetElevatorNo;
+
+  /// No description provided for @askRentlySheetBalconyYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, יש מרפסת.'**
+  String get askRentlySheetBalconyYes;
+
+  /// No description provided for @askRentlySheetBalconyNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוינה מרפסת בפרטי הדירה.'**
+  String get askRentlySheetBalconyNo;
+
+  /// No description provided for @askRentlySheetMamadYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, יש ממ״ד.'**
+  String get askRentlySheetMamadYes;
+
+  /// No description provided for @askRentlySheetMamadNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוין ממ״ד בפרטי הדירה.'**
+  String get askRentlySheetMamadNo;
+
+  /// No description provided for @askRentlySheetAcYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, יש מיזוג אוויר.'**
+  String get askRentlySheetAcYes;
+
+  /// No description provided for @askRentlySheetAcNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוין מיזוג בפרטי הדירה.'**
+  String get askRentlySheetAcNo;
+
+  /// No description provided for @askRentlySheetFurnishedYes.
+  ///
+  /// In he, this message translates to:
+  /// **'כן, הדירה מרוהטת.'**
+  String get askRentlySheetFurnishedYes;
+
+  /// No description provided for @askRentlySheetFurnishedNo.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוין ריהוט בפרטי הדירה.'**
+  String get askRentlySheetFurnishedNo;
+
+  /// No description provided for @askRentlySheetEntryAnswer.
+  ///
+  /// In he, this message translates to:
+  /// **'תאריך הכניסה: {date}.'**
+  String askRentlySheetEntryAnswer(Object date);
+
+  /// No description provided for @askRentlySheetEntryUnknown.
+  ///
+  /// In he, this message translates to:
+  /// **'לא צוין תאריך כניסה — כדאי לתאם עם בעל הנכס.'**
+  String get askRentlySheetEntryUnknown;
+
+  /// No description provided for @askRentlySheetTransitNone.
+  ///
+  /// In he, this message translates to:
+  /// **'לא נמצאה תחנת רכבת/רק״ל במרחק הליכה (עד 2 ק״מ).'**
+  String get askRentlySheetTransitNone;
+
+  /// No description provided for @askRentlySheetDistMeters.
+  ///
+  /// In he, this message translates to:
+  /// **'{m} מ׳'**
+  String askRentlySheetDistMeters(Object m);
+
+  /// No description provided for @askRentlySheetDistKm.
+  ///
+  /// In he, this message translates to:
+  /// **'{km} ק״מ'**
+  String askRentlySheetDistKm(Object km);
+
+  /// No description provided for @askRentlySheetTransitFound.
+  ///
+  /// In he, this message translates to:
+  /// **'התחנה הקרובה: {name} — כ-{dist} מהדירה.'**
+  String askRentlySheetTransitFound(Object dist, Object name);
+
+  /// No description provided for @askRentlySheetLocationAnswer.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה נמצאת ב{loc}.'**
+  String askRentlySheetLocationAnswer(Object loc);
+
+  /// No description provided for @datingProviderFitPercentLabel.
+  ///
+  /// In he, this message translates to:
+  /// **'{percent}% התאמה'**
+  String datingProviderFitPercentLabel(Object percent);
+
+  /// No description provided for @datingProviderLeadReasonBudgetFits.
+  ///
+  /// In he, this message translates to:
+  /// **'התקציב מתאים למחיר'**
+  String get datingProviderLeadReasonBudgetFits;
+
+  /// No description provided for @datingProviderLeadReasonTimingFits.
+  ///
+  /// In he, this message translates to:
+  /// **'כניסה בזמן שמתאים לך'**
+  String get datingProviderLeadReasonTimingFits;
+
+  /// No description provided for @roomScanFlowDefaultRoomName.
+  ///
+  /// In he, this message translates to:
+  /// **'חדר {n}'**
+  String roomScanFlowDefaultRoomName(Object n);
+
+  /// No description provided for @datingProviderTenantFallbackName.
+  ///
+  /// In he, this message translates to:
+  /// **'השוכר/ת'**
+  String get datingProviderTenantFallbackName;
+
+  /// No description provided for @datingProviderPropertyFallbackName.
+  ///
+  /// In he, this message translates to:
+  /// **'הנכס'**
+  String get datingProviderPropertyFallbackName;
+
+  /// No description provided for @datingProviderViewingReminderTitle.
+  ///
+  /// In he, this message translates to:
+  /// **'צפייה בדירה בעוד שעה'**
+  String get datingProviderViewingReminderTitle;
+
+  /// No description provided for @datingProviderViewingReminderBody.
+  ///
+  /// In he, this message translates to:
+  /// **'צפייה עם {who} ב{address} בשעה {time}'**
+  String datingProviderViewingReminderBody(
+      Object address, Object time, Object who);
+
+  /// No description provided for @datingProviderLandlordFallbackName.
+  ///
+  /// In he, this message translates to:
+  /// **'בעל הדירה'**
+  String get datingProviderLandlordFallbackName;
+
+  /// No description provided for @datingProviderContractSentMessage.
+  ///
+  /// In he, this message translates to:
+  /// **'שלחתי חוזה שכירות דיגיטלי לחתימה: ₪{rent} לחודש, ל-{months} חודשים.'**
+  String datingProviderContractSentMessage(Object months, Object rent);
+
+  /// No description provided for @datingProviderSignedAsLandlord.
+  ///
+  /// In he, this message translates to:
+  /// **'חתמתי על החוזה כבעל הדירה. ✍️'**
+  String get datingProviderSignedAsLandlord;
+
+  /// No description provided for @datingProviderSignedAsTenant.
+  ///
+  /// In he, this message translates to:
+  /// **'חתמתי על החוזה כשוכר/ת. ✍️'**
+  String get datingProviderSignedAsTenant;
+
+  /// No description provided for @datingProviderSystemSenderName.
+  ///
+  /// In he, this message translates to:
+  /// **'מערכת'**
+  String get datingProviderSystemSenderName;
+
+  /// No description provided for @datingProviderMatchCreatedMessage.
+  ///
+  /// In he, this message translates to:
+  /// **'נוצר מאצ׳. אפשר לפתוח צ׳אט, לשלוח חוזה ולנהל חתימות.'**
+  String get datingProviderMatchCreatedMessage;
+
+  /// No description provided for @datingProviderDemoMatchMessage1.
+  ///
+  /// In he, this message translates to:
+  /// **'נוצר מאצ׳ — שני הצדדים הסכימו להתקדם.'**
+  String get datingProviderDemoMatchMessage1;
+
+  /// No description provided for @datingProviderDemoMatchMessage2.
+  ///
+  /// In he, this message translates to:
+  /// **'נוצר מאצ׳ — שני הצדדים מעוניינים.'**
+  String get datingProviderDemoMatchMessage2;
+
+  /// No description provided for @datingProviderDemoMatchMessage3.
+  ///
+  /// In he, this message translates to:
+  /// **'התאמה חדשה! שני הצדדים הראו עניין.'**
+  String get datingProviderDemoMatchMessage3;
+
+  /// No description provided for @datingProviderDefaultContactMessage.
+  ///
+  /// In he, this message translates to:
+  /// **'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂'**
+  String get datingProviderDefaultContactMessage;
 }
 
 class _AppLocalizationsDelegate

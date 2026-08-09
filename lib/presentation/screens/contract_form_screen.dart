@@ -234,6 +234,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
       durationMonths: _durationMonths,
       startDate: _startDate,
       terms: _termsCtrl.text.trim(),
+      l10n: AppLocalizations.of(context)!,
     );
     if (!mounted) return;
     setState(() => _sending = false);

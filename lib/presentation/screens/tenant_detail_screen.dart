@@ -13,6 +13,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
+import 'package:dating_app/data/models/profile_tags.dart';
 
 /// Tenant (apartment-seeker) profile detail — restyled to be visually
 /// indistinguishable in polish from [PropertyDetailScreen]'s rentlyClassic
@@ -95,6 +96,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
         index,
         null,
         accept ? CardSwiperDirection.right : CardSwiperDirection.left,
+        l10n: AppLocalizations.of(context)!,
       );
     }
     if (mounted) Navigator.of(context).pop();
@@ -778,6 +780,7 @@ class _ChipWrap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final iconColor = danger ? AppColors.coral : _kTeal;
     final fill = danger ? AppColors.coral.withValues(alpha: 0.06) : _kFill;
     final border =
@@ -785,7 +788,9 @@ class _ChipWrap extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: tags.map((t) {
+      children: tags.map((raw) {
+        final tag = ProfileTagCatalog.tagFor(raw, isLandlord: false);
+        final t = tag?.displayLabel(l10n) ?? raw;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -942,10 +947,13 @@ class _MatchInsightCard extends StatelessWidget {
       ));
     }
     if (tenant.importantDetails.isNotEmpty) {
+      final detailLabels = tenant.importantDetails.take(2).map((raw) {
+        final tag = ProfileTagCatalog.tagFor(raw, isLandlord: false);
+        return tag?.displayLabel(l10n) ?? raw;
+      }).join(', ');
       reasons.add((
         IconsaxPlusLinear.flash_1,
-        l10n.tenantDetailScreenE3b82a80(
-            tenant.importantDetails.take(2).join(', ')),
+        l10n.tenantDetailScreenE3b82a80(detailLabels),
       ));
     }
     return reasons.take(4).toList();

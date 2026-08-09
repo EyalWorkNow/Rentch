@@ -987,7 +987,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: kMoveInBuckets.map((bucket) {
+                            children: moveInBucketsFor(l10n).map((bucket) {
                               final selected = bucket.$1 == _moveIn;
                               return GestureDetector(
                                 onTap: () {
@@ -1039,7 +1039,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: kUrgencyOptions.map((opt) {
+                            children: urgencyOptionsFor(l10n).map((opt) {
                               final selected = opt.$1 == _urgency;
                               return GestureDetector(
                                 onTap: () {
@@ -1371,7 +1371,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final e in kLifestyleLabels.entries)
+                              for (final e in lifestyleLabelsFor(l10n).entries)
                                 _ChoiceChipTag(
                                   label: e.value,
                                   selected: _religiousLifestyle == e.key,
@@ -1418,7 +1418,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final e in kPetTypeLabels.entries)
+                              for (final e in petTypeLabelsFor(l10n).entries)
                                 _ChoiceChipTag(
                                   label: e.value,
                                   selected: _petType == e.key,
@@ -1674,7 +1674,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 final tag = ProfileTagCatalog.tagFor(d,
                                     isLandlord: isLandlord);
                                 return _DetailTag(
-                                  label: d,
+                                  label: tag?.displayLabel(l10n) ?? d,
                                   isDealBreaker: _dealBreakers.contains(d),
                                   canBeDealBreaker: tag?.canBeDealBreaker ?? false,
                                   onToggleDealBreaker: () =>
@@ -2705,9 +2705,9 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   children: [
                     for (final category in categories)
-                      ..._buildCategory(category, query),
+                      ..._buildCategory(category, query, l10n),
                     if (categories.every((c) =>
-                        _matchingTags(c, query).isEmpty))
+                        _matchingTags(c, query, l10n).isEmpty))
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Text(
@@ -2747,21 +2747,25 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
     );
   }
 
-  List<ProfileTag> _matchingTags(ProfileTagCategory category, String query) {
+  List<ProfileTag> _matchingTags(
+      ProfileTagCategory category, String query, AppLocalizations l10n) {
     if (query.isEmpty) return category.tags;
     return category.tags
-        .where((tag) => tag.label.contains(query))
+        .where((tag) =>
+            tag.label.contains(query) ||
+            tag.displayLabel(l10n).contains(query))
         .toList();
   }
 
-  List<Widget> _buildCategory(ProfileTagCategory category, String query) {
-    final tags = _matchingTags(category, query);
+  List<Widget> _buildCategory(
+      ProfileTagCategory category, String query, AppLocalizations l10n) {
+    final tags = _matchingTags(category, query, l10n);
     if (tags.isEmpty) return const [];
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
         child: Text(
-          category.title,
+          category.displayTitle(l10n),
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w900,
@@ -2772,7 +2776,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
       Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: tags.map(_buildChip).toList(),
+        children: tags.map((tag) => _buildChip(tag, l10n)).toList(),
       ),
       const SizedBox(height: 14),
     ];
@@ -2790,7 +2794,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
     setState(() {});
   }
 
-  Widget _buildChip(ProfileTag tag) {
+  Widget _buildChip(ProfileTag tag, AppLocalizations l10n) {
     final selected = widget.selected.contains(tag.label);
     final isDeal = widget.dealBreakers.contains(tag.label);
     final accent = isDeal ? AppColors.coral : AppColors.primary;
@@ -2817,7 +2821,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
             ),
             const SizedBox(width: 6),
             Text(
-              tag.label,
+              tag.displayLabel(l10n),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,

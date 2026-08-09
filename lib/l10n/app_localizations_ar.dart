@@ -10861,4 +10861,770 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get roomScanFlow463d28e8 => 'غرفة';
+
+  @override
+  String get addPropertyScreenSectionPropertyDetails => 'تفاصيل العقار';
+
+  @override
+  String get addPropertyScreenTypeApartment => 'شقة';
+
+  @override
+  String get addPropertyScreenTypePenthouse => 'بنتهاوس';
+
+  @override
+  String get addPropertyScreenTypeGardenApartment => 'شقة حديقة';
+
+  @override
+  String get addPropertyScreenTypeStudio => 'استوديو';
+
+  @override
+  String get addPropertyScreenTypeCottage => 'كوخ';
+
+  @override
+  String get addPropertyScreenTypePrivateHouse => 'منزل خاص';
+
+  @override
+  String get addPropertyScreenTypeOffice => 'مكتب';
+
+  @override
+  String get addPropertyScreenConditionNew => 'جديد من المقاول';
+
+  @override
+  String get addPropertyScreenConditionRenovated => 'مجدد';
+
+  @override
+  String get addPropertyScreenConditionGood => 'حالة جيدة';
+
+  @override
+  String get addPropertyScreenConditionOld => 'قديم';
+
+  @override
+  String get addPropertyScreenFloorBasement => 'قبو';
+
+  @override
+  String get addPropertyScreenFloorGround => 'الطابق الأرضي';
+
+  @override
+  String get addPropertyScreenFeatureBalcony => 'شرفة';
+
+  @override
+  String get addPropertyScreenFeatureParking => 'موقف سيارات';
+
+  @override
+  String get addPropertyScreenFeatureStorage => 'مخزن';
+
+  @override
+  String get addPropertyScreenFeatureAc => 'مكيف هواء';
+
+  @override
+  String get addPropertyScreenFeatureMamad => 'غرفة آمنة';
+
+  @override
+  String get addPropertyScreenFeatureSunBalcony => 'شرفة شمسية';
+
+  @override
+  String get addPropertyScreenFeatureGarden => 'حديقة';
+
+  @override
+  String get addPropertyScreenFeatureElevator => 'مصعد';
+
+  @override
+  String get addPropertyScreenFeatureFurniture => 'أثاث';
+
+  @override
+  String get addPropertyScreenFeatureInternetIncluded => 'الإنترنت مشمول';
+
+  @override
+  String get addPropertyScreenFeatureEquippedKitchen => 'مطبخ مجهز';
+
+  @override
+  String get addPropertyScreenFeaturePetsAllowed => 'يسمح بالحيوانات الأليفة';
+
+  @override
+  String get addPropertyScreenFeatureLaundryIncluded => 'غسيل الملابس مشمول';
+
+  @override
+  String get addPropertyScreenFeatureSecurity => 'حارس/أمن';
+
+  @override
+  String get addPropertyScreenFeatureAccessibility =>
+      'إمكانية الوصول لذوي الإعاقة';
+
+  @override
+  String get addPropertyScreenFeatureSharedRoof => 'سطح مشترك';
+
+  @override
+  String get addPropertyScreenFeaturePool => 'مسبح';
+
+  @override
+  String get addPropertyScreenFeatureGym => 'صالة رياضية';
+
+  @override
+  String get addPropertyScreenFeatureBars => 'قضبان نوافذ';
+
+  @override
+  String get addPropertyScreenFeatureRenovated => 'مجددة';
+
+  @override
+  String get addPropertyScreenFeatureRoommateFriendly =>
+      'مناسبة للشركاء بالسكن';
+
+  @override
+  String get addPropertyScreenFeatureShelter => 'ملجأ';
+
+  @override
+  String get addPropertyScreenFeatureFloorProtectedSpace =>
+      'مساحة محمية في الطابق';
+
+  @override
+  String get addPropertyScreenFeatureBasement => 'قبو';
+
+  @override
+  String get addPropertyScreenFeatureCentralHeating => 'تدفئة مركزية';
+
+  @override
+  String get addPropertyScreenFeatureBedroomAc => 'مكيف في غرف النوم';
+
+  @override
+  String get addPropertyScreenFeatureWashingMachine => 'غسالة ملابس';
+
+  @override
+  String get addPropertyScreenFeatureFridge => 'ثلاجة';
+
+  @override
+  String get addPropertyScreenFeatureOven => 'فرن';
+
+  @override
+  String get addPropertyScreenFeatureDishwasher => 'غسالة صحون';
+
+  @override
+  String get addPropertyScreenFeatureSmartHome => 'تحكم منزلي ذكي';
+
+  @override
+  String get addPropertyScreenFeatureUndergroundParking =>
+      'موقف سيارات تحت أرضي';
+
+  @override
+  String get addPropertyScreenFeatureSoundSystem => 'نظام صوتي';
+
+  @override
+  String get addPropertyScreenFeaturePrivateEntrance => 'مدخل خاص';
+
+  @override
+  String get authScreenFeatureBalcony => 'شرفة';
+
+  @override
+  String get authScreenFeatureParking => 'موقف سيارات';
+
+  @override
+  String get authScreenFeatureElevator => 'مصعد';
+
+  @override
+  String get authScreenFeatureAc => 'تكييف';
+
+  @override
+  String get authScreenFeatureSafeRoom => 'غرفة آمنة';
+
+  @override
+  String get authScreenFeatureStorage => 'مخزن';
+
+  @override
+  String get authScreenFeatureGarden => 'حديقة';
+
+  @override
+  String get authScreenFeatureFurnished => 'مفروش';
+
+  @override
+  String get authScreenFeaturePets => 'حيوانات أليفة';
+
+  @override
+  String get authScreenFeatureInternet => 'إنترنت';
+
+  @override
+  String get profileTagsCategoryHouseholdStatus => 'الحالة والأسرة';
+
+  @override
+  String get profileTagsCategoryLifestyle => 'نمط الحياة';
+
+  @override
+  String get profileTagsCategoryApartmentRequirements => 'متطلبات الشقة';
+
+  @override
+  String get profileTagsCategoryContractPayment => 'العقد والدفع';
+
+  @override
+  String get profileTagsCategoryAboutMyProperty => 'عن عقاري';
+
+  @override
+  String get profileTagsCategorySuitableFor => 'مناسب لـ';
+
+  @override
+  String get profileTagsCategoryContractRequirements => 'العقد والمتطلبات';
+
+  @override
+  String get profileTagsCategoryService => 'الخدمة';
+
+  @override
+  String get profileTagsSingle => 'أعزب/عزباء';
+
+  @override
+  String get profileTagsCouple => 'زوجان';
+
+  @override
+  String get profileTagsFamilyWithKids => 'عائلة لديها أطفال';
+
+  @override
+  String get profileTagsSeekingRoommates => 'يبحث عن شركاء سكن';
+
+  @override
+  String get profileTagsStudent => 'طالب/ة';
+
+  @override
+  String get profileTagsWorkingProfessionals => 'مهنيون عاملون';
+
+  @override
+  String get profileTagsWorksFromHome => 'يعمل من المنزل';
+
+  @override
+  String get profileTagsNonSmoker => 'غير مدخن/ة';
+
+  @override
+  String get profileTagsHasPets => 'لدي حيوانات أليفة';
+
+  @override
+  String get profileTagsNoPets => 'بدون حيوانات أليفة';
+
+  @override
+  String get profileTagsQuietTidy => 'هادئ/ة ومرتب/ة';
+
+  @override
+  String get profileTagsVegetarian => 'نباتي/ة';
+
+  @override
+  String get profileTagsReligiousLifestyle => 'نمط حياة ديني';
+
+  @override
+  String get profileTagsShabbatObservant => 'ملتزم/ة بالسبت';
+
+  @override
+  String get profileTagsMustHaveParking => 'يجب توفر موقف سيارات';
+
+  @override
+  String get profileTagsFurnished => 'مفروشة';
+
+  @override
+  String get profileTagsElevator => 'مصعد';
+
+  @override
+  String get profileTagsBalcony => 'شرفة';
+
+  @override
+  String get profileTagsShelter => 'غرفة آمنة / ملجأ';
+
+  @override
+  String get profileTagsAc => 'تكييف هواء';
+
+  @override
+  String get profileTagsAccessibleForDisabled => 'إمكانية وصول لذوي الإعاقة';
+
+  @override
+  String get profileTagsPetFriendly => 'يسمح بالحيوانات الأليفة';
+
+  @override
+  String get profileTagsPrivateShelter => 'غرفة آمنة خاصة';
+
+  @override
+  String get profileTagsIncomeProofReady => 'إثبات الدخل جاهز';
+
+  @override
+  String get profileTagsHasGuarantors => 'لدي ضامنون';
+
+  @override
+  String get profileTagsLongTermRental => 'إيجار طويل الأمد';
+
+  @override
+  String get profileTagsShortTermRental => 'إيجار قصير الأمد';
+
+  @override
+  String get profileTagsImmediateMoveIn => 'انتقال فوري';
+
+  @override
+  String get profileTagsFlexibleMoveInDate => 'مرن بتاريخ الانتقال';
+
+  @override
+  String get profileTagsAdvancePaymentPossible => 'الدفع المسبق ممكن';
+
+  @override
+  String get profileTagsExperiencedTenantWithReferences =>
+      'مستأجر متمرس مع توصيات';
+
+  @override
+  String get profileTagsApartmentFurnished => 'الشقة مفروشة';
+
+  @override
+  String get profileTagsHasParking => 'يوجد موقف سيارات';
+
+  @override
+  String get profileTagsHasElevator => 'يوجد مصعد';
+
+  @override
+  String get profileTagsHasBalcony => 'يوجد شرفة';
+
+  @override
+  String get profileTagsAccessibleApartment => 'شقة سهلة الوصول';
+
+  @override
+  String get profileTagsRenovatedProperty => 'عقار مجدد';
+
+  @override
+  String get profileTagsAllowsPets => 'يسمح بالحيوانات الأليفة';
+
+  @override
+  String get profileTagsSuitableForCouples => 'مناسب للأزواج';
+
+  @override
+  String get profileTagsSuitableForFamilies => 'مناسب للعائلات';
+
+  @override
+  String get profileTagsSuitableForRoommates => 'مناسب لشركاء السكن';
+
+  @override
+  String get profileTagsSuitableForStudents => 'مناسب للطلاب';
+
+  @override
+  String get profileTagsPrefersNonSmokingTenants => 'يفضل مستأجرين غير مدخنين';
+
+  @override
+  String get profileTagsSeeksQuietTenants => 'يبحث عن مستأجرين هادئين';
+
+  @override
+  String get profileTagsProperContract => 'عقد منظم';
+
+  @override
+  String get profileTagsLongTermContract => 'عقد طويل الأمد';
+
+  @override
+  String get profileTagsAllowsShortTerm => 'يسمح بالإيجار قصير الأمد';
+
+  @override
+  String get profileTagsRequiresIncomeProof => 'يتطلب إثبات الدخل';
+
+  @override
+  String get profileTagsRequiresGuarantors => 'يتطلب ضامنين';
+
+  @override
+  String get profileTagsPriceFlexibility => 'مرونة في السعر';
+
+  @override
+  String get profileTagsNoBroker => 'بدون وسيط';
+
+  @override
+  String get profileTagsQuickResponse => 'استجابة سريعة';
+
+  @override
+  String get profileTagsPropertyManagementExperience =>
+      'خبرة في إدارة العقارات';
+
+  @override
+  String get profileTagsAvailableForEveningTours => 'متاح لجولات مسائية';
+
+  @override
+  String get profileTagsPersonalizedTenantService => 'خدمة شخصية للمستأجرين';
+
+  @override
+  String get rentalModelsLifestyleChiloni => 'علماني/ة';
+
+  @override
+  String get rentalModelsLifestyleMasorti => 'تقليدي/ة';
+
+  @override
+  String get rentalModelsLifestyleDati => 'متدين/ة';
+
+  @override
+  String get rentalModelsLifestyleCharedi => 'حريدي/ة';
+
+  @override
+  String get rentalModelsPetTypeNone => 'لا يوجد';
+
+  @override
+  String get rentalModelsPetTypeCat => 'قطة';
+
+  @override
+  String get rentalModelsPetTypeDogSmall => 'كلب صغير';
+
+  @override
+  String get rentalModelsPetTypeDogLarge => 'كلب كبير';
+
+  @override
+  String get rentalModelsPetTypeOther => 'آخر';
+
+  @override
+  String get rentalModelsMoveInImmediate => 'فوري';
+
+  @override
+  String get rentalModelsMoveInMonth => 'خلال شهر';
+
+  @override
+  String get rentalModelsMoveInQuarter => 'خلال 3 أشهر';
+
+  @override
+  String get rentalModelsMoveInFlexible => 'مرن';
+
+  @override
+  String get rentalModelsUrgencyNow => 'أبحث الآن';
+
+  @override
+  String get rentalModelsUrgencySoon => 'غير عاجل';
+
+  @override
+  String get rentalModelsUrgencyBrowsing => 'أتصفح فقط';
+
+  @override
+  String get rentalModelsFeatureBalcony => 'شرفة';
+
+  @override
+  String get rentalModelsFeatureParking => 'موقف سيارات';
+
+  @override
+  String get rentalModelsFeatureStorage => 'مخزن';
+
+  @override
+  String get rentalModelsFeatureAirConditioning => 'تكييف هواء';
+
+  @override
+  String get rentalModelsFeatureMamad => 'غرفة آمنة';
+
+  @override
+  String get rentalModelsFeatureSunBalcony => 'شرفة شمسية';
+
+  @override
+  String get rentalModelsFeatureGarden => 'حديقة';
+
+  @override
+  String get rentalModelsFeatureElevator => 'مصعد';
+
+  @override
+  String get rentalModelsFeatureFurnished => 'مفروش';
+
+  @override
+  String get rentalModelsFeatureInternetIncluded => 'الإنترنت مشمول';
+
+  @override
+  String get rentalModelsFeatureEquippedKitchen => 'مطبخ مجهز';
+
+  @override
+  String get rentalModelsFeaturePetsAllowed => 'يسمح بالحيوانات الأليفة';
+
+  @override
+  String get rentalModelsFeatureLaundryIncluded => 'الغسيل مشمول';
+
+  @override
+  String get rentalModelsFeatureSecurity => 'حارس أمن';
+
+  @override
+  String get rentalModelsFeatureAccessible => 'متاح لذوي الاحتياجات الخاصة';
+
+  @override
+  String get rentalModelsFeatureSharedRoof => 'سطح مشترك';
+
+  @override
+  String get rentalModelsFeaturePool => 'مسبح';
+
+  @override
+  String get rentalModelsFeatureGym => 'صالة رياضية';
+
+  @override
+  String get rentalModelsFeatureBars => 'قضبان نوافذ';
+
+  @override
+  String get rentalModelsFeatureRenovated => 'مجدد';
+
+  @override
+  String get rentalModelsFeatureRoommates => 'مناسبة للشركاء بالسكن';
+
+  @override
+  String get rentalModelsFeatureBombShelter => 'ملجأ';
+
+  @override
+  String get rentalModelsFeatureSafeFloorSpace => 'مساحة محمية بالطابق';
+
+  @override
+  String get rentalModelsFeatureBasement => 'قبو';
+
+  @override
+  String get rentalModelsFeatureCentralHeating => 'تدفئة مركزية';
+
+  @override
+  String get rentalModelsFeatureBedroomAc => 'تكييف في غرف النوم';
+
+  @override
+  String get rentalModelsFeatureWashingMachine => 'غسالة ملابس';
+
+  @override
+  String get rentalModelsFeatureRefrigerator => 'ثلاجة';
+
+  @override
+  String get rentalModelsFeatureOven => 'فرن';
+
+  @override
+  String get rentalModelsFeatureDishwasher => 'غسالة أطباق';
+
+  @override
+  String get rentalModelsFeatureSmartHome => 'تحكم منزلي ذكي';
+
+  @override
+  String get rentalModelsFeatureUndergroundParking => 'موقف سيارات تحت الأرض';
+
+  @override
+  String get rentalModelsFeatureSoundSystem => 'نظام صوتي';
+
+  @override
+  String get rentalModelsFeaturePrivateEntrance => 'مدخل خاص';
+
+  @override
+  String get rentalModelsFeatureCctv => 'كاميرات مراقبة';
+
+  @override
+  String get rentalModelsFeatureAlarmSystem => 'نظام إنذار';
+
+  @override
+  String get rentalModelsFeatureIntercom => 'اتصال داخلي';
+
+  @override
+  String get rentalModelsFeatureElectricity => 'الكهرباء مشمولة';
+
+  @override
+  String get rentalModelsFeatureWater => 'المياه مشمولة';
+
+  @override
+  String get rentalModelsFeatureNaturalLight => 'إضاءة طبيعية';
+
+  @override
+  String get rentalModelsFeatureQuietArea => 'منطقة هادئة';
+
+  @override
+  String get rentalModelsFeaturePetFriendly => 'ملائم للحيوانات الأليفة';
+
+  @override
+  String get rentalModelsFeatureAttachedParking => 'موقف سيارات مخصص';
+
+  @override
+  String get rentalModelsFeatureSecureEntrance => 'مدخل آمن';
+
+  @override
+  String get rentalModelsFeatureNearPublicTransport =>
+      'قريب من وسائل النقل العام';
+
+  @override
+  String get rentalModelsFeatureOptionalFurnished => 'الأثاث اختياري';
+
+  @override
+  String get rentalModelsFeatureNearSea => 'قريب من البحر';
+
+  @override
+  String get rentalModelsFeatureNearPark => 'قريب من الحديقة';
+
+  @override
+  String get brokerPipelineScreenSourcePhone => 'هاتف';
+
+  @override
+  String get brokerPipelineScreenSourceWalkIn => 'زار المكتب';
+
+  @override
+  String get brokerPipelineScreenSourceOther => 'أخرى';
+
+  @override
+  String get nearbyPlacesCardChipSuffixMasc => '';
+
+  @override
+  String get nearbyPlacesCardChipSuffixFem => '';
+
+  @override
+  String get panoramaSplatViewWaypointEntrance => 'المدخل';
+
+  @override
+  String get panoramaSplatViewWaypointCenter => 'المركز';
+
+  @override
+  String get panoramaSplatViewWaypointInterior => 'الداخل';
+
+  @override
+  String get taxHelperScreenAnnualReportNote =>
+      ' عند المبالغ المرتفعة (أكثر من 375,000 ₪ سنويًا) يجب أيضًا تقديم تقرير سنوي.';
+
+  @override
+  String brokerCmaScreenPerSqm(Object money) {
+    return ' · $money/م²';
+  }
+
+  @override
+  String askRentlySheetFloorWithTotal(Object floor, Object total) {
+    return 'الشقة في الطابق $floor من أصل $total.';
+  }
+
+  @override
+  String askRentlySheetFloorNoTotal(Object floor) {
+    return 'الشقة في الطابق $floor.';
+  }
+
+  @override
+  String askRentlySheetRoomsAnswer(Object rooms) {
+    return 'الشقة تحتوي على $rooms غرف.';
+  }
+
+  @override
+  String askRentlySheetSizeAnswer(Object size) {
+    return 'مساحة الشقة حوالي $size م².';
+  }
+
+  @override
+  String askRentlySheetPriceAnswer(Object price) {
+    return 'الإيجار $price ₪ شهريًا.';
+  }
+
+  @override
+  String get askRentlySheetParkingYes => 'نعم، تتوفر موقف سيارات للشقة.';
+
+  @override
+  String get askRentlySheetParkingNo =>
+      'لم يُذكر موقف سيارات في تفاصيل الشقة — يُفضّل التأكد من المالك.';
+
+  @override
+  String get askRentlySheetPetsYes => 'نعم، يُسمح بتربية الحيوانات الأليفة.';
+
+  @override
+  String get askRentlySheetPetsNo =>
+      'لم يُذكر أن الحيوانات الأليفة مسموحة — يُفضّل سؤال المالك مباشرة.';
+
+  @override
+  String get askRentlySheetElevatorYes => 'نعم، يوجد مصعد في المبنى.';
+
+  @override
+  String get askRentlySheetElevatorNo => 'لم يُذكر وجود مصعد في تفاصيل الشقة.';
+
+  @override
+  String get askRentlySheetBalconyYes => 'نعم، توجد شرفة.';
+
+  @override
+  String get askRentlySheetBalconyNo => 'لم تُذكر شرفة في تفاصيل الشقة.';
+
+  @override
+  String get askRentlySheetMamadYes => 'نعم، توجد غرفة آمنة (ممد).';
+
+  @override
+  String get askRentlySheetMamadNo =>
+      'لم تُذكر غرفة آمنة (ممد) في تفاصيل الشقة.';
+
+  @override
+  String get askRentlySheetAcYes => 'نعم، يوجد تكييف هواء.';
+
+  @override
+  String get askRentlySheetAcNo => 'لم يُذكر تكييف الهواء في تفاصيل الشقة.';
+
+  @override
+  String get askRentlySheetFurnishedYes => 'نعم، الشقة مفروشة.';
+
+  @override
+  String get askRentlySheetFurnishedNo => 'لم يُذكر الفرش في تفاصيل الشقة.';
+
+  @override
+  String askRentlySheetEntryAnswer(Object date) {
+    return 'تاريخ الدخول: $date.';
+  }
+
+  @override
+  String get askRentlySheetEntryUnknown =>
+      'لم يُذكر تاريخ دخول — يُفضّل التنسيق مع المالك.';
+
+  @override
+  String get askRentlySheetTransitNone =>
+      'لم يتم العثور على محطة قطار/قطار خفيف على مسافة يمكن المشي إليها (حتى 2 كم).';
+
+  @override
+  String askRentlySheetDistMeters(Object m) {
+    return '$m م';
+  }
+
+  @override
+  String askRentlySheetDistKm(Object km) {
+    return '$km كم';
+  }
+
+  @override
+  String askRentlySheetTransitFound(Object dist, Object name) {
+    return 'أقرب محطة: $name — على بعد حوالي $dist من الشقة.';
+  }
+
+  @override
+  String askRentlySheetLocationAnswer(Object loc) {
+    return 'تقع الشقة في $loc.';
+  }
+
+  @override
+  String datingProviderFitPercentLabel(Object percent) {
+    return '$percent٪ تطابق';
+  }
+
+  @override
+  String get datingProviderLeadReasonBudgetFits => 'الميزانية تناسب السعر';
+
+  @override
+  String get datingProviderLeadReasonTimingFits => 'توقيت الانتقال يناسبك';
+
+  @override
+  String roomScanFlowDefaultRoomName(Object n) {
+    return 'غرفة $n';
+  }
+
+  @override
+  String get datingProviderTenantFallbackName => 'المستأجر';
+
+  @override
+  String get datingProviderPropertyFallbackName => 'العقار';
+
+  @override
+  String get datingProviderViewingReminderTitle => 'المعاينة خلال ساعة';
+
+  @override
+  String datingProviderViewingReminderBody(
+      Object address, Object time, Object who) {
+    return 'معاينة مع $who في $address الساعة $time';
+  }
+
+  @override
+  String get datingProviderLandlordFallbackName => 'المالك';
+
+  @override
+  String datingProviderContractSentMessage(Object months, Object rent) {
+    return 'أرسلت عقد إيجار رقمي للتوقيع: ₪$rent شهريًا، لمدة $months أشهر.';
+  }
+
+  @override
+  String get datingProviderSignedAsLandlord => 'وقّعت العقد كمالك. ✍️';
+
+  @override
+  String get datingProviderSignedAsTenant => 'وقّعت العقد كمستأجر. ✍️';
+
+  @override
+  String get datingProviderSystemSenderName => 'النظام';
+
+  @override
+  String get datingProviderMatchCreatedMessage =>
+      'تم إنشاء تطابق. يمكنك فتح الدردشة وإرسال عقد وإدارة التوقيعات.';
+
+  @override
+  String get datingProviderDemoMatchMessage1 =>
+      'تم إنشاء تطابق — وافق الطرفان على المضي قدمًا.';
+
+  @override
+  String get datingProviderDemoMatchMessage2 =>
+      'تم إنشاء تطابق — كلا الطرفين مهتم.';
+
+  @override
+  String get datingProviderDemoMatchMessage3 =>
+      'تطابق جديد! أبدى الطرفان اهتمامًا.';
+
+  @override
+  String get datingProviderDefaultContactMessage =>
+      'مرحبًا، يسعدني معرفة المزيد من التفاصيل عن الشقة 🙂';
 }

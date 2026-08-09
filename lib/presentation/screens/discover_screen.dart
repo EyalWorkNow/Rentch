@@ -289,6 +289,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           currentIndex,
           direction,
           swiped: swiped,
+          l10n: AppLocalizations.of(context)!,
         );
   }
 
@@ -3543,7 +3544,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               .map((feature) {
                             final state = f.featureState(feature);
                             return _PriorityFilterChip(
-                              label: feature,
+                              label: PropertyFeatureCatalog.labelFor(
+                                AppLocalizations.of(context)!,
+                                feature,
+                              ),
                               state: state,
                               icon: _featureIcon(feature),
                               onTap: () {

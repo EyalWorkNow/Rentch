@@ -448,7 +448,9 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                 const SizedBox(height: 2),
                 Text(
                   l10n.brokerCmaScreenE17f3334(comp.roomsLabel, comp.sizeM2) +
-                      (perM2 != null ? ' · ${_money(perM2.toDouble())}/מ״ר' : ''),
+                      (perM2 != null
+                          ? l10n.brokerCmaScreenPerSqm(_money(perM2.toDouble()))
+                          : ''),
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.textSecondary),
                 ),

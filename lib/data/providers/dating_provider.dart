@@ -42,6 +42,7 @@ import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/appwrite_client.dart' show ID;
 import 'package:dating_app/core/services/interaction_service.dart';
 import 'package:dating_app/core/services/signature_service.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
 import 'package:dating_app/data/repositories/contract_repository.dart';
@@ -790,7 +791,12 @@ class DatingProvider extends ChangeNotifier {
         ScoredProperty(
           r.property,
           r.fitScore / 100.0,
-          ['${r.fitPct}% התאמה', ...r.highlights],
+          // Locale-neutral: no "match" word baked in here (this provider has no
+          // BuildContext to localize with) — the number-only tag is parsed by
+          // consumers (e.g. why_details.dart) or re-labelled with a localized
+          // "N% match" string at the widget layer (map_style_property_card.dart,
+          // assistant_property_card.dart) where a BuildContext is available.
+          ['${r.fitPct}%', ...r.highlights],
           r.trainKm,
           r.strictMatch,
           r.scorecard,
@@ -2023,8 +2029,11 @@ class DatingProvider extends ChangeNotifier {
       leadFitScore(property) >= _highFitLeadScore;
 
   /// One concrete, real reason this candidate fits — or null if none stands
-  /// out. Budget is checked first (the strongest signal), then timing.
-  String? leadFitReason(RentalProperty property) {
+  /// out. Budget is checked first (the strongest signal), then timing. Returns
+  /// a stable [LeadFitReason] key (not a display string) — this provider has
+  /// no BuildContext to localize with; callers (e.g. explore_screen.dart)
+  /// translate the key with a widget-local label map.
+  LeadFitReason? leadFitReason(RentalProperty property) {
     final tenant = _tenantProfile;
     final liker = _representativeLikerFor(property);
     if (tenant == null && liker == null) return null;
@@ -2034,14 +2043,14 @@ class DatingProvider extends ChangeNotifier {
         _hasKnownPrice(property) &&
         budget >= property.price &&
         _leadBudgetFit(budget, property) >= 0.8) {
-      return 'התקציב מתאים למחיר';
+      return LeadFitReason.budgetFits;
     }
     final window = (liker?.moveInSnapshot.trim().isNotEmpty ?? false)
         ? liker!.moveInSnapshot
         : (tenant?.moveInWindow ?? '');
     final timingFit = _leadTimingFit(window, property);
     if (timingFit != null && timingFit >= 0.8) {
-      return 'כניסה בזמן שמתאים לך';
+      return LeadFitReason.timingFits;
     }
     return null;
   }
@@ -2127,7 +2136,7 @@ class DatingProvider extends ChangeNotifier {
   /// booked (slot deleted / already taken) (SCHED-2). Fail-soft — never throws
   /// into the UI. Notifies listeners when a booking is made so dependent widgets
   /// (e.g. the dashboard "next viewing" card) can refresh (SCHED-3).
-  Future<void> processViewingConfirms() async {
+  Future<void> processViewingConfirms(AppLocalizations l10n) async {
     if (!isLandlord) return;
     if (_processingConfirms) return;
     _processingConfirms = true;
@@ -2139,7 +2148,9 @@ class DatingProvider extends ChangeNotifier {
           final parsed = SlotMessageCodec.parse(m.text);
           if (parsed is SlotConfirmMessage &&
               !_processedConfirmSlotIds.contains(parsed.confirm.slotId)) {
-            final who = m.sender.trim().isEmpty ? 'השוכר/ת' : m.sender.trim();
+            final who = m.sender.trim().isEmpty
+                ? l10n.datingProviderTenantFallbackName
+                : m.sender.trim();
             pending.add((
               confirm: parsed.confirm,
               who: who,
@@ -2188,14 +2199,14 @@ class DatingProvider extends ChangeNotifier {
           final property = propertyById(p.propertyId);
           final address = (property?.address.trim().isNotEmpty ?? false)
               ? property!.address.trim()
-              : 'הנכס';
+              : l10n.datingProviderPropertyFallbackName;
+          final time = '${c.start.hour.toString().padLeft(2, '0')}:'
+              '${c.start.minute.toString().padLeft(2, '0')}';
           // Fixed id per slot → rescheduling replaces rather than duplicates.
           await NotificationService.instance.scheduleReminder(
             id: NotificationService.instance.viewingReminderId(c.slotId),
-            title: 'צפייה בדירה בעוד שעה',
-            body: 'צפייה עם ${p.who} ב$address בשעה '
-                '${c.start.hour.toString().padLeft(2, '0')}:'
-                '${c.start.minute.toString().padLeft(2, '0')}',
+            title: l10n.datingProviderViewingReminderTitle,
+            body: l10n.datingProviderViewingReminderBody(p.who, address, time),
             when: c.start.subtract(const Duration(hours: 1)),
           );
         }
@@ -2747,8 +2758,8 @@ class DatingProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> enterGuestMode(String role) async {
-    _seedGuestDemoState(role);
+  Future<void> enterGuestMode(String role, AppLocalizations l10n) async {
+    _seedGuestDemoState(role, l10n);
     _hasActiveSession = true;
     // Fire-and-forget the anonymous Firebase session so the UI never blocks
     // on network availability. The JWT will arrive within a few seconds in
@@ -3473,9 +3484,11 @@ class DatingProvider extends ChangeNotifier {
           // time (naming happens after the scan), so default to the next number.
           final existing =
               _customPropertyById(scan.propertyId)?.model3d?.rooms.length ?? 0;
-          final name = scan.roomName.isNotEmpty
-              ? scan.roomName
-              : 'חדר ${existing + 1}';
+          // No hardcoded Hebrew default here — this provider has no
+          // BuildContext to localize with. An empty name falls back to a
+          // localized "Room N" label at the widget layer (scan3d_viewer.dart,
+          // room_scan_flow.dart).
+          final name = scan.roomName;
           await appendScanRoom(
             propertyId: scan.propertyId,
             room: ScannedRoom(
@@ -3768,7 +3781,12 @@ class DatingProvider extends ChangeNotifier {
       propertyId: propertyId,
       ownerUserId: property.ownerUserId,
       tenantId: _currentAnalyticsUserId,
-      tenantName: tp?.name ?? 'מתעניין/ת',
+      // No hardcoded Hebrew placeholder — leave blank when the tenant has no
+      // name yet. Every UI consumer of PropertyLike.tenantName (see
+      // explore_screen.dart's `displayName` getter) already falls back to a
+      // locally-known name when this is empty, so an empty string here is
+      // safe and correctly localized at render time.
+      tenantName: tp?.name ?? '',
       tenantPhotoUrl:
           tp?.photoUrls.isNotEmpty == true ? tp!.photoUrls.first : '',
       moveInSnapshot: tp?.moveInWindow ?? '',
@@ -3987,6 +4005,7 @@ class DatingProvider extends ChangeNotifier {
     int? currentIndex,
     CardSwiperDirection direction, {
     RentalProperty? swiped,
+    required AppLocalizations l10n,
   }) async {
     // The swiper now advances a STABLE deck snapshot, so [previousIndex] indexes
     // that snapshot, not the live (shrinking) filteredProperties. The caller
@@ -4058,7 +4077,7 @@ class DatingProvider extends ChangeNotifier {
         final acceptsDemo = isSuperLike || _autoLikeEnabled;
         if (acceptsDemo) {
           _ownerAcceptedPropertyIds.add(_ownerActionKey(property.id, ''));
-          _createMatch(property);
+          _createMatch(property, l10n: l10n);
         }
       }
     } else {
@@ -4253,10 +4272,10 @@ class DatingProvider extends ChangeNotifier {
     ownerSwiperController.swipe(CardSwiperDirection.right);
   }
 
-  void toggleAutoLike() {
+  void toggleAutoLike(AppLocalizations l10n) {
     _autoLikeEnabled = !_autoLikeEnabled;
     if (_autoLikeEnabled) {
-      _processAutoLikes();
+      _processAutoLikes(l10n);
     }
     _persist();
     notifyListeners();
@@ -4276,14 +4295,15 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _processAutoLikes() {
+  void _processAutoLikes(AppLocalizations l10n) {
     final leads = ownerLeads;
     if (leads.isEmpty) return;
 
     for (final property in leads) {
       final tenantId = _acceptedTenantOf(property) ?? '';
       _ownerAcceptedPropertyIds.add(_ownerActionKey(property.id, tenantId));
-      _createMatch(property, tenantUserId: tenantId.isEmpty ? null : tenantId);
+      _createMatch(property,
+          tenantUserId: tenantId.isEmpty ? null : tenantId, l10n: l10n);
     }
   }
 
@@ -4305,6 +4325,7 @@ class DatingProvider extends ChangeNotifier {
     int? currentIndex,
     CardSwiperDirection direction, {
     List<RentalProperty>? visibleLeads,
+    required AppLocalizations l10n,
   }) async {
     // Resolve the swiped index against the EXACT list the deck rendered. When
     // the candidate filters are active the deck shows a subset of [ownerLeads],
@@ -4332,7 +4353,8 @@ class DatingProvider extends ChangeNotifier {
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       _ownerAcceptedPropertyIds.add(key);
-      _createMatch(property, tenantUserId: tenantId.isEmpty ? null : tenantId);
+      _createMatch(property,
+          tenantUserId: tenantId.isEmpty ? null : tenantId, l10n: l10n);
     } else {
       return false;
     }
@@ -4640,7 +4662,10 @@ class DatingProvider extends ChangeNotifier {
     }
   }
 
-  /// Landlord drafts + sends a rental contract for a match.
+  /// Landlord drafts + sends a rental contract for a match. [l10n] is
+  /// required only to localize the fallback names/chat text below — this
+  /// provider has no BuildContext of its own, so every caller (a widget with
+  /// context) passes its own `AppLocalizations.of(context)!`.
   Future<RentalContract?> createRentalContract({
     required String matchId,
     required int monthlyRent,
@@ -4648,6 +4673,7 @@ class DatingProvider extends ChangeNotifier {
     required int durationMonths,
     required DateTime startDate,
     required String terms,
+    required AppLocalizations l10n,
   }) async {
     final match = matchById(matchId);
     final property = propertyById(match?.propertyId ?? '');
@@ -4658,12 +4684,14 @@ class DatingProvider extends ChangeNotifier {
         : _currentOwnerUserId;
     final landlordName = property.ownerName.isNotEmpty
         ? property.ownerName
-        : (_tenantProfile?.name ?? 'בעל הדירה');
+        : (_tenantProfile?.name ?? l10n.datingProviderLandlordFallbackName);
 
     final likes = incomingLikesFor(property.id);
     final tenantLike = likes.isNotEmpty ? likes.first : null;
     final tenantUserId = tenantLike?.tenantId ?? _firstLikerOf(property.id) ?? '';
-    final tenantName = tenantLike?.tenantName ?? 'השוכר';
+    final tenantName = (tenantLike?.tenantName.isNotEmpty ?? false)
+        ? tenantLike!.tenantName
+        : l10n.datingProviderTenantFallbackName;
 
     final now = DateTime.now().toUtc();
     var contract = RentalContract(
@@ -4705,8 +4733,8 @@ class DatingProvider extends ChangeNotifier {
             ChatMessage(
               id: 'contract-${now.microsecondsSinceEpoch}',
               sender: landlordName,
-              text: 'שלחתי חוזה שכירות דיגיטלי לחתימה: '
-                  '₪$monthlyRent לחודש, ל-$durationMonths חודשים.',
+              text: l10n.datingProviderContractSentMessage(
+                  monthlyRent, durationMonths),
               createdAt: DateTime.now(),
             ),
           ],
@@ -4719,18 +4747,25 @@ class DatingProvider extends ChangeNotifier {
   }
 
   /// Signs [contract] with this device's Ed25519 key (private key never leaves
-  /// the device) plus an optional handwritten signature image.
+  /// the device) plus an optional handwritten signature image. [l10n] is
+  /// required only to localize the fallback name/chat text below — this
+  /// provider has no BuildContext of its own, so every caller (a widget with
+  /// context) passes its own `AppLocalizations.of(context)!`.
   Future<RentalContract?> signRentalContract(
     RentalContract contract, {
     required bool asOwner,
+    required AppLocalizations l10n,
     Uint8List? signatureImage,
   }) async {
     final role = asOwner ? 'landlord' : 'tenant';
     final signerName = asOwner
         ? (contract.landlordName.isNotEmpty
             ? contract.landlordName
-            : 'בעל הדירה')
-        : (_tenantProfile?.name ?? contract.tenantName);
+            : l10n.datingProviderLandlordFallbackName)
+        : (_tenantProfile?.name ??
+            (contract.tenantName.isNotEmpty
+                ? contract.tenantName
+                : l10n.datingProviderTenantFallbackName));
 
     final hash = contract.contentHash;
     final publicKey = await _signatureService.publicKeyBase64();
@@ -4783,8 +4818,8 @@ class DatingProvider extends ChangeNotifier {
               id: 'signature-${DateTime.now().microsecondsSinceEpoch}',
               sender: signerName,
               text: asOwner
-                  ? 'חתמתי על החוזה כבעל הדירה. ✍️'
-                  : 'חתמתי על החוזה כשוכר/ת. ✍️',
+                  ? l10n.datingProviderSignedAsLandlord
+                  : l10n.datingProviderSignedAsTenant,
               createdAt: DateTime.now(),
             ),
           ],
@@ -5609,7 +5644,7 @@ class DatingProvider extends ChangeNotifier {
     _invalidateFilterCache();
   }
 
-  void _seedGuestDemoState(String role) {
+  void _seedGuestDemoState(String role, AppLocalizations l10n) {
     // For owner demo: profile = landlord; for tenant demo: profile = tenant
     final isOwner = role == 'owner' || role == 'landlord';
     final tenant = _rentalDataService.createDefaultTenantProfile().copyWith(
@@ -5934,8 +5969,8 @@ class DatingProvider extends ChangeNotifier {
         messages: [
           ChatMessage(
             id: 'd1-1',
-            sender: 'מערכת',
-            text: 'נוצר מאצ׳ — שני הצדדים הסכימו להתקדם.',
+            sender: l10n.datingProviderSystemSenderName,
+            text: l10n.datingProviderDemoMatchMessage1,
             createdAt: DateTime.now().subtract(const Duration(days: 18)),
           ),
           ChatMessage(
@@ -5978,8 +6013,8 @@ class DatingProvider extends ChangeNotifier {
         messages: [
           ChatMessage(
             id: 'd2-1',
-            sender: 'מערכת',
-            text: 'נוצר מאצ׳ — שני הצדדים מעוניינים.',
+            sender: l10n.datingProviderSystemSenderName,
+            text: l10n.datingProviderDemoMatchMessage2,
             createdAt: DateTime.now().subtract(const Duration(days: 9)),
           ),
           ChatMessage(
@@ -6015,8 +6050,8 @@ class DatingProvider extends ChangeNotifier {
         messages: [
           ChatMessage(
             id: 'd3-1',
-            sender: 'מערכת',
-            text: 'התאמה חדשה! שני הצדדים הראו עניין.',
+            sender: l10n.datingProviderSystemSenderName,
+            text: l10n.datingProviderDemoMatchMessage3,
             createdAt: DateTime.now().subtract(const Duration(days: 3)),
           ),
           ChatMessage(
@@ -6174,7 +6209,8 @@ class DatingProvider extends ChangeNotifier {
     _invalidateCatalogCache();
   }
 
-  void _createMatch(RentalProperty property, {String? tenantUserId}) {
+  void _createMatch(RentalProperty property,
+      {String? tenantUserId, required AppLocalizations l10n}) {
     // The chat thread is keyed by the TENANT's uid so the landlord and that
     // specific tenant share one private thread (a property can have several
     // interested tenants, each in their own thread).
@@ -6202,8 +6238,8 @@ class DatingProvider extends ChangeNotifier {
         messages: [
           ChatMessage(
             id: 'intro-${property.id}',
-            sender: 'מערכת',
-            text: 'נוצר מאצ׳. אפשר לפתוח צ׳אט, לשלוח חוזה ולנהל חתימות.',
+            sender: l10n.datingProviderSystemSenderName,
+            text: l10n.datingProviderMatchCreatedMessage,
             createdAt: DateTime.now(),
           ),
         ],
@@ -6406,12 +6442,12 @@ class DatingProvider extends ChangeNotifier {
   /// to) a private thread flagged as a request → it shows under "מבקשים לשלוח
   /// הודעה" for the owner until they reply.
   Future<void> requestToMessage(RentalProperty property,
-      {String note = ''}) async {
+      {String note = '', required AppLocalizations l10n}) async {
     final matchId = 'match-${property.id}~$_currentOwnerUserId';
     final now = DateTime.now();
-    final myName = _tenantProfile?.name ?? 'מתעניין/ת';
+    final myName = _tenantProfile?.name ?? l10n.datingProviderTenantFallbackName;
     final text = note.trim().isEmpty
-        ? 'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂'
+        ? l10n.datingProviderDefaultContactMessage
         : note.trim();
     final msg = ChatMessage(
       id: 'req-${property.id}-${now.microsecondsSinceEpoch}',
@@ -6689,6 +6725,10 @@ class _PropertyDetailSession {
 }
 
 enum PriceContext { belowAverage, average, aboveAverage }
+
+/// Stable reason keys for [DatingProvider.leadFitReason] — the provider has
+/// no BuildContext to localize with, so callers translate the key.
+enum LeadFitReason { budgetFits, timingFits }
 
 class LandlordStats {
   const LandlordStats({

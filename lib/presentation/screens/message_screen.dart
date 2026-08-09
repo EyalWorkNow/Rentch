@@ -959,7 +959,9 @@ class _MessageScreenState extends State<MessageScreen> {
 
         if (provider.isLandlord) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) provider.processViewingConfirms();
+            if (mounted) {
+              provider.processViewingConfirms(AppLocalizations.of(context)!);
+            }
           });
         }
 

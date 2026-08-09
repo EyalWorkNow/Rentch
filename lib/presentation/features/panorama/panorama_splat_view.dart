@@ -162,8 +162,9 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
     return utf8.encode(injected);
   }
 
-  List<SplatWaypoint> get _effectiveWaypoints =>
-      widget.waypoints.isNotEmpty ? widget.waypoints : SplatWaypoint.defaults;
+  List<SplatWaypoint> get _effectiveWaypoints => widget.waypoints.isNotEmpty
+      ? widget.waypoints
+      : SplatWaypoint.defaultsFor(AppLocalizations.of(context)!);
 
   static void _send(HttpRequest req, String contentType, List<int> body) {
     req.response.headers.set(HttpHeaders.contentTypeHeader, contentType);
@@ -367,21 +368,21 @@ class SplatWaypoint {
 
   /// A small default orbit used when no authored waypoints exist, so the scene
   /// is still navigable. Real waypoints come from the capture's pose track.
-  static const List<SplatWaypoint> defaults = [
-    SplatWaypoint(
-      label: 'כניסה',
-      position: [0, 1.5, 3],
-      target: [0, 1.2, 0],
-    ),
-    SplatWaypoint(
-      label: 'מרכז',
-      position: [0, 1.5, 0.5],
-      target: [0, 1.2, -2],
-    ),
-    SplatWaypoint(
-      label: 'פנים',
-      position: [1.5, 1.5, -2],
-      target: [0, 1.2, -3],
-    ),
-  ];
+  static List<SplatWaypoint> defaultsFor(AppLocalizations l10n) => [
+        SplatWaypoint(
+          label: l10n.panoramaSplatViewWaypointEntrance,
+          position: const [0, 1.5, 3],
+          target: const [0, 1.2, 0],
+        ),
+        SplatWaypoint(
+          label: l10n.panoramaSplatViewWaypointCenter,
+          position: const [0, 1.5, 0.5],
+          target: const [0, 1.2, -2],
+        ),
+        SplatWaypoint(
+          label: l10n.panoramaSplatViewWaypointInterior,
+          position: const [1.5, 1.5, -2],
+          target: const [0, 1.2, -3],
+        ),
+      ];
 }

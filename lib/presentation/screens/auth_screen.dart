@@ -176,7 +176,9 @@ class _AuthScreenState extends State<AuthScreen>
       builder: (_) => const _GuestModeDialog(),
     );
     if (!mounted || role == null) return;
-    await context.read<DatingProvider>().enterGuestMode(role);
+    await context
+        .read<DatingProvider>()
+        .enterGuestMode(role, AppLocalizations.of(context)!);
     if (mounted) _onEnter();
   }
 
@@ -3365,6 +3367,37 @@ class _StepPropertyDetails extends StatelessWidget {
     'אינטרנט',
   ];
 
+  // Display-only label map: `_featureTags` values are stored verbatim on the
+  // draft property (matched elsewhere via .contains, e.g. _getFeatureIcon in
+  // property_detail_screen.dart), so the underlying strings must not change —
+  // only what's rendered in the chip.
+  static String _featureLabel(String value, AppLocalizations l10n) {
+    switch (value) {
+      case 'מרפסת':
+        return l10n.authScreenFeatureBalcony;
+      case 'חניה':
+        return l10n.authScreenFeatureParking;
+      case 'מעלית':
+        return l10n.authScreenFeatureElevator;
+      case 'מיזוג':
+        return l10n.authScreenFeatureAc;
+      case 'ממ"ד':
+        return l10n.authScreenFeatureSafeRoom;
+      case 'مחסן':
+        return l10n.authScreenFeatureStorage;
+      case 'גינה':
+        return l10n.authScreenFeatureGarden;
+      case 'ריהוט':
+        return l10n.authScreenFeatureFurnished;
+      case 'מחמדים':
+        return l10n.authScreenFeaturePets;
+      case 'אינטרנט':
+        return l10n.authScreenFeatureInternet;
+      default:
+        return value;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -3424,7 +3457,7 @@ class _StepPropertyDetails extends StatelessWidget {
             runSpacing: 8,
             children: _featureTags
                 .map((f) => _FeatureChip(
-                      label: f,
+                      label: _featureLabel(f, l10n),
                       selected: features.contains(f),
                       onTap: () => onToggleFeature(f),
                       icon: _featureIcons[f],

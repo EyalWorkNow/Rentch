@@ -333,7 +333,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         autoLikeEnabled: provider.autoLikeEnabled,
                         onToggleAutoLike: () {
                           HapticFeedback.mediumImpact();
-                          provider.toggleAutoLike();
+                          provider.toggleAutoLike(l10n);
                         },
                         activeFilterCount: _filters.activeCount,
                         showFilters: allLeads.isNotEmpty,
@@ -404,6 +404,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                               current,
                                               dir,
                                               visibleLeads: leads,
+                                              l10n: l10n,
                                             );
                                           },
                                           cardBuilder: (context, index, hOffset,
@@ -501,6 +502,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 
+/// DatingProvider.leadFitReason returns a stable [LeadFitReason] key (the
+/// provider has no BuildContext to localize with) — translate it here.
+String? _leadFitReasonLabel(LeadFitReason? reason, AppLocalizations l10n) {
+  switch (reason) {
+    case LeadFitReason.budgetFits:
+      return l10n.datingProviderLeadReasonBudgetFits;
+    case LeadFitReason.timingFits:
+      return l10n.datingProviderLeadReasonTimingFits;
+    case null:
+      return null;
+  }
+}
+
 class _LeadCard extends StatefulWidget {
   _LeadCard({
     required this.tenant,
@@ -528,7 +542,7 @@ class _LeadCard extends StatefulWidget {
   final List<AppReview> reviews;
   final int hOffset;
   final bool isHighFit;
-  final String? fitReason;
+  final LeadFitReason? fitReason;
 
   /// Honest fit score [0,100] for the compact ring/badge on the photo header.
   final double fitScore;
@@ -727,7 +741,7 @@ class _LeadCardState extends State<_LeadCard> {
     final age = widget.displayAge;
     final nameLine =
         age != null ? '${widget.displayName}, $age' : widget.displayName;
-    final fitReason = widget.fitReason;
+    final fitReason = _leadFitReasonLabel(widget.fitReason, l10n);
 
     final dragFactor = (widget.hOffset.abs() / 100.0).clamp(0.0, 1.0);
     final blurRadius = 18.0 + (14.0 * dragFactor);
@@ -2130,7 +2144,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final e in _kLifestyleLabels.entries)
+                          for (final e in lifestyleLabelsFor(l10n).entries)
                             _QuickChip(
                               label: e.value,
                               selected:
@@ -2180,7 +2194,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final e in _kPetTypeLabels.entries)
+                          for (final e in petTypeLabelsFor(l10n).entries)
                             _QuickChip(
                               label: e.value,
                               selected: _draft.petTypes.contains(e.key),
@@ -2535,11 +2549,6 @@ Map<String, String> _householdLabels(BuildContext context) {
     'student': l10n.exploreScreen42ed7e8d,
   };
 }
-
-// kLifestyleLabels / kPetTypeLabels live in rental_models.dart (shared with the
-// tenant profile capture). Local aliases keep the sheet code terse.
-const Map<String, String> _kLifestyleLabels = kLifestyleLabels;
-const Map<String, String> _kPetTypeLabels = kPetTypeLabels;
 
 String _occupationLabel(BuildContext context, String key) =>
     _occupationLabels(context)[key] ?? key;

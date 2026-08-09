@@ -65,7 +65,8 @@ void main() {
 
       try {
         await provider.initialize();
-        await provider.enterGuestMode('landlord');
+        await provider.enterGuestMode(
+            'landlord', lookupAppLocalizations(const Locale('he')));
         await tester.pumpWidget(
           ChangeNotifierProvider<DatingProvider>.value(
             value: provider,
@@ -121,7 +122,8 @@ void main() {
     );
     try {
       await provider.initialize();
-      await provider.enterGuestMode('tenant');
+      await provider.enterGuestMode(
+          'tenant', lookupAppLocalizations(const Locale('he')));
       await provider.toggleSave('c1');
       await provider.toggleSave('c2');
       await provider.toggleSave('c3');

@@ -208,7 +208,8 @@ class AssistantPropertyCard extends StatelessWidget {
                               .assistantPropertyCard615d28b8(p.sizeM2)),
                       for (final t in scored.tags.where((t) => !_isGeoTag(t))) ...[
                         const SizedBox(width: 8),
-                        _InfoChip(label: t),
+                        _InfoChip(
+                            label: _fitTagLabel(t, AppLocalizations.of(context)!)),
                       ],
                     ]),
                   ),
@@ -278,6 +279,17 @@ const Map<String, IconData> _geoIcon = {
 };
 
 bool _isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
+
+/// DatingProvider.recommendForTenant packs the fit-score tag as a bare
+/// "NN%" (locale-neutral — the provider has no BuildContext to localize
+/// with); re-label it as a localized "N% match" string here. Other tags
+/// (highlights) pass through unchanged.
+final RegExp _bareFitPct = RegExp(r'^(\d+)%$');
+String _fitTagLabel(String t, AppLocalizations l10n) {
+  final m = _bareFitPct.firstMatch(t);
+  if (m == null) return t;
+  return l10n.datingProviderFitPercentLabel(m.group(1)!);
+}
 
 /// Render the geo tags (if any) as a wrap under the quick facts.
 List<Widget> _geoWhy(List<String> tags) {

@@ -3043,7 +3043,7 @@ class _AssistantPropertyCard extends StatelessWidget {
                       // sources); only plain facts stay on this quick-facts row.
                       for (final t in scored.tags.where((t) => !isGeoTag(t))) ...[
                         const SizedBox(width: 8),
-                        _InfoChip(label: t),
+                        _InfoChip(label: _fitTagLabel(t, l10n)),
                       ],
                     ]),
                   ),
@@ -3088,6 +3088,17 @@ class _AssistantPropertyCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// DatingProvider.recommendForTenant packs the fit-score tag as a bare
+/// "NN%" (locale-neutral — the provider has no BuildContext to localize
+/// with); re-label it as a localized "N% match" string here. Other tags
+/// (highlights) pass through unchanged.
+final RegExp _bareFitPct = RegExp(r'^(\d+)%$');
+String _fitTagLabel(String t, AppLocalizations l10n) {
+  final m = _bareFitPct.firstMatch(t);
+  if (m == null) return t;
+  return l10n.datingProviderFitPercentLabel(m.group(1)!);
 }
 
 class _InfoChip extends StatelessWidget {

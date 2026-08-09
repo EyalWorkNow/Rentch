@@ -114,7 +114,9 @@ class _Scan3dViewerScreenState extends State<Scan3dViewerScreen> {
       return PanoramaSplatView(
         key: ValueKey('room-$_index-splat'),
         splatUrl: splat,
-        title: room.name,
+        title: room.name.trim().isNotEmpty
+            ? room.name
+            : AppLocalizations.of(context)!.roomScanFlowDefaultRoomName(_index + 1),
         showChrome: false,
       );
     }

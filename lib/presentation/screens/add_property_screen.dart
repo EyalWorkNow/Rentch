@@ -2222,7 +2222,7 @@ class _StepDetails extends StatelessWidget {
       children: [
         _SectionHint(
           icon: IconsaxPlusLinear.building,
-          title: 'פרטי הנכס',
+          title: AppLocalizations.of(context)!.addPropertyScreenSectionPropertyDetails,
           subtitle: AppLocalizations.of(context)!.addPropertyScreen284dcfc6,
         ),
         const SizedBox(height: 16),
@@ -2350,6 +2350,84 @@ class _StepFeatures extends StatelessWidget {
   final Set<String> publishChannels;
   final ValueChanged<String> onChannelToggle;
 
+  // Feature values are the canonical persisted tags (property.features,
+  // matching) so [allFeatures]/[selectedFeatures] stay in Hebrew — only the
+  // visible chip text is localized here.
+  String _featureLabel(String value, AppLocalizations l10n) {
+    switch (value) {
+      case 'מרפסת':
+        return l10n.addPropertyScreenFeatureBalcony;
+      case 'חניה':
+        return l10n.addPropertyScreenFeatureParking;
+      case 'מחסן':
+        return l10n.addPropertyScreenFeatureStorage;
+      case 'מזגן':
+        return l10n.addPropertyScreenFeatureAc;
+      case 'ממ"ד':
+        return l10n.addPropertyScreenFeatureMamad;
+      case 'מרפסת שמש':
+        return l10n.addPropertyScreenFeatureSunBalcony;
+      case 'גינה':
+        return l10n.addPropertyScreenFeatureGarden;
+      case 'מעלית':
+        return l10n.addPropertyScreenFeatureElevator;
+      case 'ריהוט':
+        return l10n.addPropertyScreenFeatureFurniture;
+      case 'אינטרנט כלול':
+        return l10n.addPropertyScreenFeatureInternetIncluded;
+      case 'מטבח מאובזר':
+        return l10n.addPropertyScreenFeatureEquippedKitchen;
+      case 'חיות מחמד מותר':
+        return l10n.addPropertyScreenFeaturePetsAllowed;
+      case 'כביסה כלולה':
+        return l10n.addPropertyScreenFeatureLaundryIncluded;
+      case 'שומר/אבטחה':
+        return l10n.addPropertyScreenFeatureSecurity;
+      case 'נגישות לנכים':
+        return l10n.addPropertyScreenFeatureAccessibility;
+      case 'גג משותף':
+        return l10n.addPropertyScreenFeatureSharedRoof;
+      case 'בריכה':
+        return l10n.addPropertyScreenFeaturePool;
+      case 'חדר כושר':
+        return l10n.addPropertyScreenFeatureGym;
+      case 'סורגים':
+        return l10n.addPropertyScreenFeatureBars;
+      case 'משופצת':
+        return l10n.addPropertyScreenFeatureRenovated;
+      case 'מתאימה לשותפים':
+        return l10n.addPropertyScreenFeatureRoommateFriendly;
+      case 'מקלט':
+        return l10n.addPropertyScreenFeatureShelter;
+      case 'מרחב מוגן קומתי':
+        return l10n.addPropertyScreenFeatureFloorProtectedSpace;
+      case 'מרתף':
+        return l10n.addPropertyScreenFeatureBasement;
+      case 'חימום מרכזי':
+        return l10n.addPropertyScreenFeatureCentralHeating;
+      case 'מזגן בחדרי שינה':
+        return l10n.addPropertyScreenFeatureBedroomAc;
+      case 'מכונת כביסה':
+        return l10n.addPropertyScreenFeatureWashingMachine;
+      case 'מקרר':
+        return l10n.addPropertyScreenFeatureFridge;
+      case 'תנור':
+        return l10n.addPropertyScreenFeatureOven;
+      case 'מדיח כלים':
+        return l10n.addPropertyScreenFeatureDishwasher;
+      case 'בקרה חכמה בבית':
+        return l10n.addPropertyScreenFeatureSmartHome;
+      case 'חניה תת קרקעית':
+        return l10n.addPropertyScreenFeatureUndergroundParking;
+      case 'מערכת סאונד':
+        return l10n.addPropertyScreenFeatureSoundSystem;
+      case 'כניסה פרטית':
+        return l10n.addPropertyScreenFeaturePrivateEntrance;
+      default:
+        return value;
+    }
+  }
+
   IconData _getFeatureIcon(String label) {
     switch (label) {
       case 'מרפסת':
@@ -2427,6 +2505,7 @@ class _StepFeatures extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
@@ -2512,7 +2591,7 @@ class _StepFeatures extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            f,
+                            _featureLabel(f, l10n),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -4716,8 +4795,23 @@ class _FloorDropdown extends StatelessWidget {
     '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
   ];
 
+  // These two entries double as the persisted floor value (written straight
+  // into [ctrl]) so the canonical list above stays in Hebrew; only the
+  // on-screen label is localized.
+  String _floorLabel(String value, AppLocalizations l10n) {
+    switch (value) {
+      case 'מרתף':
+        return l10n.addPropertyScreenFloorBasement;
+      case 'קרקע':
+        return l10n.addPropertyScreenFloorGround;
+      default:
+        return value;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final current = ctrl.text.trim();
     // A pre-filled value (GPS / Erik draft) might not be in the canonical list —
     // surface it as an extra option so it isn't silently dropped.
@@ -4746,7 +4840,7 @@ class _FloorDropdown extends StatelessWidget {
       dropdownColor: Colors.white,
       borderRadius: BorderRadius.circular(16),
       items: items
-          .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+          .map((f) => DropdownMenuItem(value: f, child: Text(_floorLabel(f, l10n))))
           .toList(),
       onChanged: (v) => ctrl.text = v ?? '',
     );
@@ -5351,6 +5445,38 @@ class _DropdownRow extends StatelessWidget {
   final List<String> options;
   final ValueChanged<String?> onChanged;
 
+  // Dropdown options double as canonical persisted data values (property.type,
+  // property.condition, matching/filtering) so the option lists themselves must
+  // stay in Hebrew — only the on-screen label is localized here.
+  String _optionLabel(String value, AppLocalizations l10n) {
+    switch (value) {
+      case 'דירה':
+        return l10n.addPropertyScreenTypeApartment;
+      case 'דירת גג':
+        return l10n.addPropertyScreenTypePenthouse;
+      case 'דירת גן':
+        return l10n.addPropertyScreenTypeGardenApartment;
+      case 'סטודיו':
+        return l10n.addPropertyScreenTypeStudio;
+      case 'קוטג׳':
+        return l10n.addPropertyScreenTypeCottage;
+      case 'בית פרטי':
+        return l10n.addPropertyScreenTypePrivateHouse;
+      case 'משרד':
+        return l10n.addPropertyScreenTypeOffice;
+      case 'חדש מקבלן':
+        return l10n.addPropertyScreenConditionNew;
+      case 'משופץ':
+        return l10n.addPropertyScreenConditionRenovated;
+      case 'תקין':
+        return l10n.addPropertyScreenConditionGood;
+      case 'ישן':
+        return l10n.addPropertyScreenConditionOld;
+      default:
+        return value;
+    }
+  }
+
   IconData? _iconForOption(String option) {
     switch (option) {
       // Property types
@@ -5384,6 +5510,7 @@ class _DropdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final selectedIcon = _iconForOption(value);
 
     return DropdownButtonFormField<String>(
@@ -5418,7 +5545,7 @@ class _DropdownRow extends StatelessWidget {
                 Icon(itemIcon, size: 18, color: AppColors.primary),
                 const SizedBox(width: 10),
               ],
-              Text(o),
+              Text(_optionLabel(o, l10n)),
             ],
           ),
         );

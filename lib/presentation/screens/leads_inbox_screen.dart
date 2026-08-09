@@ -36,7 +36,11 @@ class _LeadsInboxScreenState extends State<LeadsInboxScreen> {
     // reminder + dashboard entry even if the landlord never opens that specific
     // thread. Idempotent + fail-soft (guarded inside the provider).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<DatingProvider>().processViewingConfirms();
+      if (mounted) {
+        context
+            .read<DatingProvider>()
+            .processViewingConfirms(AppLocalizations.of(context)!);
+      }
     });
   }
 

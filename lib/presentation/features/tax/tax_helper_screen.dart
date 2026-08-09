@@ -216,7 +216,7 @@ class _WhatDoesItMean extends StatelessWidget {
         l10n.taxHelperScreen4dd6aab6 +
         l10n.taxHelperScreen2546b90e(_money(result.tenPercentMonthly)) +
         (result.requiresAnnualReport
-            ? ' בסכומים גבוהים (מעל ₪375,000 בשנה) צריך גם להגיש דוח שנתי.'
+            ? l10n.taxHelperScreenAnnualReportNote
             : '');
   }
 

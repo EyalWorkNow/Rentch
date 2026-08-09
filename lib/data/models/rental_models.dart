@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dating_app/core/search/nearby_relevance.dart' show NearbyKind;
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/scanned_room.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart';
 
 enum SearchSortOption {
@@ -279,6 +280,14 @@ class PropertyFeatureSet {
 class PropertyFeatureCatalog {
   static List<String> get allLabels =>
       _propertyFeatureCatalog.map((item) => item.label).toList(growable: false);
+
+  /// Localized display label for a canonical feature VALUE (the Hebrew string
+  /// stored/matched in [RentalProperty.features] / [SearchFilters.requiredFeatures]
+  /// / etc. — e.g. 'מרפסת'). Storage/matching always use the raw value; this is
+  /// display-only. Unknown values (custom landlord-typed features, legacy
+  /// English aliases) pass through unchanged.
+  static String labelFor(AppLocalizations l10n, String rawLabel) =>
+      propertyFeatureLabelFor(l10n, rawLabel);
 }
 
 class PropertyModel3d {
@@ -1789,6 +1798,108 @@ String moveInBucketOf(String moveInWindow) {
   return 'flexible';
 }
 
+// ─── Localized display labels for the catalogs above ──────────────────────────
+// [kLifestyleLabels], [kPetTypeLabels], [kMoveInBuckets] and [kUrgencyOptions]
+// are LOCKED canonical contracts: their Hebrew VALUES are the actual data
+// persisted/matched across the app (tenant profile fields, landlord filters,
+// the backend eligibility gate). They must never change. The functions below
+// add a display-only translation layer — call these at every render site
+// instead of showing the raw Hebrew value directly, so the UI honors the
+// user's language while storage/matching stay untouched.
+
+/// Localized label for a [kLifestyleLabels] token ('chiloni'/'masorti'/'dati'/
+/// 'charedi'). Falls back to the canonical Hebrew label for an unknown token.
+String lifestyleLabelFor(AppLocalizations l10n, String token) {
+  switch (token) {
+    case 'chiloni':
+      return l10n.rentalModelsLifestyleChiloni;
+    case 'masorti':
+      return l10n.rentalModelsLifestyleMasorti;
+    case 'dati':
+      return l10n.rentalModelsLifestyleDati;
+    case 'charedi':
+      return l10n.rentalModelsLifestyleCharedi;
+    default:
+      return kLifestyleLabels[token] ?? token;
+  }
+}
+
+/// [kLifestyleLabels] with every value translated for the active locale, in
+/// the same (token → label) shape and iteration order as the canonical map.
+Map<String, String> lifestyleLabelsFor(AppLocalizations l10n) =>
+    <String, String>{
+      for (final key in kLifestyleLabels.keys) key: lifestyleLabelFor(l10n, key),
+    };
+
+/// Localized label for a [kPetTypeLabels] token ('none'/'cat'/'dog_small'/
+/// 'dog_large'/'other'). Falls back to the canonical Hebrew label.
+String petTypeLabelFor(AppLocalizations l10n, String token) {
+  switch (token) {
+    case 'none':
+      return l10n.rentalModelsPetTypeNone;
+    case 'cat':
+      return l10n.rentalModelsPetTypeCat;
+    case 'dog_small':
+      return l10n.rentalModelsPetTypeDogSmall;
+    case 'dog_large':
+      return l10n.rentalModelsPetTypeDogLarge;
+    case 'other':
+      return l10n.rentalModelsPetTypeOther;
+    default:
+      return kPetTypeLabels[token] ?? token;
+  }
+}
+
+/// [kPetTypeLabels] with every value translated for the active locale.
+Map<String, String> petTypeLabelsFor(AppLocalizations l10n) => <String, String>{
+      for (final key in kPetTypeLabels.keys) key: petTypeLabelFor(l10n, key),
+    };
+
+/// Localized label for a [kMoveInBuckets] token ('immediate'/'month'/
+/// 'quarter'/'flexible'). Falls back to the token itself when unknown.
+String moveInBucketLabelFor(AppLocalizations l10n, String token) {
+  switch (token) {
+    case 'immediate':
+      return l10n.rentalModelsMoveInImmediate;
+    case 'month':
+      return l10n.rentalModelsMoveInMonth;
+    case 'quarter':
+      return l10n.rentalModelsMoveInQuarter;
+    case 'flexible':
+      return l10n.rentalModelsMoveInFlexible;
+    default:
+      return token;
+  }
+}
+
+/// [kMoveInBuckets] with every label translated for the active locale, same
+/// (token, label) tuple shape and presentation order as the canonical list.
+List<(String, String)> moveInBucketsFor(AppLocalizations l10n) => [
+      for (final bucket in kMoveInBuckets)
+        (bucket.$1, moveInBucketLabelFor(l10n, bucket.$1)),
+    ];
+
+/// Localized label for a [kUrgencyOptions] token ('now'/'soon'/'browsing').
+/// Falls back to the token itself when unknown.
+String urgencyLabelFor(AppLocalizations l10n, String token) {
+  switch (token) {
+    case 'now':
+      return l10n.rentalModelsUrgencyNow;
+    case 'soon':
+      return l10n.rentalModelsUrgencySoon;
+    case 'browsing':
+      return l10n.rentalModelsUrgencyBrowsing;
+    default:
+      return token;
+  }
+}
+
+/// [kUrgencyOptions] with every label translated for the active locale.
+List<(String, String)> urgencyOptionsFor(AppLocalizations l10n) => [
+      for (final option in kUrgencyOptions)
+        (option.$1, urgencyLabelFor(l10n, option.$1)),
+    ];
+
 class SearchArea {
   const SearchArea({
     required this.id,
@@ -2772,6 +2883,118 @@ String _normalizeFeatureToken(String value) {
 
 String? _featureKeyFor(String value) {
   return _featureAliasLookup[_normalizeFeatureToken(value)];
+}
+
+/// Localized display label for a canonical property-feature VALUE (the exact
+/// Hebrew string persisted/matched in [RentalProperty.features] and
+/// [SearchFilters] — see [_propertyFeatureCatalog]). Two catalog entries share
+/// the 'furnished'/'parking' KEY but have distinct Hebrew VALUES ('ריהוט' vs
+/// 'ריהוט אופציונלי', 'חניה' vs 'חניה מוצמדת'), so this switches on the exact
+/// value rather than the resolved key to keep both translated distinctly.
+/// Anything not in the catalog (a landlord's free-text custom feature, or a
+/// legacy English alias) passes through unchanged — storage/matching never
+/// change, only what's rendered.
+String propertyFeatureLabelFor(AppLocalizations l10n, String rawLabel) {
+  switch (rawLabel.trim()) {
+    case 'מרפסת':
+      return l10n.rentalModelsFeatureBalcony;
+    case 'חניה':
+      return l10n.rentalModelsFeatureParking;
+    case 'מחסן':
+      return l10n.rentalModelsFeatureStorage;
+    case 'מזגן':
+      return l10n.rentalModelsFeatureAirConditioning;
+    case 'ממ"ד':
+      return l10n.rentalModelsFeatureMamad;
+    case 'מרפסת שמש':
+      return l10n.rentalModelsFeatureSunBalcony;
+    case 'גינה':
+      return l10n.rentalModelsFeatureGarden;
+    case 'מעלית':
+      return l10n.rentalModelsFeatureElevator;
+    case 'ריהוט':
+      return l10n.rentalModelsFeatureFurnished;
+    case 'אינטרנט כלול':
+      return l10n.rentalModelsFeatureInternetIncluded;
+    case 'מטבח מאובזר':
+      return l10n.rentalModelsFeatureEquippedKitchen;
+    case 'חיות מחמד מותר':
+      return l10n.rentalModelsFeaturePetsAllowed;
+    case 'כביסה כלולה':
+      return l10n.rentalModelsFeatureLaundryIncluded;
+    case 'שומר/אבטחה':
+      return l10n.rentalModelsFeatureSecurity;
+    case 'נגישות לנכים':
+      return l10n.rentalModelsFeatureAccessible;
+    case 'גג משותף':
+      return l10n.rentalModelsFeatureSharedRoof;
+    case 'בריכה':
+      return l10n.rentalModelsFeaturePool;
+    case 'חדר כושר':
+      return l10n.rentalModelsFeatureGym;
+    case 'סורגים':
+      return l10n.rentalModelsFeatureBars;
+    case 'משופצת':
+      return l10n.rentalModelsFeatureRenovated;
+    case 'מתאימה לשותפים':
+      return l10n.rentalModelsFeatureRoommates;
+    case 'מקלט':
+      return l10n.rentalModelsFeatureBombShelter;
+    case 'מרחב מוגן קומתי':
+      return l10n.rentalModelsFeatureSafeFloorSpace;
+    case 'מרתף':
+      return l10n.rentalModelsFeatureBasement;
+    case 'חימום מרכזי':
+      return l10n.rentalModelsFeatureCentralHeating;
+    case 'מזגן בחדרי שינה':
+      return l10n.rentalModelsFeatureBedroomAc;
+    case 'מכונת כביסה':
+      return l10n.rentalModelsFeatureWashingMachine;
+    case 'מקרר':
+      return l10n.rentalModelsFeatureRefrigerator;
+    case 'תנור':
+      return l10n.rentalModelsFeatureOven;
+    case 'מדיח כלים':
+      return l10n.rentalModelsFeatureDishwasher;
+    case 'בקרה חכמה בבית':
+      return l10n.rentalModelsFeatureSmartHome;
+    case 'חניה תת קרקעית':
+      return l10n.rentalModelsFeatureUndergroundParking;
+    case 'מערכת סאונד':
+      return l10n.rentalModelsFeatureSoundSystem;
+    case 'כניסה פרטית':
+      return l10n.rentalModelsFeaturePrivateEntrance;
+    case 'מצלמות אבטחה':
+      return l10n.rentalModelsFeatureCctv;
+    case 'מערכת אזעקה':
+      return l10n.rentalModelsFeatureAlarmSystem;
+    case 'אינטרקום':
+      return l10n.rentalModelsFeatureIntercom;
+    case 'חשמל כלול':
+      return l10n.rentalModelsFeatureElectricity;
+    case 'מים כלולים':
+      return l10n.rentalModelsFeatureWater;
+    case 'אור טבעי':
+      return l10n.rentalModelsFeatureNaturalLight;
+    case 'אזור שקט':
+      return l10n.rentalModelsFeatureQuietArea;
+    case 'מתאים לחיות מחמד':
+      return l10n.rentalModelsFeaturePetFriendly;
+    case 'חניה מוצמדת':
+      return l10n.rentalModelsFeatureAttachedParking;
+    case 'כניסה מאובטחת':
+      return l10n.rentalModelsFeatureSecureEntrance;
+    case 'קרוב לתחבורה ציבורית':
+      return l10n.rentalModelsFeatureNearPublicTransport;
+    case 'ריהוט אופציונלי':
+      return l10n.rentalModelsFeatureOptionalFurnished;
+    case 'קרוב לים':
+      return l10n.rentalModelsFeatureNearSea;
+    case 'קרוב לפארק':
+      return l10n.rentalModelsFeatureNearPark;
+    default:
+      return rawLabel;
+  }
 }
 
 Map<String, bool> _completeFeatureFlags(Map<String, bool> values) {

@@ -1191,7 +1191,8 @@ void main() {
       final deck = warm.filteredProperties;
       final idx = deck.indexWhere((p) => p.id.startsWith('train-'));
       if (idx < 0) break;
-      await warm.handlePropertySwipe(idx, null, CardSwiperDirection.right);
+      await warm.handlePropertySwipe(idx, null, CardSwiperDirection.right,
+          l10n: lookupAppLocalizations(const Locale('he')));
     }
 
     final warmScore = warm.matchScore(probe);

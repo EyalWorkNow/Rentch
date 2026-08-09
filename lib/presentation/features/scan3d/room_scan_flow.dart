@@ -146,11 +146,12 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
 
   void _previewRoom(ScannedRoom room) {
     if (!room.hasViewableAsset) return;
+    final index = _rooms.indexOf(room);
     Scan3dViewerScreen.open(
       context,
       meshGlbUrl: room.meshGlbUrl,
       splatUrl: room.splatUrl,
-      title: room.name,
+      title: _roomDisplayName(room, index, AppLocalizations.of(context)!),
     );
   }
 
@@ -207,6 +208,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
                         ..._rooms.asMap().entries.map(
                               (e) => _RoomCard(
                                 room: e.value,
+                                index: e.key,
                                 onPreview: () => _previewRoom(e.value),
                                 onRemove: () => _removeRoom(e.key),
                               ),
@@ -285,14 +287,25 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
   }
 }
 
+/// A cloud-processed room (see [DatingProvider.finalizePendingScans]) may
+/// come back with an empty [ScannedRoom.name] — the provider has no
+/// BuildContext to localize a default with. Fall back to a localized
+/// "Room N" label (1-based) here, where a BuildContext is available.
+String _roomDisplayName(ScannedRoom room, int index, AppLocalizations l10n) =>
+    room.name.trim().isNotEmpty
+        ? room.name
+        : l10n.roomScanFlowDefaultRoomName(index + 1);
+
 class _RoomCard extends StatelessWidget {
   _RoomCard({
     required this.room,
+    required this.index,
     required this.onPreview,
     required this.onRemove,
   });
 
   final ScannedRoom room;
+  final int index;
   final VoidCallback onPreview;
   final VoidCallback onRemove;
 
@@ -326,7 +339,7 @@ class _RoomCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  room.name,
+                  _roomDisplayName(room, index, l10n),
                   style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 16,

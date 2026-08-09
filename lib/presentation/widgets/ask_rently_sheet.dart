@@ -111,7 +111,8 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
     _scrollToEnd();
 
     // 1) Answer instantly from the listing's own data whenever we can.
-    String? answer = answerFromListing(question, widget.property);
+    final askL10n = mounted ? AppLocalizations.of(context) : null;
+    String? answer = answerFromListing(question, widget.property, l10n: askL10n);
 
     // 2) Only fall back to the backend for what the data can't cover.
     if (answer == null) {
@@ -151,7 +152,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
     final provider = context.read<DatingProvider>();
     final l10n = AppLocalizations.of(context)!;
     final note = _lastQuestion.isNotEmpty ? _lastQuestion : l10n.askRentlySheetD8ba43e9;
-    await provider.requestToMessage(widget.property, note: note);
+    await provider.requestToMessage(widget.property, note: note, l10n: l10n);
     if (!mounted) return;
     Navigator.of(context).maybePop();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -427,8 +428,10 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
 /// Grounded, INSTANT answers to common tenant questions from the listing's own
 /// fields + the geo index. Returns null only when the data genuinely can't
 /// answer — that's when the sheet offers the "message the landlord" CTA.
-/// Top-level & pure so it's unit-testable.
-String? answerFromListing(String q, RentalProperty p) {
+/// Top-level & pure so it's unit-testable. [l10n] is optional: when supplied
+/// (the real app always has a [BuildContext] here) the reply is localized;
+/// when omitted (e.g. plain unit tests) it falls back to the Hebrew original.
+String? answerFromListing(String q, RentalProperty p, {AppLocalizations? l10n}) {
   final t = q.toLowerCase();
   bool ask(String pat) => RegExp(pat, caseSensitive: false).hasMatch(t);
   final feats = p.features.join(' ').toLowerCase();
@@ -439,64 +442,130 @@ String? answerFromListing(String q, RentalProperty p) {
 
   if (ask(r'קומה|באיזו ?קומה|floor')) {
     if (p.floor.trim().isEmpty) return null;
-    final of = p.totalFloors.trim().isNotEmpty ? ' מתוך ${p.totalFloors}' : '';
-    return 'הדירה בקומה ${p.floor}$of.';
+    if (p.totalFloors.trim().isNotEmpty) {
+      return l10n != null
+          ? l10n.askRentlySheetFloorWithTotal(p.floor, p.totalFloors)
+          : 'הדירה בקומה ${p.floor} מתוך ${p.totalFloors}.';
+    }
+    return l10n != null
+        ? l10n.askRentlySheetFloorNoTotal(p.floor)
+        : 'הדירה בקומה ${p.floor}.';
   }
-  if (ask(r'כמה ?חדר|חדרים|rooms?')) return 'בדירה ${rooms()} חדרים.';
+  if (ask(r'כמה ?חדר|חדרים|rooms?')) {
+    return l10n != null
+        ? l10n.askRentlySheetRoomsAnswer(rooms())
+        : 'בדירה ${rooms()} חדרים.';
+  }
   if (ask(r'גודל|שטח|כמה ?מטר|מ.?ר(?![\wא-ת])|size|sqm|square')) {
-    return p.sizeM2 > 0 ? 'שטח הדירה כ-${p.sizeM2} מ״ר.' : null;
+    if (p.sizeM2 <= 0) return null;
+    return l10n != null
+        ? l10n.askRentlySheetSizeAnswer(p.sizeM2)
+        : 'שטח הדירה כ-${p.sizeM2} מ״ר.';
   }
   if (ask(r'מחיר|כמה ?עולה|כמה ?זה|שכר ?דירה|שכ.?ד|price|rent|cost')) {
-    return 'שכר הדירה ${p.price} ₪ לחודש.';
+    return l10n != null
+        ? l10n.askRentlySheetPriceAnswer(p.price)
+        : 'שכר הדירה ${p.price} ₪ לחודש.';
   }
   if (ask(r'חני[יה]|חנה|parking')) {
-    return has(r'חני|parking')
+    final yes = has(r'חני|parking');
+    if (l10n != null) {
+      return yes
+          ? l10n.askRentlySheetParkingYes
+          : l10n.askRentlySheetParkingNo;
+    }
+    return yes
         ? 'כן, יש חניה לדירה.'
         : 'לא צוינה חניה בפרטי הדירה — כדאי לוודא מול בעל הנכס.';
   }
   if (ask(r'חי[הות]|כלב|חתול|מחמד|pet|dog|cat')) {
-    return has(r'חיות|pets?|petsallowed|כלב')
+    final yes = has(r'חיות|pets?|petsallowed|כלב');
+    if (l10n != null) {
+      return yes ? l10n.askRentlySheetPetsYes : l10n.askRentlySheetPetsNo;
+    }
+    return yes
         ? 'כן, מותר להחזיק חיות מחמד.'
         : 'לא צוין שמותר להחזיק חיות — עדיף לשאול את בעל הנכס ישירות.';
   }
   if (ask(r'מעלית|elevator|lift')) {
-    return has(r'מעלית|elevator|lift')
-        ? 'כן, יש מעלית בבניין.'
-        : 'לא צוינה מעלית בפרטי הדירה.';
+    final yes = has(r'מעלית|elevator|lift');
+    if (l10n != null) {
+      return yes
+          ? l10n.askRentlySheetElevatorYes
+          : l10n.askRentlySheetElevatorNo;
+    }
+    return yes ? 'כן, יש מעלית בבניין.' : 'לא צוינה מעלית בפרטי הדירה.';
   }
   if (ask(r'מרפסת|balcony')) {
-    return has(r'מרפסת|balcony') ? 'כן, יש מרפסת.' : 'לא צוינה מרפסת בפרטי הדירה.';
+    final yes = has(r'מרפסת|balcony');
+    if (l10n != null) {
+      return yes
+          ? l10n.askRentlySheetBalconyYes
+          : l10n.askRentlySheetBalconyNo;
+    }
+    return yes ? 'כן, יש מרפסת.' : 'לא צוינה מרפסת בפרטי הדירה.';
   }
   if (ask(r'ממ.?ד|מקלט|shelter|safe ?room')) {
-    return has(r'ממ.?ד|mamad|shelter') ? 'כן, יש ממ״ד.' : 'לא צוין ממ״ד בפרטי הדירה.';
+    final yes = has(r'ממ.?ד|mamad|shelter');
+    if (l10n != null) {
+      return yes ? l10n.askRentlySheetMamadYes : l10n.askRentlySheetMamadNo;
+    }
+    return yes ? 'כן, יש ממ״ד.' : 'לא צוין ממ״ד בפרטי הדירה.';
   }
   if (ask(r'מיזוג|מזגן|air ?con|\bac\b')) {
-    return has(r'מיזוג|מזגן|\bac\b|air')
-        ? 'כן, יש מיזוג אוויר.'
-        : 'לא צוין מיזוג בפרטי הדירה.';
+    final yes = has(r'מיזוג|מזגן|\bac\b|air');
+    if (l10n != null) {
+      return yes ? l10n.askRentlySheetAcYes : l10n.askRentlySheetAcNo;
+    }
+    return yes ? 'כן, יש מיזוג אוויר.' : 'לא צוין מיזוג בפרטי הדירה.';
   }
   if (ask(r'מרוהט|ריהוט|furnish')) {
-    return has(r'מרוהט|ריהוט|furnish')
-        ? 'כן, הדירה מרוהטת.'
-        : 'לא צוין ריהוט בפרטי הדירה.';
+    final yes = has(r'מרוהט|ריהוט|furnish');
+    if (l10n != null) {
+      return yes
+          ? l10n.askRentlySheetFurnishedYes
+          : l10n.askRentlySheetFurnishedNo;
+    }
+    return yes ? 'כן, הדירה מרוהטת.' : 'לא צוין ריהוט בפרטי הדירה.';
   }
   if (ask(r'כניסה|מתי ?אפשר|פנוי|מתי ?נכנס|entry|available|move ?in')) {
-    return p.entryDate.trim().isNotEmpty
-        ? 'תאריך הכניסה: ${p.entryDate}.'
-        : 'לא צוין תאריך כניסה — כדאי לתאם עם בעל הנכס.';
+    if (p.entryDate.trim().isEmpty) {
+      return l10n != null
+          ? l10n.askRentlySheetEntryUnknown
+          : 'לא צוין תאריך כניסה — כדאי לתאם עם בעל הנכס.';
+    }
+    return l10n != null
+        ? l10n.askRentlySheetEntryAnswer(p.entryDate)
+        : 'תאריך הכניסה: ${p.entryDate}.';
   }
   if (ask(r'תחבורה|רכבת|אוטובוס|תחנה|רק.?ל|מטרו|transit|train|bus|metro')) {
     final st = IsraelGeoIndex.transitStopsWithin(p.lat, p.lon, km: 2);
-    if (st.isEmpty) return 'לא נמצאה תחנת רכבת/רק״ל במרחק הליכה (עד 2 ק״מ).';
+    if (st.isEmpty) {
+      return l10n != null
+          ? l10n.askRentlySheetTransitNone
+          : 'לא נמצאה תחנת רכבת/רק״ל במרחק הליכה (עד 2 ק״מ).';
+    }
     final d = st.first.km;
-    final dist = d < 1 ? '${(d * 1000).round()} מ׳' : '${d.toStringAsFixed(1)} ק״מ';
-    return 'התחנה הקרובה: ${st.first.name} — כ-$dist מהדירה.';
+    final String dist;
+    if (l10n != null) {
+      dist = d < 1
+          ? l10n.askRentlySheetDistMeters((d * 1000).round())
+          : l10n.askRentlySheetDistKm(d.toStringAsFixed(1));
+    } else {
+      dist = d < 1 ? '${(d * 1000).round()} מ׳' : '${d.toStringAsFixed(1)} ק״מ';
+    }
+    return l10n != null
+        ? l10n.askRentlySheetTransitFound(st.first.name, dist)
+        : 'התחנה הקרובה: ${st.first.name} — כ-$dist מהדירה.';
   }
   if (ask(r'שכונה|איפה|כתובת|מיקום|באיזה ?אזור|neighborhood|where|address|location')) {
     final loc = [p.street, p.neighborhood, p.city]
         .where((x) => x.trim().isNotEmpty)
         .join(', ');
-    return loc.isNotEmpty ? 'הדירה נמצאת ב$loc.' : null;
+    if (loc.isEmpty) return null;
+    return l10n != null
+        ? l10n.askRentlySheetLocationAnswer(loc)
+        : 'הדירה נמצאת ב$loc.';
   }
   return null;
 }

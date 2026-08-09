@@ -10951,4 +10951,779 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roomScanFlow463d28e8 => 'Room';
+
+  @override
+  String get addPropertyScreenSectionPropertyDetails => 'Property Details';
+
+  @override
+  String get addPropertyScreenTypeApartment => 'Apartment';
+
+  @override
+  String get addPropertyScreenTypePenthouse => 'Penthouse';
+
+  @override
+  String get addPropertyScreenTypeGardenApartment => 'Garden Apartment';
+
+  @override
+  String get addPropertyScreenTypeStudio => 'Studio';
+
+  @override
+  String get addPropertyScreenTypeCottage => 'Cottage';
+
+  @override
+  String get addPropertyScreenTypePrivateHouse => 'Private House';
+
+  @override
+  String get addPropertyScreenTypeOffice => 'Office';
+
+  @override
+  String get addPropertyScreenConditionNew => 'New from Contractor';
+
+  @override
+  String get addPropertyScreenConditionRenovated => 'Renovated';
+
+  @override
+  String get addPropertyScreenConditionGood => 'Good Condition';
+
+  @override
+  String get addPropertyScreenConditionOld => 'Old';
+
+  @override
+  String get addPropertyScreenFloorBasement => 'Basement';
+
+  @override
+  String get addPropertyScreenFloorGround => 'Ground Floor';
+
+  @override
+  String get addPropertyScreenFeatureBalcony => 'Balcony';
+
+  @override
+  String get addPropertyScreenFeatureParking => 'Parking';
+
+  @override
+  String get addPropertyScreenFeatureStorage => 'Storage';
+
+  @override
+  String get addPropertyScreenFeatureAc => 'Air Conditioning';
+
+  @override
+  String get addPropertyScreenFeatureMamad => 'Safe Room';
+
+  @override
+  String get addPropertyScreenFeatureSunBalcony => 'Sun Balcony';
+
+  @override
+  String get addPropertyScreenFeatureGarden => 'Garden';
+
+  @override
+  String get addPropertyScreenFeatureElevator => 'Elevator';
+
+  @override
+  String get addPropertyScreenFeatureFurniture => 'Furniture';
+
+  @override
+  String get addPropertyScreenFeatureInternetIncluded => 'Internet Included';
+
+  @override
+  String get addPropertyScreenFeatureEquippedKitchen => 'Equipped Kitchen';
+
+  @override
+  String get addPropertyScreenFeaturePetsAllowed => 'Pets Allowed';
+
+  @override
+  String get addPropertyScreenFeatureLaundryIncluded => 'Laundry Included';
+
+  @override
+  String get addPropertyScreenFeatureSecurity => 'Security Guard';
+
+  @override
+  String get addPropertyScreenFeatureAccessibility => 'Wheelchair Accessible';
+
+  @override
+  String get addPropertyScreenFeatureSharedRoof => 'Shared Roof';
+
+  @override
+  String get addPropertyScreenFeaturePool => 'Pool';
+
+  @override
+  String get addPropertyScreenFeatureGym => 'Gym';
+
+  @override
+  String get addPropertyScreenFeatureBars => 'Window Bars';
+
+  @override
+  String get addPropertyScreenFeatureRenovated => 'Renovated';
+
+  @override
+  String get addPropertyScreenFeatureRoommateFriendly => 'Roommate Friendly';
+
+  @override
+  String get addPropertyScreenFeatureShelter => 'Shelter';
+
+  @override
+  String get addPropertyScreenFeatureFloorProtectedSpace =>
+      'Floor Protected Space';
+
+  @override
+  String get addPropertyScreenFeatureBasement => 'Basement';
+
+  @override
+  String get addPropertyScreenFeatureCentralHeating => 'Central Heating';
+
+  @override
+  String get addPropertyScreenFeatureBedroomAc => 'AC in Bedrooms';
+
+  @override
+  String get addPropertyScreenFeatureWashingMachine => 'Washing Machine';
+
+  @override
+  String get addPropertyScreenFeatureFridge => 'Refrigerator';
+
+  @override
+  String get addPropertyScreenFeatureOven => 'Oven';
+
+  @override
+  String get addPropertyScreenFeatureDishwasher => 'Dishwasher';
+
+  @override
+  String get addPropertyScreenFeatureSmartHome => 'Smart Home Control';
+
+  @override
+  String get addPropertyScreenFeatureUndergroundParking =>
+      'Underground Parking';
+
+  @override
+  String get addPropertyScreenFeatureSoundSystem => 'Sound System';
+
+  @override
+  String get addPropertyScreenFeaturePrivateEntrance => 'Private Entrance';
+
+  @override
+  String get authScreenFeatureBalcony => 'Balcony';
+
+  @override
+  String get authScreenFeatureParking => 'Parking';
+
+  @override
+  String get authScreenFeatureElevator => 'Elevator';
+
+  @override
+  String get authScreenFeatureAc => 'AC';
+
+  @override
+  String get authScreenFeatureSafeRoom => 'Safe room';
+
+  @override
+  String get authScreenFeatureStorage => 'Storage';
+
+  @override
+  String get authScreenFeatureGarden => 'Garden';
+
+  @override
+  String get authScreenFeatureFurnished => 'Furnished';
+
+  @override
+  String get authScreenFeaturePets => 'Pets';
+
+  @override
+  String get authScreenFeatureInternet => 'Internet';
+
+  @override
+  String get profileTagsCategoryHouseholdStatus => 'Status & Household';
+
+  @override
+  String get profileTagsCategoryLifestyle => 'Lifestyle';
+
+  @override
+  String get profileTagsCategoryApartmentRequirements =>
+      'Apartment Requirements';
+
+  @override
+  String get profileTagsCategoryContractPayment => 'Contract & Payment';
+
+  @override
+  String get profileTagsCategoryAboutMyProperty => 'About My Property';
+
+  @override
+  String get profileTagsCategorySuitableFor => 'Suitable For';
+
+  @override
+  String get profileTagsCategoryContractRequirements =>
+      'Contract & Requirements';
+
+  @override
+  String get profileTagsCategoryService => 'Service';
+
+  @override
+  String get profileTagsSingle => 'Single';
+
+  @override
+  String get profileTagsCouple => 'Couple';
+
+  @override
+  String get profileTagsFamilyWithKids => 'Family with Kids';
+
+  @override
+  String get profileTagsSeekingRoommates => 'Looking for Roommates';
+
+  @override
+  String get profileTagsStudent => 'Student';
+
+  @override
+  String get profileTagsWorkingProfessionals => 'Working Professionals';
+
+  @override
+  String get profileTagsWorksFromHome => 'Works from Home';
+
+  @override
+  String get profileTagsNonSmoker => 'Non-Smoker';
+
+  @override
+  String get profileTagsHasPets => 'I Have Pets';
+
+  @override
+  String get profileTagsNoPets => 'No Pets';
+
+  @override
+  String get profileTagsQuietTidy => 'Quiet & Tidy';
+
+  @override
+  String get profileTagsVegetarian => 'Vegetarian';
+
+  @override
+  String get profileTagsReligiousLifestyle => 'Religious Lifestyle';
+
+  @override
+  String get profileTagsShabbatObservant => 'Shabbat Observant';
+
+  @override
+  String get profileTagsMustHaveParking => 'Must Have Parking';
+
+  @override
+  String get profileTagsFurnished => 'Furnished';
+
+  @override
+  String get profileTagsElevator => 'Elevator';
+
+  @override
+  String get profileTagsBalcony => 'Balcony';
+
+  @override
+  String get profileTagsShelter => 'Safe Room / Shelter';
+
+  @override
+  String get profileTagsAc => 'Air Conditioning';
+
+  @override
+  String get profileTagsAccessibleForDisabled => 'Wheelchair Accessible';
+
+  @override
+  String get profileTagsPetFriendly => 'Pet Friendly';
+
+  @override
+  String get profileTagsPrivateShelter => 'Private Safe Room';
+
+  @override
+  String get profileTagsIncomeProofReady => 'Proof of Income Ready';
+
+  @override
+  String get profileTagsHasGuarantors => 'I Have Guarantors';
+
+  @override
+  String get profileTagsLongTermRental => 'Long-Term Rental';
+
+  @override
+  String get profileTagsShortTermRental => 'Short-Term Rental';
+
+  @override
+  String get profileTagsImmediateMoveIn => 'Immediate Move-In';
+
+  @override
+  String get profileTagsFlexibleMoveInDate => 'Flexible Move-In Date';
+
+  @override
+  String get profileTagsAdvancePaymentPossible => 'Advance Payment Possible';
+
+  @override
+  String get profileTagsExperiencedTenantWithReferences =>
+      'Experienced Tenant with References';
+
+  @override
+  String get profileTagsApartmentFurnished => 'Apartment Furnished';
+
+  @override
+  String get profileTagsHasParking => 'Has Parking';
+
+  @override
+  String get profileTagsHasElevator => 'Has Elevator';
+
+  @override
+  String get profileTagsHasBalcony => 'Has Balcony';
+
+  @override
+  String get profileTagsAccessibleApartment => 'Accessible Apartment';
+
+  @override
+  String get profileTagsRenovatedProperty => 'Renovated Property';
+
+  @override
+  String get profileTagsAllowsPets => 'Pets Allowed';
+
+  @override
+  String get profileTagsSuitableForCouples => 'Suitable for Couples';
+
+  @override
+  String get profileTagsSuitableForFamilies => 'Suitable for Families';
+
+  @override
+  String get profileTagsSuitableForRoommates => 'Suitable for Roommates';
+
+  @override
+  String get profileTagsSuitableForStudents => 'Suitable for Students';
+
+  @override
+  String get profileTagsPrefersNonSmokingTenants =>
+      'Prefers Non-Smoking Tenants';
+
+  @override
+  String get profileTagsSeeksQuietTenants => 'Seeks Quiet Tenants';
+
+  @override
+  String get profileTagsProperContract => 'Proper Contract';
+
+  @override
+  String get profileTagsLongTermContract => 'Long-Term Contract';
+
+  @override
+  String get profileTagsAllowsShortTerm => 'Allows Short-Term';
+
+  @override
+  String get profileTagsRequiresIncomeProof => 'Requires Proof of Income';
+
+  @override
+  String get profileTagsRequiresGuarantors => 'Requires Guarantors';
+
+  @override
+  String get profileTagsPriceFlexibility => 'Price Flexibility';
+
+  @override
+  String get profileTagsNoBroker => 'No Broker';
+
+  @override
+  String get profileTagsQuickResponse => 'Quick Response';
+
+  @override
+  String get profileTagsPropertyManagementExperience =>
+      'Property Management Experience';
+
+  @override
+  String get profileTagsAvailableForEveningTours =>
+      'Available for Evening Tours';
+
+  @override
+  String get profileTagsPersonalizedTenantService =>
+      'Personalized Tenant Service';
+
+  @override
+  String get rentalModelsLifestyleChiloni => 'Secular';
+
+  @override
+  String get rentalModelsLifestyleMasorti => 'Traditional';
+
+  @override
+  String get rentalModelsLifestyleDati => 'Religious';
+
+  @override
+  String get rentalModelsLifestyleCharedi => 'Ultra-Orthodox';
+
+  @override
+  String get rentalModelsPetTypeNone => 'None';
+
+  @override
+  String get rentalModelsPetTypeCat => 'Cat';
+
+  @override
+  String get rentalModelsPetTypeDogSmall => 'Small dog';
+
+  @override
+  String get rentalModelsPetTypeDogLarge => 'Large dog';
+
+  @override
+  String get rentalModelsPetTypeOther => 'Other';
+
+  @override
+  String get rentalModelsMoveInImmediate => 'Immediate';
+
+  @override
+  String get rentalModelsMoveInMonth => 'Within a month';
+
+  @override
+  String get rentalModelsMoveInQuarter => 'Within 3 months';
+
+  @override
+  String get rentalModelsMoveInFlexible => 'Flexible';
+
+  @override
+  String get rentalModelsUrgencyNow => 'Looking now';
+
+  @override
+  String get rentalModelsUrgencySoon => 'No rush';
+
+  @override
+  String get rentalModelsUrgencyBrowsing => 'Just browsing';
+
+  @override
+  String get rentalModelsFeatureBalcony => 'Balcony';
+
+  @override
+  String get rentalModelsFeatureParking => 'Parking';
+
+  @override
+  String get rentalModelsFeatureStorage => 'Storage room';
+
+  @override
+  String get rentalModelsFeatureAirConditioning => 'Air conditioning';
+
+  @override
+  String get rentalModelsFeatureMamad => 'Safe room';
+
+  @override
+  String get rentalModelsFeatureSunBalcony => 'Sun balcony';
+
+  @override
+  String get rentalModelsFeatureGarden => 'Garden';
+
+  @override
+  String get rentalModelsFeatureElevator => 'Elevator';
+
+  @override
+  String get rentalModelsFeatureFurnished => 'Furnished';
+
+  @override
+  String get rentalModelsFeatureInternetIncluded => 'Internet included';
+
+  @override
+  String get rentalModelsFeatureEquippedKitchen => 'Equipped kitchen';
+
+  @override
+  String get rentalModelsFeaturePetsAllowed => 'Pets allowed';
+
+  @override
+  String get rentalModelsFeatureLaundryIncluded => 'Laundry included';
+
+  @override
+  String get rentalModelsFeatureSecurity => 'Security guard';
+
+  @override
+  String get rentalModelsFeatureAccessible => 'Wheelchair accessible';
+
+  @override
+  String get rentalModelsFeatureSharedRoof => 'Shared rooftop';
+
+  @override
+  String get rentalModelsFeaturePool => 'Pool';
+
+  @override
+  String get rentalModelsFeatureGym => 'Gym';
+
+  @override
+  String get rentalModelsFeatureBars => 'Window bars';
+
+  @override
+  String get rentalModelsFeatureRenovated => 'Renovated';
+
+  @override
+  String get rentalModelsFeatureRoommates => 'Suitable for roommates';
+
+  @override
+  String get rentalModelsFeatureBombShelter => 'Bomb shelter';
+
+  @override
+  String get rentalModelsFeatureSafeFloorSpace => 'Protected floor space';
+
+  @override
+  String get rentalModelsFeatureBasement => 'Basement';
+
+  @override
+  String get rentalModelsFeatureCentralHeating => 'Central heating';
+
+  @override
+  String get rentalModelsFeatureBedroomAc => 'Bedroom air conditioning';
+
+  @override
+  String get rentalModelsFeatureWashingMachine => 'Washing machine';
+
+  @override
+  String get rentalModelsFeatureRefrigerator => 'Refrigerator';
+
+  @override
+  String get rentalModelsFeatureOven => 'Oven';
+
+  @override
+  String get rentalModelsFeatureDishwasher => 'Dishwasher';
+
+  @override
+  String get rentalModelsFeatureSmartHome => 'Smart home controls';
+
+  @override
+  String get rentalModelsFeatureUndergroundParking => 'Underground parking';
+
+  @override
+  String get rentalModelsFeatureSoundSystem => 'Sound system';
+
+  @override
+  String get rentalModelsFeaturePrivateEntrance => 'Private entrance';
+
+  @override
+  String get rentalModelsFeatureCctv => 'Security cameras';
+
+  @override
+  String get rentalModelsFeatureAlarmSystem => 'Alarm system';
+
+  @override
+  String get rentalModelsFeatureIntercom => 'Intercom';
+
+  @override
+  String get rentalModelsFeatureElectricity => 'Electricity included';
+
+  @override
+  String get rentalModelsFeatureWater => 'Water included';
+
+  @override
+  String get rentalModelsFeatureNaturalLight => 'Natural light';
+
+  @override
+  String get rentalModelsFeatureQuietArea => 'Quiet area';
+
+  @override
+  String get rentalModelsFeaturePetFriendly => 'Pet friendly';
+
+  @override
+  String get rentalModelsFeatureAttachedParking => 'Assigned parking';
+
+  @override
+  String get rentalModelsFeatureSecureEntrance => 'Secure entrance';
+
+  @override
+  String get rentalModelsFeatureNearPublicTransport => 'Near public transport';
+
+  @override
+  String get rentalModelsFeatureOptionalFurnished => 'Furniture optional';
+
+  @override
+  String get rentalModelsFeatureNearSea => 'Near the sea';
+
+  @override
+  String get rentalModelsFeatureNearPark => 'Near a park';
+
+  @override
+  String get brokerPipelineScreenSourcePhone => 'Phone';
+
+  @override
+  String get brokerPipelineScreenSourceWalkIn => 'Walked into office';
+
+  @override
+  String get brokerPipelineScreenSourceOther => 'Other';
+
+  @override
+  String get nearbyPlacesCardChipSuffixMasc => '';
+
+  @override
+  String get nearbyPlacesCardChipSuffixFem => '';
+
+  @override
+  String get panoramaSplatViewWaypointEntrance => 'Entrance';
+
+  @override
+  String get panoramaSplatViewWaypointCenter => 'Center';
+
+  @override
+  String get panoramaSplatViewWaypointInterior => 'Interior';
+
+  @override
+  String get taxHelperScreenAnnualReportNote =>
+      ' At higher amounts (over ₪375,000 a year) you also need to file an annual report.';
+
+  @override
+  String brokerCmaScreenPerSqm(Object money) {
+    return ' · $money/m²';
+  }
+
+  @override
+  String askRentlySheetFloorWithTotal(Object floor, Object total) {
+    return 'The apartment is on floor $floor of $total.';
+  }
+
+  @override
+  String askRentlySheetFloorNoTotal(Object floor) {
+    return 'The apartment is on floor $floor.';
+  }
+
+  @override
+  String askRentlySheetRoomsAnswer(Object rooms) {
+    return 'The apartment has $rooms rooms.';
+  }
+
+  @override
+  String askRentlySheetSizeAnswer(Object size) {
+    return 'The apartment is about $size m².';
+  }
+
+  @override
+  String askRentlySheetPriceAnswer(Object price) {
+    return 'The rent is ₪$price per month.';
+  }
+
+  @override
+  String get askRentlySheetParkingYes => 'Yes, the apartment has parking.';
+
+  @override
+  String get askRentlySheetParkingNo =>
+      'Parking isn\'t listed in the apartment\'s details — best to check with the landlord.';
+
+  @override
+  String get askRentlySheetPetsYes => 'Yes, pets are allowed.';
+
+  @override
+  String get askRentlySheetPetsNo =>
+      'It isn\'t stated that pets are allowed — best to ask the landlord directly.';
+
+  @override
+  String get askRentlySheetElevatorYes => 'Yes, the building has an elevator.';
+
+  @override
+  String get askRentlySheetElevatorNo =>
+      'An elevator isn\'t listed in the apartment\'s details.';
+
+  @override
+  String get askRentlySheetBalconyYes => 'Yes, there\'s a balcony.';
+
+  @override
+  String get askRentlySheetBalconyNo =>
+      'A balcony isn\'t listed in the apartment\'s details.';
+
+  @override
+  String get askRentlySheetMamadYes => 'Yes, there\'s a safe room (mamad).';
+
+  @override
+  String get askRentlySheetMamadNo =>
+      'A safe room (mamad) isn\'t listed in the apartment\'s details.';
+
+  @override
+  String get askRentlySheetAcYes => 'Yes, there\'s air conditioning.';
+
+  @override
+  String get askRentlySheetAcNo =>
+      'Air conditioning isn\'t listed in the apartment\'s details.';
+
+  @override
+  String get askRentlySheetFurnishedYes => 'Yes, the apartment is furnished.';
+
+  @override
+  String get askRentlySheetFurnishedNo =>
+      'Furnishing isn\'t listed in the apartment\'s details.';
+
+  @override
+  String askRentlySheetEntryAnswer(Object date) {
+    return 'Move-in date: $date.';
+  }
+
+  @override
+  String get askRentlySheetEntryUnknown =>
+      'No move-in date is listed — best to coordinate with the landlord.';
+
+  @override
+  String get askRentlySheetTransitNone =>
+      'No train/light-rail station found within walking distance (up to 2 km).';
+
+  @override
+  String askRentlySheetDistMeters(Object m) {
+    return '$m m';
+  }
+
+  @override
+  String askRentlySheetDistKm(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String askRentlySheetTransitFound(Object dist, Object name) {
+    return 'Nearest station: $name — about $dist from the apartment.';
+  }
+
+  @override
+  String askRentlySheetLocationAnswer(Object loc) {
+    return 'The apartment is located in $loc.';
+  }
+
+  @override
+  String datingProviderFitPercentLabel(Object percent) {
+    return '$percent% match';
+  }
+
+  @override
+  String get datingProviderLeadReasonBudgetFits => 'Budget fits the price';
+
+  @override
+  String get datingProviderLeadReasonTimingFits =>
+      'Move-in timing works for you';
+
+  @override
+  String roomScanFlowDefaultRoomName(Object n) {
+    return 'Room $n';
+  }
+
+  @override
+  String get datingProviderTenantFallbackName => 'The tenant';
+
+  @override
+  String get datingProviderPropertyFallbackName => 'The property';
+
+  @override
+  String get datingProviderViewingReminderTitle => 'Viewing in one hour';
+
+  @override
+  String datingProviderViewingReminderBody(
+      Object address, Object time, Object who) {
+    return 'Viewing with $who at $address at $time';
+  }
+
+  @override
+  String get datingProviderLandlordFallbackName => 'The landlord';
+
+  @override
+  String datingProviderContractSentMessage(Object months, Object rent) {
+    return 'I sent a digital rental contract to sign: ₪$rent/month, for $months months.';
+  }
+
+  @override
+  String get datingProviderSignedAsLandlord =>
+      'I signed the contract as the landlord. ✍️';
+
+  @override
+  String get datingProviderSignedAsTenant =>
+      'I signed the contract as the tenant. ✍️';
+
+  @override
+  String get datingProviderSystemSenderName => 'System';
+
+  @override
+  String get datingProviderMatchCreatedMessage =>
+      'Match created. You can open the chat, send a contract, and manage signatures.';
+
+  @override
+  String get datingProviderDemoMatchMessage1 =>
+      'Match created — both sides agreed to move forward.';
+
+  @override
+  String get datingProviderDemoMatchMessage2 =>
+      'Match created — both sides are interested.';
+
+  @override
+  String get datingProviderDemoMatchMessage3 =>
+      'New match! Both sides showed interest.';
+
+  @override
+  String get datingProviderDefaultContactMessage =>
+      'Hi, I\'d love to hear more details about the apartment 🙂';
 }

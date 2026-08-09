@@ -13,6 +13,7 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/main.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -89,7 +90,8 @@ void main() {
     );
     try {
       await provider.initialize();
-      await provider.enterGuestMode('landlord');
+      await provider.enterGuestMode(
+          'landlord', lookupAppLocalizations(const Locale('he')));
       await tester.pumpWidget(
         ChangeNotifierProvider<DatingProvider>.value(
           value: provider,

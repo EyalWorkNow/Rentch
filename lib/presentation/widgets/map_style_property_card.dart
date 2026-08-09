@@ -34,8 +34,16 @@ class _MapStylePropertyCardState extends State<MapStylePropertyCard> {
   Widget build(BuildContext context) {
     final p = widget.scored.property;
     final tags = widget.scored.tags;
-    // recommendForTenant packs tags as ['NN% התאמה', ...highlights].
-    final String? fit = tags.isNotEmpty ? tags.first : null;
+    // recommendForTenant packs tags as ['NN%', ...highlights] — the fit
+    // percentage is locale-neutral (no word baked in provider-side, since it
+    // has no BuildContext to localize with); build the localized "N% match"
+    // label here where a BuildContext is available.
+    final fitPctStr = tags.isNotEmpty
+        ? RegExp(r'(\d+)').firstMatch(tags.first)?.group(1)
+        : null;
+    final String? fit = fitPctStr != null
+        ? AppLocalizations.of(context)!.datingProviderFitPercentLabel(fitPctStr)
+        : null;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),

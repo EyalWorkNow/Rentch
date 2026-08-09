@@ -9,6 +9,7 @@ import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
+import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
@@ -787,10 +788,13 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
     });
   }
 
-  /// Pick the first meaningful badge detail from importantDetails.
-  String? _badgeDetail(List<String> details) {
+  /// Pick the first meaningful badge detail from importantDetails, localized
+  /// for display (the raw value stays the catalog's stable Hebrew label).
+  String? _badgeDetail(List<String> details, AppLocalizations l10n) {
     if (details.isEmpty) return null;
-    return details.first;
+    final raw = details.first;
+    final tag = ProfileTagCatalog.tagFor(raw, isLandlord: false);
+    return tag?.displayLabel(l10n) ?? raw;
   }
 
   @override
@@ -798,7 +802,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
     final l10n = AppLocalizations.of(context)!;
     final profile = widget.profile;
     final photos = profile.photoUrls;
-    final badge = _badgeDetail(profile.importantDetails);
+    final badge = _badgeDetail(profile.importantDetails, l10n);
     final safeCurrentPage = _safePhotoIndex(_currentPage);
 
     return SliverAppBar(
@@ -4049,7 +4053,7 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
             inputWidget: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ...kMoveInBuckets.map((bucket) {
+                ...moveInBucketsFor(l10n).map((bucket) {
                   final token = bucket.$1;
                   return buildRow(
                     // Highlight the bucket the stored value resolves into, unless

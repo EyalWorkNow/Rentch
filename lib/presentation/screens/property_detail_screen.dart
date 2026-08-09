@@ -2495,7 +2495,7 @@ class _MessageRequestButton extends StatelessWidget {
       ),
     );
     if (sent == true) {
-      await provider.requestToMessage(property, note: controller.text);
+      await provider.requestToMessage(property, note: controller.text, l10n: l10n);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2600),

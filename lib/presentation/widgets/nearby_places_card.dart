@@ -458,6 +458,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
   }
 
   Widget _chip(int index, bool on) {
+    final l10n = AppLocalizations.of(context)!;
     final (icon, title, _) = _meta(_sections[index].$1.kind);
     final n = _sections[index].$2.length;
     return InkWell(
@@ -476,7 +477,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 16, color: on ? Colors.white : AppColors.primary),
           const SizedBox(width: 6),
-          Text(title.replaceAll(' קרובים', '').replaceAll(' קרובות', ''),
+          Text(
+              title
+                  .replaceAll(l10n.nearbyPlacesCardChipSuffixMasc, '')
+                  .replaceAll(l10n.nearbyPlacesCardChipSuffixFem, ''),
               style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,

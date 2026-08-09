@@ -569,6 +569,7 @@ class _SignSheetState extends State<_SignSheet> {
       widget.contract,
       asOwner: widget.asOwner,
       signatureImage: png,
+      l10n: AppLocalizations.of(context)!,
     );
     if (!mounted) return;
     Navigator.of(context).pop(true);
