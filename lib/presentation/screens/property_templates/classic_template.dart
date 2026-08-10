@@ -172,6 +172,25 @@ class _ClassicTemplate extends StatelessWidget {
                         const SizedBox(height: 24),
                       ],
 
+                      // ── Description — was captured (website's Ezra
+                      // publisher flow always sends it) but had no field in
+                      // the app's model at all: silently dropped, never shown
+                      // anywhere. Now modeled (RentalProperty.description)
+                      // and surfaced here, right above features — this is the
+                      // actually-used default layout (Classic), unlike the
+                      // broker-template branch in property_detail_screen.dart.
+                      if (p.description.trim().isNotEmpty) ...[
+                        _SectionCardShell(
+                          title: l10n.propertyDetailScreenDescription,
+                          icon: IconsaxPlusLinear.document_text,
+                          child: Text(
+                            p.description.trim(),
+                            style: const TextStyle(
+                                fontSize: 14.5, height: 1.5, color: AppColors.ink),
+                          ),
+                        ),
+                      ],
+
                       // ── ALL tags/features right under the specs. Shows the
                       // FULL set (no cap) so the tenant sees exactly what the
                       // property has.
