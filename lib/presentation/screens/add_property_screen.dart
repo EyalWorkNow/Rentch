@@ -1510,10 +1510,19 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
 class _StepIndicator extends StatelessWidget {
   _StepIndicator(
-      {required this.step, required this.total, required this.labels});
+      {required this.step,
+      required this.total,
+      required this.labels,
+      this.onStepTap});
   final int step;
   final int total;
   final List<String> labels;
+
+  /// Non-null only in edit mode — lets a landlord jump straight to any
+  /// station instead of paging through linearly. Null (the Add flow) keeps
+  /// the indicator purely decorative, since a brand-new listing genuinely
+  /// needs each step filled in order.
+  final ValueChanged<int>? onStepTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1540,38 +1549,45 @@ class _StepIndicator extends StatelessWidget {
           final idx = i ~/ 2;
           final isActive = idx == step;
           final isDone = idx < step;
+          final circle = Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: isDone || isActive ? Colors.white : Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDone || isActive
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.45),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: isDone
+                  ? Icon(Icons.check_rounded,
+                      color: AppColors.primary, size: 14)
+                  : Text(
+                      '${idx + 1}',
+                      style: TextStyle(
+                        color: isActive
+                            ? AppColors.primary
+                            : Colors.white.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
+            ),
+          );
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isDone || isActive ? Colors.white : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDone || isActive
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.45),
-                    width: 2,
-                  ),
-                ),
-                child: Center(
-                  child: isDone
-                      ? Icon(Icons.check_rounded,
-                          color: AppColors.primary, size: 14)
-                      : Text(
-                          '${idx + 1}',
-                          style: TextStyle(
-                            color: isActive
-                                ? AppColors.primary
-                                : Colors.white.withValues(alpha: 0.7),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                          ),
-                        ),
-                ),
-              ),
+              onStepTap == null
+                  ? circle
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onStepTap!(idx),
+                      child: circle,
+                    ),
               const SizedBox(height: 4),
               Text(
                 labels[idx],
@@ -5932,6 +5948,20 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
   }
 
+  // Edit-mode only (wired via _StepIndicator's onStepTap): every field is
+  // already filled from the existing listing, so unlike _next() there's
+  // nothing to validate before jumping - the landlord is just navigating
+  // between already-complete stations, not filling them in order.
+  void _jumpToStep(int index) {
+    if (index == _step) return;
+    setState(() => _step = index);
+    _pageCtrl.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOut,
+    );
+  }
+
   Future<void> _pickPropertyImage(ImageSource source) async {
     if (_wantsVerifiedListing) {
       _showMediaError(AppLocalizations.of(context)!.addPropertyScreen40b9326f);
@@ -6532,9 +6562,23 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
+        // Quick exit — editing an existing listing shouldn't require paging
+        // back through every station just to leave; the back-arrow already
+        // does that (previous step, or pop at step 0), this is the shortcut.
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
-          child: _StepIndicator(step: _step, total: 5, labels: _stepLabels(context)),
+          child: _StepIndicator(
+            step: _step,
+            total: 5,
+            labels: _stepLabels(context),
+            onStepTap: _jumpToStep,
+          ),
         ),
       ),
       body: Column(

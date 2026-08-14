@@ -73,22 +73,23 @@ class AtiVoiceScreen extends StatefulWidget {
 }
 
 class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
-  late AtiVoiceState _state = widget.demoMode
-      ? AtiVoiceState.listening
-      : AtiVoiceState.idle;
+  late AtiVoiceState _state =
+      widget.demoMode ? AtiVoiceState.listening : AtiVoiceState.idle;
   String _transcript = '';
   String _reply = '';
   bool _l10nInited = false;
   double _level = 0; // smoothed mic level 0..1
   late List<String> _criteria = List.of(widget.criteria);
   late int _resultCount = widget.resultCount;
-  List<ScoredProperty> _results = const []; // options shown inline in this screen
+  List<ScoredProperty> _results =
+      const []; // options shown inline in this screen
   final PageController _carousel = PageController(viewportFraction: 0.88);
   int _page = 0;
   bool _recording = false; // holding the orb to record
   bool _sending = false; // guards against a double-send on release
   bool _needLocation = false; // show the animated "share my location" button
-  bool _locating = false; // guards the share-location tap (independent of _sending)
+  bool _locating =
+      false; // guards the share-location tap (independent of _sending)
 
   @override
   void initState() {
@@ -172,8 +173,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
         final l10n = AppLocalizations.of(context)!;
         setState(() {
           _state = AtiVoiceState.idle;
-          _reply = l10n.atiVoiceScreen77515f7a +
-              (err != null ? '\n($err)' : '');
+          _reply =
+              l10n.atiVoiceScreen77515f7a + (err != null ? '\n($err)' : '');
         });
         return;
       }
@@ -188,9 +189,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     try {
       final timeoutReply = AppLocalizations.of(context)!.atiVoiceScreenCcaa1ca0;
       final result = await widget.onUtterance(text).timeout(
-        const Duration(seconds: 25),
-        onTimeout: () => VoiceTurn(reply: timeoutReply),
-      );
+            const Duration(seconds: 25),
+            onTimeout: () => VoiceTurn(reply: timeoutReply),
+          );
       await _applyTurn(result);
     } catch (_) {
       // network / model error → keep the screen usable
@@ -255,8 +256,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       duration: const Duration(milliseconds: 350),
       switchInCurve: Curves.elasticOut,
       switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, anim) =>
-          ScaleTransition(scale: anim, child: FadeTransition(opacity: anim, child: child)),
+      transitionBuilder: (child, anim) => ScaleTransition(
+          scale: anim, child: FadeTransition(opacity: anim, child: child)),
       child: !_needLocation
           ? const SizedBox.shrink(key: ValueKey('no-loc'))
           : Padding(
@@ -292,7 +293,6 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     }
   }
 
-
   // ── copy ───────────────────────────────────────────────────────────────────
   String get _statusLabel {
     final l10n = AppLocalizations.of(context)!;
@@ -310,9 +310,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final caption = (_state == AtiVoiceState.listening && _transcript.isNotEmpty)
-        ? _transcript
-        : _reply;
+    final caption =
+        (_state == AtiVoiceState.listening && _transcript.isNotEmpty)
+            ? _transcript
+            : _reply;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -423,8 +424,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                         color: _state == AtiVoiceState.idle
                             ? Colors.white38
                             : const Color(0xFF34D399),
-                        border: Border.all(
-                            color: AppColors.ink, width: 2),
+                        border: Border.all(color: AppColors.ink, width: 2),
                       ),
                     ),
                   ),
@@ -441,7 +441,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.3)),
                   Text(AppLocalizations.of(context)!.atiVoiceScreen5ddb8c89,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ],
@@ -609,8 +610,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               color: isUserSpeaking ? Colors.white70 : Colors.white,
               fontSize: 19,
               height: 1.5,
-              fontStyle:
-                  isUserSpeaking ? FontStyle.italic : FontStyle.normal,
+              fontStyle: isUserSpeaking ? FontStyle.italic : FontStyle.normal,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -654,8 +654,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                   scored: _results[i],
                   width: double.infinity,
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) =>
-                          PropertyDetailScreen(property: _results[i].property))),
+                      builder: (_) => PropertyDetailScreen(
+                          property: _results[i].property))),
                 ),
               ),
             ),
@@ -716,7 +716,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               ),
               Text(AppLocalizations.of(context)!.atiVoiceScreen193535e0,
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700)),
               const Icon(IconsaxPlusLinear.arrow_left_2, color: Colors.white70),
             ],
           ),
@@ -736,7 +738,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             onPointerUp: (_) => _stopAndSend(),
             onPointerCancel: (_) => _stopAndSend(),
             child: _roundBtn(
-              icon: _recording ? IconsaxPlusBold.microphone : IconsaxPlusLinear.microphone,
+              icon: _recording
+                  ? IconsaxPlusBold.microphone
+                  : IconsaxPlusLinear.microphone,
               bg: _recording
                   ? AppColors.tealBright.withValues(alpha: 0.30)
                   : Colors.white.withValues(alpha: 0.12),
@@ -837,7 +841,8 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
               const Icon(IconsaxPlusLinear.gps, color: Colors.white, size: 20),
               const SizedBox(width: 10),
               Flexible(
-                child: Text(AppLocalizations.of(context)!.atiVoiceScreen7ddcbdea,
+                child: Text(
+                    AppLocalizations.of(context)!.atiVoiceScreen7ddcbdea,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -913,14 +918,22 @@ class _AuroraBackgroundState extends State<_AuroraBackground>
                     size: Size.infinite,
                   ),
                 ),
-              // Heavy liquid glass overlay (behind text, blurs the snakes underneath)
+              // Heavy liquid glass overlay (behind text, blurs the snakes underneath).
+              // Wrapped in its own RepaintBoundary: this whole Stack sits inside
+              // an AnimatedBuilder ticking every frame for the 3s intro (driving
+              // the sibling _AuroraRibbonPainter above), and without a boundary
+              // the sibling's repaint would force this blur to be redone too.
               if (t < 0.99)
                 Positioned.fill(
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.16),
+                  child: RepaintBoundary(
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                            sigmaX: PlatformFx.blurSigma(14),
+                            sigmaY: PlatformFx.blurSigma(14)),
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.16),
+                        ),
                       ),
                     ),
                   ),
@@ -970,7 +983,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathCyan = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.85 - (x / w) * (h * 0.75);
-      final y = baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
+      final y =
+          baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
       if (x == -50) {
         pathCyan.moveTo(x, y);
       } else {
@@ -983,7 +997,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathGreen = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.92 - (x / w) * (h * 0.82);
-      final y = baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
+      final y =
+          baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
       if (x == -50) {
         pathGreen.moveTo(x, y);
       } else {
@@ -996,7 +1011,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathPurple = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.78 - (x / w) * (h * 0.68);
-      final y = baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
+      final y =
+          baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
       if (x == -50) {
         pathPurple.moveTo(x, y);
       } else {
@@ -1019,7 +1035,7 @@ class _FadeScaleEntrance extends StatefulWidget {
   });
   final Widget child;
   final Duration delay;
-  
+
   @override
   State<_FadeScaleEntrance> createState() => _FadeScaleEntranceState();
 }
@@ -1038,7 +1054,7 @@ class _FadeScaleEntranceState extends State<_FadeScaleEntrance>
     parent: _controller,
     curve: Curves.easeOut,
   );
-  
+
   Timer? _entranceTimer;
 
   @override
@@ -1058,7 +1074,7 @@ class _FadeScaleEntranceState extends State<_FadeScaleEntrance>
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(

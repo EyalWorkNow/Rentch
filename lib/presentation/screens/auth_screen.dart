@@ -221,10 +221,9 @@ class _AuthScreenState extends State<AuthScreen>
           msg.contains('sign_in_canceled')) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              duration: const Duration(milliseconds: 2500),
-              content: Text(l10n.authScreenB840c378)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -257,8 +256,7 @@ class _AuthScreenState extends State<AuthScreen>
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
       debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
-      _showAppleError(
-          l10n.authScreen3219b950(e.code.name, '${e.message}'));
+      _showAppleError(l10n.authScreen3219b950(e.code.name, '${e.message}'));
     } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
@@ -307,8 +305,8 @@ class _AuthScreenState extends State<AuthScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child:
-                Text(l10n.authScreen55247199, style: const TextStyle(color: AppColors.slate500)),
+            child: Text(l10n.authScreen55247199,
+                style: const TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -382,7 +380,8 @@ class _AuthScreenState extends State<AuthScreen>
                 if (loadingProgress == null) return child;
                 return Container(color: AppColors.navy);
               },
-              errorBuilder: (context, error, stackTrace) => Container(color: AppColors.navy),
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: AppColors.navy),
             ),
             Positioned.fill(
               child: Container(
@@ -396,7 +395,8 @@ class _AuthScreenState extends State<AuthScreen>
                 child: _LoginTab(
                   onLogin: _onEnter,
                   onGuestLogin: _onGuestEnter,
-                  onSwitchToRegister: () => setState(() => _currentView = AuthView.register),
+                  onSwitchToRegister: () =>
+                      setState(() => _currentView = AuthView.register),
                   onBack: () => setState(() => _currentView = AuthView.welcome),
                 ),
               ),
@@ -416,7 +416,8 @@ class _AuthScreenState extends State<AuthScreen>
                 if (loadingProgress == null) return child;
                 return Container(color: AppColors.navy);
               },
-              errorBuilder: (context, error, stackTrace) => Container(color: AppColors.navy),
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: AppColors.navy),
             ),
             Positioned.fill(
               child: Container(
@@ -430,7 +431,8 @@ class _AuthScreenState extends State<AuthScreen>
                 child: _RegisterFlow(
                   initialRole: _pendingRole ?? 'tenant',
                   onDone: _onEnter,
-                  onSwitchToLogin: () => setState(() => _currentView = AuthView.login),
+                  onSwitchToLogin: () =>
+                      setState(() => _currentView = AuthView.login),
                   onBack: () => setState(() => _currentView = AuthView.welcome),
                 ),
               ),
@@ -505,11 +507,11 @@ class _WideLayout extends StatelessWidget {
                             controller: tabController,
                             children: [
                               _LoginTab(
-                                  onLogin: onLogin,
-                                  onGuestLogin: onGuestLogin,
-                                  onSwitchToRegister: () =>
-                                      tabController.animateTo(1),
-                                  onBack: () {},
+                                onLogin: onLogin,
+                                onGuestLogin: onGuestLogin,
+                                onSwitchToRegister: () =>
+                                    tabController.animateTo(1),
+                                onBack: () {},
                               ),
                               Column(
                                 children: [
@@ -523,7 +525,8 @@ class _WideLayout extends StatelessWidget {
                                       // Keyed by role so re-picking the account
                                       // type rebuilds the flow with the new role
                                       // (the flow captures initialRole once).
-                                      key: ValueKey('wide_register_$registerRole'),
+                                      key: ValueKey(
+                                          'wide_register_$registerRole'),
                                       initialRole: registerRole,
                                       onDone: onDone,
                                       onSwitchToLogin: () =>
@@ -621,8 +624,7 @@ class _WideAccountTypeSelector extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w800)),
           const SizedBox(width: 4),
-          Icon(Icons.chevron_left_rounded,
-              color: _kBrandTeal, size: 20),
+          Icon(Icons.chevron_left_rounded, color: _kBrandTeal, size: 20),
         ]),
       ),
     );
@@ -660,8 +662,7 @@ class _LogoHeader extends StatelessWidget {
               child: SvgPicture.asset(
                 'assets/images/rently_logo_with_text.svg',
                 height: logoHeight,
-                colorFilter:
-                    ColorFilter.mode(color, BlendMode.srcIn),
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
                 placeholderBuilder: (_) => Text('Rently',
                     style: TextStyle(
                         color: color,
@@ -678,13 +679,18 @@ class _LogoHeader extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isDark ? Colors.white.withOpacity(0.12) : Colors.white,
-                    border: Border.all(color: isDark ? Colors.white.withOpacity(0.18) : _kInputBorder),
+                    color:
+                        isDark ? Colors.white.withOpacity(0.12) : Colors.white,
+                    border: Border.all(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.18)
+                            : _kInputBorder),
                   ),
                   child: IconButton(
                     padding: EdgeInsets.zero,
                     icon: Icon(Icons.arrow_back_rounded,
-                        size: 18, color: isDark ? Colors.white : AppColors.navy),
+                        size: 18,
+                        color: isDark ? Colors.white : AppColors.navy),
                     onPressed: onBack,
                   ),
                 ),
@@ -964,14 +970,18 @@ class _SocialRow extends StatelessWidget {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.15) : AppColors.slate100,
+                          color: isDark
+                              ? Colors.white.withOpacity(0.15)
+                              : AppColors.slate100,
                           borderRadius: BorderRadius.circular(4)),
                       child: Center(
                         child: Text('G',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
-                                color: isDark ? Colors.white : AppColors.superLike)),
+                                color: isDark
+                                    ? Colors.white
+                                    : AppColors.superLike)),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -994,7 +1004,9 @@ class _SocialRow extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.apple_rounded, size: 20, color: isDark ? Colors.white : AppColors.navy),
+                    Icon(Icons.apple_rounded,
+                        size: 20,
+                        color: isDark ? Colors.white : AppColors.navy),
                     const SizedBox(width: 6),
                     Text('Apple',
                         style: TextStyle(
@@ -1041,7 +1053,9 @@ class _SocialBtn extends StatelessWidget {
               ? const []
               : const [
                   BoxShadow(
-                      color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
+                      color: Color(0x0A072946),
+                      blurRadius: 8,
+                      offset: Offset(0, 2))
                 ],
         ),
         child: loading
@@ -1051,7 +1065,8 @@ class _SocialBtn extends StatelessWidget {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: isDark ? Colors.white : AppColors.navy)),
+                          strokeWidth: 2,
+                          color: isDark ? Colors.white : AppColors.navy)),
                 ),
               )
             : child,
@@ -1069,16 +1084,16 @@ class _OrDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lineColor = isDark ? Colors.white.withOpacity(0.15) : _kInputBorder;
-    final textColor = isDark ? Colors.white60 : AppColors.textSecondary.withValues(alpha: 0.7);
+    final textColor = isDark
+        ? Colors.white60
+        : AppColors.textSecondary.withValues(alpha: 0.7);
     return Row(children: [
       Expanded(child: Divider(color: lineColor)),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Text(AppLocalizations.of(context)!.authScreenFbff31ee,
             style: TextStyle(
-                color: textColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
+                color: textColor, fontSize: 13, fontWeight: FontWeight.w600)),
       ),
       Expanded(child: Divider(color: lineColor)),
     ]);
@@ -1096,66 +1111,78 @@ class _GuestModeDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.authScreen7e02b34c,
-                      style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white)),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.authScreen6bf26430,
-                    style: TextStyle(
-                        fontSize: 14, height: 1.5, color: Colors.white.withOpacity(0.7)),
-                  ),
-                  const SizedBox(height: 20),
-                  _GuestRoleOption(
-                    title: l10n.authScreen10683ed0,
-                    subtitle: l10n.authScreen24eb3d5b,
-                    icon: IconsaxPlusLinear.profile_circle,
-                    color: _kBrandTeal,
-                    onTap: () => Navigator.of(context).pop('tenant'),
-                  ),
-                  const SizedBox(height: 12),
-                  _GuestRoleOption(
-                    title: l10n.authScreen7e33e9cc,
-                    subtitle: l10n.authScreenBb12d654,
-                    icon: IconsaxPlusLinear.home,
-                    color: _kBrandTeal, // use primary brand color so it pops nicely on dark glass
-                    onTap: () => Navigator.of(context).pop('landlord'),
-                  ),
-                  const SizedBox(height: 12),
-                  _GuestRoleOption(
-                    title: l10n.authScreen160b6f4f,
-                    subtitle: l10n.authScreen7345afa5,
-                    icon: IconsaxPlusLinear.briefcase,
-                    color: BrandPalette.broker.primary,
-                    onTap: () => Navigator.of(context).pop('broker'),
+      // The dialog route animates this content in (fade/scale) on open, which
+      // repaints the whole subtree every frame — RepaintBoundary lets Flutter
+      // cache the blurred layer as a raster and just transform/fade it in
+      // instead of redoing the (expensive) Gaussian blur each frame.
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(25),
+                sigmaY: PlatformFx.blurSigma(25)),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.24), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
                 ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.authScreen7e02b34c,
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white)),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.authScreen6bf26430,
+                      style: TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: Colors.white.withOpacity(0.7)),
+                    ),
+                    const SizedBox(height: 20),
+                    _GuestRoleOption(
+                      title: l10n.authScreen10683ed0,
+                      subtitle: l10n.authScreen24eb3d5b,
+                      icon: IconsaxPlusLinear.profile_circle,
+                      color: _kBrandTeal,
+                      onTap: () => Navigator.of(context).pop('tenant'),
+                    ),
+                    const SizedBox(height: 12),
+                    _GuestRoleOption(
+                      title: l10n.authScreen7e33e9cc,
+                      subtitle: l10n.authScreenBb12d654,
+                      icon: IconsaxPlusLinear.home,
+                      color:
+                          _kBrandTeal, // use primary brand color so it pops nicely on dark glass
+                      onTap: () => Navigator.of(context).pop('landlord'),
+                    ),
+                    const SizedBox(height: 12),
+                    _GuestRoleOption(
+                      title: l10n.authScreen160b6f4f,
+                      subtitle: l10n.authScreen7345afa5,
+                      icon: IconsaxPlusLinear.briefcase,
+                      color: BrandPalette.broker.primary,
+                      onTap: () => Navigator.of(context).pop('broker'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1187,63 +1214,70 @@ class _LandlordAgentDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(
-                  color: Colors.white.withOpacity(0.24), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.authScreen405e3450,
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.authScreen98539dbe,
-                    style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Colors.white.withOpacity(0.75)),
-                  ),
-                  const SizedBox(height: 22),
-                  _GuestRoleOption(
-                    title: l10n.authScreenB651765c,
-                    subtitle: l10n.authScreenF2529a48,
-                    icon: IconsaxPlusLinear.home,
-                    color: _kBrandTeal,
-                    onTap: () => Navigator.of(context).pop('landlord'),
-                  ),
-                  const SizedBox(height: 12),
-                  _GuestRoleOption(
-                    title: l10n.authScreen244b2e78,
-                    subtitle: l10n.authScreen7345afa5,
-                    icon: IconsaxPlusLinear.briefcase,
-                    color: BrandPalette.broker.primary,
-                    onTap: () => Navigator.of(context).pop('broker'),
+      // Dialog-open transition animates this in every frame; RepaintBoundary
+      // caches the blurred layer instead of re-running the Gaussian blur per
+      // frame (same reasoning as _GuestModeDialog above).
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(25),
+                sigmaY: PlatformFx.blurSigma(25)),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.24), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
                 ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.authScreen405e3450,
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.authScreen98539dbe,
+                      style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: Colors.white.withOpacity(0.75)),
+                    ),
+                    const SizedBox(height: 22),
+                    _GuestRoleOption(
+                      title: l10n.authScreenB651765c,
+                      subtitle: l10n.authScreenF2529a48,
+                      icon: IconsaxPlusLinear.home,
+                      color: _kBrandTeal,
+                      onTap: () => Navigator.of(context).pop('landlord'),
+                    ),
+                    const SizedBox(height: 12),
+                    _GuestRoleOption(
+                      title: l10n.authScreen244b2e78,
+                      subtitle: l10n.authScreen7345afa5,
+                      icon: IconsaxPlusLinear.briefcase,
+                      color: BrandPalette.broker.primary,
+                      onTap: () => Navigator.of(context).pop('broker'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1311,7 +1345,8 @@ class _GuestRoleOption extends StatelessWidget {
                 ],
               ),
             ),
-            const RentlyIcon(IconsaxPlusLinear.arrow_left_2, color: Colors.white, size: 16),
+            const RentlyIcon(IconsaxPlusLinear.arrow_left_2,
+                color: Colors.white, size: 16),
           ]),
         ),
       ),
@@ -1365,21 +1400,29 @@ class _LoginTabState extends State<_LoginTab> {
       barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 360),
       pageBuilder: (ctx, anim1, anim2) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(
-                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
-              child: Material(
-                color: Colors.transparent,
-                child: _EulaSheet(
-                  onAccept: () => Navigator.pop(ctx, true),
-                  onDecline: () => Navigator.pop(ctx, false),
+        // showGeneralDialog's default transitionBuilder wraps this whole
+        // subtree in a FadeTransition (and the sheet itself slides in via
+        // SlideTransition below), so without a boundary the BackdropFilter
+        // redoes its Gaussian blur every frame of the entrance animation.
+        return RepaintBoundary(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(8),
+                sigmaY: PlatformFx.blurSigma(8)),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(
+                    CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+                child: Material(
+                  color: Colors.transparent,
+                  child: _EulaSheet(
+                    onAccept: () => Navigator.pop(ctx, true),
+                    onDecline: () => Navigator.pop(ctx, false),
+                  ),
                 ),
               ),
             ),
@@ -1396,10 +1439,9 @@ class _LoginTabState extends State<_LoginTab> {
     final password = _passwordCtrl.text;
     if (email.isEmpty || password.isEmpty) {
       _shakeCtrl.shake();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(
-              duration: const Duration(milliseconds: 2500),
-              content: Text(l10n.authScreen6525ddbe)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreen6525ddbe)));
       return;
     }
     setState(() => _loading = true);
@@ -1413,8 +1455,7 @@ class _LoginTabState extends State<_LoginTab> {
       // profile + listings back from the backend. Social logins already do this
       // via applyAuthenticatedIdentity; email login must too, otherwise a
       // returning landlord never sees the properties they uploaded.
-      final displayName =
-          FirebaseAuth.instance.currentUser?.displayName ?? '';
+      final displayName = FirebaseAuth.instance.currentUser?.displayName ?? '';
       await provider.applyAuthenticatedIdentity(
           displayName: displayName, source: 'email');
       await provider.setUserRole(provider.userRole);
@@ -1431,8 +1472,7 @@ class _LoginTabState extends State<_LoginTab> {
         _ => l10n.authScreenB4d2edd3,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 2500),
-          content: Text(msg)));
+          duration: const Duration(milliseconds: 2500), content: Text(msg)));
     } on TimeoutException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1447,8 +1487,7 @@ class _LoginTabState extends State<_LoginTab> {
     final l10n = AppLocalizations.of(context)!;
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
-    final emailValid =
-        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    final emailValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
     if (email.isEmpty || !emailValid) {
       _shakeCtrl.shake();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1473,8 +1512,7 @@ class _LoginTabState extends State<_LoginTab> {
         _ => l10n.authScreen2c3813b7,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 2500),
-          content: Text(msg)));
+          duration: const Duration(milliseconds: 2500), content: Text(msg)));
     } on TimeoutException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1511,8 +1549,7 @@ class _LoginTabState extends State<_LoginTab> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2500),
-          content:
-              Text(l10n.authScreen014274ee)));
+          content: Text(l10n.authScreen014274ee)));
     } catch (error) {
       if (!mounted) return;
       final msg = error.toString().toLowerCase();
@@ -1521,10 +1558,9 @@ class _LoginTabState extends State<_LoginTab> {
           msg.contains('sign_in_canceled')) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              duration: const Duration(milliseconds: 2500),
-              content: Text(l10n.authScreenB840c378)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(l10n.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -1554,8 +1590,7 @@ class _LoginTabState extends State<_LoginTab> {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
       debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
-      _showAppleError(
-          l10n.authScreen3219b950(e.code.name, '${e.message}'));
+      _showAppleError(l10n.authScreen3219b950(e.code.name, '${e.message}'));
     } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
       debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
@@ -1604,8 +1639,8 @@ class _LoginTabState extends State<_LoginTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child:
-                Text(l10n.authScreen55247199, style: const TextStyle(color: AppColors.slate500)),
+            child: Text(l10n.authScreen55247199,
+                style: const TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -1640,265 +1675,283 @@ class _LoginTabState extends State<_LoginTab> {
               logoHeight: 135,
             ),
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(40),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(22),
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Title
-                  Text(
-                    l10n.authScreenD8d84317,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        shadows: [
-                          Shadow(
-                            color: Color(0x40000000),
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ]),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.authScreenAdf821d4,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 20),
-                  _SocialRow(
-                    googleLoading: _googleLoading,
-                    appleLoading: _appleLoading,
-                    onGoogle: _loginWithGoogle,
-                    onApple: _loginWithApple,
-                    isDark: true,
-                  ),
-                  const SizedBox(height: 16),
-                  const _OrDivider(isDark: true),
-                  const SizedBox(height: 16),
-
-                  HorizontalShake(
-                    controller: _shakeCtrl,
+            // This card sits inside the entry flow's AnimatedSwitcher
+            // (mobile) / TabBarView (wide) transitions, both of which
+            // animate every frame — RepaintBoundary keeps the blur from
+            // being recomputed each frame of those transitions.
+            RepaintBoundary(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(40),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                      sigmaX: PlatformFx.blurSigma(25),
+                      sigmaY: PlatformFx.blurSigma(25)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(40),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.24), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(22),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Email
-                        _FieldLabel(label: l10n.authScreen98bcf26f, isDark: true),
-                        const SizedBox(height: 4),
-                        _CleanTextField(
-                          controller: _emailCtrl,
-                          hint: 'name@example.com',
-                          keyboardType: TextInputType.emailAddress,
-                          textDirection: TextDirection.ltr,
-                          prefixIcon: IconsaxPlusLinear.sms,
-                          isDark: true,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Password
-                        _FieldLabel(label: l10n.authScreen0b490b5e, isDark: true),
-                        const SizedBox(height: 4),
-                        _CleanTextField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscure,
-                          hint: '••••••••',
-                          prefixIcon: IconsaxPlusLinear.key,
-                          isDark: true,
-                          suffixIcon: EyeMorphIcon(
-                            isObscured: _obscure,
-                            onTap: () => setState(() => _obscure = !_obscure),
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Remember me & Forgot Password
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          GestureDetector(
-                            onTap: () => setState(() => _rememberMe = !_rememberMe),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: 18,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(5),
-                                color: _rememberMe ? _kBrandTeal : Colors.transparent,
-                                border: Border.all(
-                                  color:
-                                      _rememberMe ? _kBrandTeal : Colors.white.withOpacity(0.25),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: _rememberMe
-                                  ? const Icon(Icons.check_rounded,
-                                      size: 10, color: Colors.white)
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            l10n.authScreen3e35b351,
-                            style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      TextButton(
-                        onPressed: _resetPassword,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          l10n.authScreenD30f1cbd,
-                          style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-
-                  // Login CTA
-                  _PillButton(
-                    label: l10n.authScreen254e07f0,
-                    loading: _loading,
-                    onTap: _login,
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Terms of use — presented before login (App Store Guideline 1.2)
-                  Center(
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          l10n.authScreen73103765,
-                          style: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500),
-                        ),
-                        GestureDetector(
-                          onTap: _showTerms,
-                          child: Text(
-                            l10n.authScreenA25bd15a,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                decoration: TextDecoration.underline),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Guest / Anonymous entry
-                  Center(
-                    child: TextButton(
-                      onPressed: widget.onGuestLogin,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(IconsaxPlusLinear.eye, size: 14, color: Colors.white.withOpacity(0.7)),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(l10n.authScreen7e02b34c,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        Colors.white.withOpacity(0.7))),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Switch to register
-                  Center(
-                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(l10n.authScreen20f9f23f,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500)),
+                        // Title
+                        Text(
+                          l10n.authScreenD8d84317,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0x40000000),
+                                  blurRadius: 10,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]),
                         ),
-                        GestureDetector(
-                          onTap: widget.onSwitchToRegister,
-                          child: Text(l10n.authScreen070f0a6c,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: _kBrandTeal,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 6),
+                        Text(
+                          l10n.authScreenAdf821d4,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13.5,
+                              height: 1.35,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 20),
+                        _SocialRow(
+                          googleLoading: _googleLoading,
+                          appleLoading: _appleLoading,
+                          onGoogle: _loginWithGoogle,
+                          onApple: _loginWithApple,
+                          isDark: true,
+                        ),
+                        const SizedBox(height: 16),
+                        const _OrDivider(isDark: true),
+                        const SizedBox(height: 16),
+
+                        HorizontalShake(
+                          controller: _shakeCtrl,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Email
+                              _FieldLabel(
+                                  label: l10n.authScreen98bcf26f, isDark: true),
+                              const SizedBox(height: 4),
+                              _CleanTextField(
+                                controller: _emailCtrl,
+                                hint: 'name@example.com',
+                                keyboardType: TextInputType.emailAddress,
+                                textDirection: TextDirection.ltr,
+                                prefixIcon: IconsaxPlusLinear.sms,
+                                isDark: true,
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Password
+                              _FieldLabel(
+                                  label: l10n.authScreen0b490b5e, isDark: true),
+                              const SizedBox(height: 4),
+                              _CleanTextField(
+                                controller: _passwordCtrl,
+                                obscureText: _obscure,
+                                hint: '••••••••',
+                                prefixIcon: IconsaxPlusLinear.key,
+                                isDark: true,
+                                suffixIcon: EyeMorphIcon(
+                                  isObscured: _obscure,
+                                  onTap: () =>
+                                      setState(() => _obscure = !_obscure),
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Remember me & Forgot Password
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => setState(
+                                      () => _rememberMe = !_rememberMe),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: 18,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(5),
+                                      color: _rememberMe
+                                          ? _kBrandTeal
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: _rememberMe
+                                            ? _kBrandTeal
+                                            : Colors.white.withOpacity(0.25),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: _rememberMe
+                                        ? const Icon(Icons.check_rounded,
+                                            size: 10, color: Colors.white)
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  l10n.authScreen3e35b351,
+                                  style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: _resetPassword,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                l10n.authScreenD30f1cbd,
+                                style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Login CTA
+                        _PillButton(
+                          label: l10n.authScreen254e07f0,
+                          loading: _loading,
+                          onTap: _login,
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Terms of use — presented before login (App Store Guideline 1.2)
+                        Center(
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                l10n.authScreen73103765,
+                                style: const TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              GestureDetector(
+                                onTap: _showTerms,
+                                child: Text(
+                                  l10n.authScreenA25bd15a,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      decoration: TextDecoration.underline),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guest / Anonymous entry
+                        Center(
+                          child: TextButton(
+                            onPressed: widget.onGuestLogin,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(IconsaxPlusLinear.eye,
+                                    size: 14,
+                                    color: Colors.white.withOpacity(0.7)),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(l10n.authScreen7e02b34c,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              Colors.white.withOpacity(0.7))),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Switch to register
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(l10n.authScreen20f9f23f,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500)),
+                              ),
+                              GestureDetector(
+                                onTap: widget.onSwitchToRegister,
+                                child: Text(l10n.authScreen070f0a6c,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color: _kBrandTeal,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800)),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
-    ),
       ),
     );
   }
@@ -1966,24 +2019,21 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
       if (name.isEmpty) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(
-                duration: const Duration(milliseconds: 2500),
-                content: Text(l10n.authScreen7fcb9eb9)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(l10n.authScreen7fcb9eb9)));
         return;
       }
       if (email.isEmpty || !email.contains('@')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                duration: const Duration(milliseconds: 2500),
-                content: Text(l10n.authScreen574b1fc6)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(l10n.authScreen574b1fc6)));
         return;
       }
       if (password.length < 8) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                duration: const Duration(milliseconds: 2500),
-                content: Text(l10n.authScreen2da8e039)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(l10n.authScreen2da8e039)));
         return;
       }
       if (!_agreedToTerms) {
@@ -2031,10 +2081,9 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       // no-op
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              duration: const Duration(milliseconds: 2500),
-              content: Text(AppLocalizations.of(context)!.authScreenB840c378)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(AppLocalizations.of(context)!.authScreenB840c378)));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -2070,21 +2119,29 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (ctx, anim1, anim2) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(
-                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
-              child: Material(
-                color: Colors.transparent,
-                child: _EulaSheet(
-                  onAccept: () => Navigator.pop(ctx, true),
-                  onDecline: () => Navigator.pop(ctx, false),
+        // showGeneralDialog's default transitionBuilder wraps this whole
+        // subtree in a FadeTransition (and the sheet itself slides in via
+        // SlideTransition below), so without a boundary the BackdropFilter
+        // redoes its Gaussian blur every frame of the entrance animation.
+        return RepaintBoundary(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(8),
+                sigmaY: PlatformFx.blurSigma(8)),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(
+                    CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+                child: Material(
+                  color: Colors.transparent,
+                  child: _EulaSheet(
+                    onAccept: () => Navigator.pop(ctx, true),
+                    onDecline: () => Navigator.pop(ctx, false),
+                  ),
                 ),
               ),
             ),
@@ -2113,7 +2170,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       // email user (and all their uploads) ended up under the same owner id.
       // applyAuthenticatedIdentity forces profile.id = uid before the draft
       // property below is created, isolating each user's data correctly.
-      await provider.applyAuthenticatedIdentity(displayName: name, source: 'email');
+      await provider.applyAuthenticatedIdentity(
+          displayName: name, source: 'email');
       final bound = provider.tenantProfile;
       if (bound != null) {
         await provider.updateTenantProfile(
@@ -2156,8 +2214,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
         _ => l10n.authScreen7e95f8ea,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 2500),
-          content: Text(msg)));
+          duration: const Duration(milliseconds: 2500), content: Text(msg)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -2170,19 +2227,26 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 450),
       pageBuilder: (ctx, anim1, anim2) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(
-                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
-              child: Material(
-                color: Colors.transparent,
-                child: _AnimatedSuccessSheet(onContinue: widget.onDone),
+        // Same reasoning as the EULA sheet above: the route's default
+        // FadeTransition + this SlideTransition both animate every frame,
+        // so isolate the blur behind a RepaintBoundary.
+        return RepaintBoundary(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(8),
+                sigmaY: PlatformFx.blurSigma(8)),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(
+                    CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+                child: Material(
+                  color: Colors.transparent,
+                  child: _AnimatedSuccessSheet(onContinue: widget.onDone),
+                ),
               ),
             ),
           ),
@@ -2219,126 +2283,133 @@ class _RegisterFlowState extends State<_RegisterFlow> {
         Expanded(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-                16,
-                4,
-                16,
-                12 + MediaQuery.of(context).padding.bottom),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(56),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(56),
-                    border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-              children: [
-                Expanded(
-                  child: PageView(
-                    controller: _pageCtrl,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _StepEmailPassword(
-                        nameCtrl: _nameCtrl,
-                        emailCtrl: _emailCtrl,
-                        passwordCtrl: _passwordCtrl,
-                        obscure: _passwordObscure,
-                        agreedToTerms: _agreedToTerms,
-                        onToggleObscure: () =>
-                            setState(() => _passwordObscure = !_passwordObscure),
-                        onToggleTerms: () =>
-                            setState(() => _agreedToTerms = !_agreedToTerms),
-                        googleLoading: _googleLoading,
-                        appleLoading: _appleLoading,
-                        onGoogle: _loginWithGoogle,
-                        onApple: _loginWithApple,
-                        onSwitchToLogin: widget.onSwitchToLogin,
-                        isDark: true,
-                      ),
-                      if (_role == 'landlord')
-                        _StepPropertyDetails(
-                          cityCtrl: _cityCtrl,
-                          rooms: _propRooms,
-                          features: _propFeatures,
-                          onRooms: (v) => setState(() => _propRooms = v),
-                          onToggleFeature: (f) => setState(() =>
-                              _propFeatures.contains(f)
-                                  ? _propFeatures.remove(f)
-                                  : _propFeatures.add(f)),
-                          isDark: true,
-                        )
-                      else
-                        _StepPersonal(
-                          nameCtrl: _nameCtrl,
-                          role: _role,
-                          budget: _budget,
-                          onBudget: (v) =>
-                              setState(() => _budget = (v / 100).round() * 100),
-                          isDark: true,
+                16, 4, 16, 12 + MediaQuery.of(context).padding.bottom),
+            // Same reasoning as the login card: this register card lives
+            // inside the entry flow's AnimatedSwitcher/TabBarView transition
+            // (and its own internal step PageView), so a RepaintBoundary
+            // stops the blur from being redone on every animated frame.
+            child: RepaintBoundary(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(56),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                      sigmaX: PlatformFx.blurSigma(25),
+                      sigmaY: PlatformFx.blurSigma(25)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(56),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.24), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
                         ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _NavButtons(
-                        nextLabel: _nextLabel,
-                        loading: _loading,
-                        onPrev: _step > 0 ? _prev : null,
-                        onNext: _next,
-                        onSkip: isOptionalStep ? _submit : null,
-                      ),
-                      if (_step == 0) ...[
-                        const SizedBox(height: 12),
-                        Center(
-                          child: Row(
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: PageView(
+                            controller: _pageCtrl,
+                            physics: const NeverScrollableScrollPhysics(),
+                            children: [
+                              _StepEmailPassword(
+                                nameCtrl: _nameCtrl,
+                                emailCtrl: _emailCtrl,
+                                passwordCtrl: _passwordCtrl,
+                                obscure: _passwordObscure,
+                                agreedToTerms: _agreedToTerms,
+                                onToggleObscure: () => setState(
+                                    () => _passwordObscure = !_passwordObscure),
+                                onToggleTerms: () => setState(
+                                    () => _agreedToTerms = !_agreedToTerms),
+                                googleLoading: _googleLoading,
+                                appleLoading: _appleLoading,
+                                onGoogle: _loginWithGoogle,
+                                onApple: _loginWithApple,
+                                onSwitchToLogin: widget.onSwitchToLogin,
+                                isDark: true,
+                              ),
+                              if (_role == 'landlord')
+                                _StepPropertyDetails(
+                                  cityCtrl: _cityCtrl,
+                                  rooms: _propRooms,
+                                  features: _propFeatures,
+                                  onRooms: (v) =>
+                                      setState(() => _propRooms = v),
+                                  onToggleFeature: (f) => setState(() =>
+                                      _propFeatures.contains(f)
+                                          ? _propFeatures.remove(f)
+                                          : _propFeatures.add(f)),
+                                  isDark: true,
+                                )
+                              else
+                                _StepPersonal(
+                                  nameCtrl: _nameCtrl,
+                                  role: _role,
+                                  budget: _budget,
+                                  onBudget: (v) => setState(
+                                      () => _budget = (v / 100).round() * 100),
+                                  isDark: true,
+                                ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Flexible(
-                                child: Text(l10n.authScreenE0c41b8a,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500)),
+                              _NavButtons(
+                                nextLabel: _nextLabel,
+                                loading: _loading,
+                                onPrev: _step > 0 ? _prev : null,
+                                onNext: _next,
+                                onSkip: isOptionalStep ? _submit : null,
                               ),
-                              GestureDetector(
-                                onTap: widget.onSwitchToLogin,
-                                child: Text(l10n.authScreen254e07f0,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: _kBrandTeal,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800)),
-                              ),
+                              if (_step == 0) ...[
+                                const SizedBox(height: 12),
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(l10n.authScreenE0c41b8a,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500)),
+                                      ),
+                                      GestureDetector(
+                                        onTap: widget.onSwitchToLogin,
+                                        child: Text(l10n.authScreen254e07f0,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                color: _kBrandTeal,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
-    ),
-  ),
       ],
     );
   }
@@ -2588,8 +2659,7 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                       color: AppColors.greenBright,
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              AppColors.greenBright.withValues(alpha: 0.35),
+                          color: AppColors.greenBright.withValues(alpha: 0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
@@ -2895,7 +2965,11 @@ class _StepEmailPassword extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                     color: agreedToTerms ? _kBrandTeal : Colors.transparent,
                     border: Border.all(
-                      color: agreedToTerms ? _kBrandTeal : (isDark ? Colors.white.withOpacity(0.6) : _kInputBorder),
+                      color: agreedToTerms
+                          ? _kBrandTeal
+                          : (isDark
+                              ? Colors.white.withOpacity(0.6)
+                              : _kInputBorder),
                       width: 1.5,
                     ),
                   ),
@@ -2910,21 +2984,20 @@ class _StepEmailPassword extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     style: TextStyle(
-                        fontSize: 13, color: isDark ? Colors.white : AppColors.textSecondary),
+                        fontSize: 13,
+                        color: isDark ? Colors.white : AppColors.textSecondary),
                     children: [
                       TextSpan(text: l10n.authScreen10fb73fe),
                       TextSpan(
                         text: l10n.authScreenA25bd15a,
                         style: TextStyle(
-                            color: _kBrandTeal,
-                            fontWeight: FontWeight.w700),
+                            color: _kBrandTeal, fontWeight: FontWeight.w700),
                       ),
                       TextSpan(text: l10n.authScreen0e3bcbcf),
                       TextSpan(
                         text: l10n.authScreenF52fda14,
                         style: TextStyle(
-                            color: _kBrandTeal,
-                            fontWeight: FontWeight.w700),
+                            color: _kBrandTeal, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -2971,15 +3044,15 @@ class _StepPersonal extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5)),
           const SizedBox(height: 6),
-          Text(
-              l10n.authScreenC178b5d4,
+          Text(l10n.authScreenC178b5d4,
               style: TextStyle(
                   color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500)),
           const SizedBox(height: 24),
           if (isTenant)
-            _CompactBudgetPicker(budget: budget, onBudget: onBudget, isDark: isDark),
+            _CompactBudgetPicker(
+                budget: budget, onBudget: onBudget, isDark: isDark),
         ],
       ),
     );
@@ -2989,7 +3062,8 @@ class _StepPersonal extends StatelessWidget {
 // ─── Compact Budget Picker ────────────────────────────────────────────────────
 
 class _CompactBudgetPicker extends StatelessWidget {
-  const _CompactBudgetPicker({required this.budget, required this.onBudget, this.isDark = false});
+  const _CompactBudgetPicker(
+      {required this.budget, required this.onBudget, this.isDark = false});
   final int budget;
   final ValueChanged<double> onBudget;
   final bool isDark;
@@ -3001,12 +3075,15 @@ class _CompactBudgetPicker extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
+        border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
         boxShadow: isDark
             ? const []
             : const [
                 BoxShadow(
-                    color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
+                    color: Color(0x0A072946),
+                    blurRadius: 8,
+                    offset: Offset(0, 2))
               ],
       ),
       child: Column(
@@ -3032,7 +3109,8 @@ class _CompactBudgetPicker extends StatelessWidget {
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
               activeTrackColor: _kBrandTeal,
-              inactiveTrackColor: isDark ? Colors.white.withOpacity(0.12) : AppColors.mist,
+              inactiveTrackColor:
+                  isDark ? Colors.white.withOpacity(0.12) : AppColors.mist,
               thumbColor: _kBrandTeal,
               overlayColor: _kBrandTeal.withValues(alpha: 0.16),
             ),
@@ -3178,7 +3256,9 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(label,
         style: TextStyle(
-            color: isDark ? Colors.white : AppColors.navy, fontSize: 13, fontWeight: FontWeight.w700));
+            color: isDark ? Colors.white : AppColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w700));
   }
 }
 
@@ -3219,7 +3299,9 @@ class _CleanTextFieldState extends State<_CleanTextField> {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide(
-        color: widget.isDark ? Colors.white.withOpacity(0.24) : AppColors.navy.withOpacity(0.08),
+        color: widget.isDark
+            ? Colors.white.withOpacity(0.24)
+            : AppColors.navy.withOpacity(0.08),
         width: 1.2,
       ),
     );
@@ -3241,11 +3323,17 @@ class _CleanTextFieldState extends State<_CleanTextField> {
           obscureText: widget.obscureText,
           textCapitalization: widget.textCapitalization,
           style: TextStyle(
-              color: widget.isDark ? Colors.white : AppColors.navy, fontSize: 15, fontWeight: FontWeight.w600),
+              color: widget.isDark ? Colors.white : AppColors.navy,
+              fontSize: 15,
+              fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: widget.hint,
             prefixIcon: widget.prefixIcon != null
-                ? Icon(widget.prefixIcon, color: widget.isDark ? Colors.white : AppColors.textSecondary.withOpacity(0.7), size: 20)
+                ? Icon(widget.prefixIcon,
+                    color: widget.isDark
+                        ? Colors.white
+                        : AppColors.textSecondary.withOpacity(0.7),
+                    size: 20)
                 : null,
             suffixIcon: widget.suffixIcon != null
                 ? Padding(
@@ -3254,9 +3342,13 @@ class _CleanTextFieldState extends State<_CleanTextField> {
                   )
                 : null,
             filled: true,
-            fillColor: widget.isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.65),
+            fillColor: widget.isDark
+                ? Colors.white.withOpacity(0.12)
+                : Colors.white.withOpacity(0.65),
             hintStyle: TextStyle(
-                color: widget.isDark ? Colors.white.withOpacity(0.45) : AppColors.textSecondary.withValues(alpha: 0.55),
+                color: widget.isDark
+                    ? Colors.white.withOpacity(0.45)
+                    : AppColors.textSecondary.withValues(alpha: 0.55),
                 fontWeight: FontWeight.w400),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -3474,7 +3566,8 @@ class _StepPropertyDetails extends StatelessWidget {
 // ─── Rooms Stepper ────────────────────────────────────────────────────────────
 
 class _RoomsStepper extends StatelessWidget {
-  const _RoomsStepper({required this.rooms, required this.onRooms, this.isDark = false});
+  const _RoomsStepper(
+      {required this.rooms, required this.onRooms, this.isDark = false});
   final double rooms;
   final ValueChanged<double> onRooms;
   final bool isDark;
@@ -3487,7 +3580,8 @@ class _RoomsStepper extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
+        border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
       ),
       child: Row(children: [
         Text(AppLocalizations.of(context)!.authScreen4f4cd24f,
@@ -3539,7 +3633,9 @@ class _StepperBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = filled
         ? _kBrandTeal
-        : (isDark ? Colors.white.withOpacity(0.12) : _kInputBorder.withValues(alpha: 0.6));
+        : (isDark
+            ? Colors.white.withOpacity(0.12)
+            : _kInputBorder.withValues(alpha: 0.6));
     final iconColor = filled
         ? Colors.white
         : (isDark ? Colors.white : AppColors.textSecondary);
@@ -3610,7 +3706,9 @@ class _FeatureChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 14,
-                color: selected ? Colors.white : (isDark ? Colors.white70 : AppColors.textSecondary),
+                color: selected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : AppColors.textSecondary),
               ),
               const SizedBox(width: 5),
             ],
@@ -3620,7 +3718,9 @@ class _FeatureChip extends StatelessWidget {
             ],
             Text(label,
                 style: TextStyle(
-                    color: selected ? Colors.white : (isDark ? Colors.white : AppColors.navy),
+                    color: selected
+                        ? Colors.white
+                        : (isDark ? Colors.white : AppColors.navy),
                     fontSize: 13,
                     fontWeight: FontWeight.w700)),
           ],
@@ -3957,6 +4057,7 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
     _scaleCtrl.reverse();
     widget.onTap();
   }
+
   void _onTapCancel() => _scaleCtrl.reverse();
 
   @override
@@ -3970,7 +4071,7 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
                 end: Alignment.bottomLeft,
                 colors: [
                   AppColors.primaryLight, // Bright vibrant turquoise/cyan
-                  _kBrandTeal,       // Core brand teal
+                  _kBrandTeal, // Core brand teal
                   AppColors.primaryDark, // Deeper teal
                 ],
               ),
@@ -4065,16 +4166,22 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
       ),
     );
 
+    // This whole button is wrapped in a ScaleTransition below, driven by
+    // _scaleCtrl on every tap-down/tap-up (140ms) — without a boundary the
+    // frosted button's Gaussian blur gets recomputed on every frame of that
+    // press animation.
     final Widget frostedOrSolid = widget.isPrimary
         ? buttonContent
-        : ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: PlatformFx.blurSigma(24),
-                sigmaY: PlatformFx.blurSigma(24),
+        : RepaintBoundary(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: PlatformFx.blurSigma(24),
+                  sigmaY: PlatformFx.blurSigma(24),
+                ),
+                child: buttonContent,
               ),
-              child: buttonContent,
             ),
           );
 
@@ -4097,4 +4204,3 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
     );
   }
 }
-

@@ -859,7 +859,7 @@ class _PropertyManageCard extends StatelessWidget {
         : (property.isBoosted ? AppColors.primary : null);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         border: boostFrame != null
             ? Border.all(color: boostFrame, width: 2.5)
             : null,
@@ -874,7 +874,9 @@ class _PropertyManageCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        // Matches the discover/swipe property card's corner radius (18) for
+        // visual consistency between the two card components.
+        borderRadius: BorderRadius.circular(18),
         // Whole card is tappable → opens the property (detail/preview).
         child: Material(
           color: Colors.transparent,
@@ -1235,16 +1237,22 @@ class _PropertyThumb extends StatelessWidget {
       media: media,
       fallback: _fallback(),
       fit: BoxFit.cover,
-      alignment: Alignment.topCenter,
+      alignment: Alignment.center,
     );
   }
 
+  // Matches the branded fallback on the tenant-facing discover card
+  // (profile_card.dart's _ImageFallback) instead of a flat, unbranded tint —
+  // a landlord looking at their own draft/photo-less listings previously saw
+  // a visibly different, less-finished-looking empty state here.
   Widget _fallback() => Container(
-        color: AppColors.primaryLight2,
-        child: RentlyIcon(
-          IconsaxPlusLinear.building,
-          size: 42,
-          color: AppColors.primary,
+        color: AppColors.navy,
+        child: Center(
+          child: RentlyIcon(
+            IconsaxPlusLinear.building,
+            size: 42,
+            color: AppColors.primary.withValues(alpha: 0.5),
+          ),
         ),
       );
 }

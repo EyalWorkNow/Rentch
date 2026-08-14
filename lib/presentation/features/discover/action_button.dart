@@ -169,8 +169,10 @@ class _ActionButtonState extends State<_ActionButton>
   @override
   Widget build(BuildContext context) {
     final bool isDark3d = widget.iconColor == AppColors.navy;
-    final bool isBlack = widget.iconColor == const Color(0xFF000000) || widget.iconColor == Colors.black;
-    final actualIconColor = (isDark3d || isBlack) ? Colors.white : widget.iconColor;
+    final bool isBlack = widget.iconColor == const Color(0xFF000000) ||
+        widget.iconColor == Colors.black;
+    final actualIconColor =
+        (isDark3d || isBlack) ? Colors.white : widget.iconColor;
 
     return Tooltip(
       message: widget.tooltip,
@@ -197,30 +199,36 @@ class _ActionButtonState extends State<_ActionButton>
                 ),
               ],
             ),
-            child: ClipOval(
-              child: BackdropFilter(
-                // Very heavy glass blur. Routed through PlatformFx so iOS gets
-                // the full heavy look while Android/Impeller (where this sits
-                // over the animating deck) is trimmed enough to stay smooth.
-                filter: ImageFilter.blur(
-                    sigmaX: PlatformFx.blurSigma(34),
-                    sigmaY: PlatformFx.blurSigma(34)),
-                child: Container(
-                  decoration: BoxDecoration(
-                    // Dark GRAY (not black), with relative transparency so the
-                    // heavy blur reads as frosted glass.
-                    color: AppColors.inkSoft.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      width: 1.5,
+            // This button is itself wrapped in a ScaleTransition (below)
+            // driven by _ctrl on every tap-down/up — without a boundary the
+            // heavy glass blur gets recomputed on every frame of that press
+            // animation, not just when it's actually pressed.
+            child: RepaintBoundary(
+              child: ClipOval(
+                child: BackdropFilter(
+                  // Very heavy glass blur. Routed through PlatformFx so iOS gets
+                  // the full heavy look while Android/Impeller (where this sits
+                  // over the animating deck) is trimmed enough to stay smooth.
+                  filter: ImageFilter.blur(
+                      sigmaX: PlatformFx.blurSigma(34),
+                      sigmaY: PlatformFx.blurSigma(34)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      // Dark GRAY (not black), with relative transparency so the
+                      // heavy blur reads as frosted glass.
+                      color: AppColors.inkSoft.withValues(alpha: 0.4),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      widget.icon,
-                      size: widget.iconSize,
-                      color: actualIconColor,
+                    child: Center(
+                      child: Icon(
+                        widget.icon,
+                        size: widget.iconSize,
+                        color: actualIconColor,
+                      ),
                     ),
                   ),
                 ),

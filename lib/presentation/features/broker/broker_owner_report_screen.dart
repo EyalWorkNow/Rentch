@@ -6,6 +6,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -64,7 +65,21 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final properties = context.watch<DatingProvider>().myProperties;
+    // `myProperties` recomputes a fresh List<RentalProperty> on every access
+    // (a `.where(...).toList()`), so a plain `context.select` would never
+    // dedupe (two distinct list instances are never `==`). Selector's
+    // `shouldRebuild` lets us do a real element-wise comparison instead, so
+    // this screen only rebuilds when the landlord's own listings actually
+    // change (add/remove/edit) rather than on every unrelated
+    // notifyListeners() elsewhere in DatingProvider (chat, swipes, etc).
+    return Selector<DatingProvider, List<RentalProperty>>(
+      selector: (_, p) => p.myProperties,
+      shouldRebuild: (previous, next) => !listEquals(previous, next),
+      builder: (context, properties, _) => _buildContent(context, properties),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, List<RentalProperty> properties) {
     final selected = _resolveSelected(properties);
     final l10n = AppLocalizations.of(context)!;
 
@@ -107,12 +122,14 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _SectionLabel(l10n.brokerOwnerReportScreen80dfca38(
-                                    selected.address)),
+                                _SectionLabel(
+                                    l10n.brokerOwnerReportScreen80dfca38(
+                                        selected.address)),
                                 const SizedBox(height: 10),
                                 _MetricsGrid(property: selected),
                                 const SizedBox(height: 20),
-                                _SectionLabel(l10n.brokerOwnerReportScreenD304ce53),
+                                _SectionLabel(
+                                    l10n.brokerOwnerReportScreenD304ce53),
                                 const SizedBox(height: 10),
                                 _NarrativeCard(
                                     text: _narrative(context, selected)),
@@ -172,9 +189,12 @@ List<_Metric> _metricsFor(BuildContext context, RentalProperty property) {
   final s = property.marketSignals;
   String n(int value) => value > 0 ? _formatNumber(value) : '—';
   return [
-    _Metric(l10n.brokerOwnerReportScreen48227f9c, n(s.views), IconsaxPlusLinear.eye),
-    _Metric(l10n.brokerOwnerReportScreenDaa11b47, n(s.likes), IconsaxPlusLinear.heart),
-    _Metric(l10n.brokerOwnerReportScreen066de4f8, n(s.saves), IconsaxPlusLinear.archive),
+    _Metric(l10n.brokerOwnerReportScreen48227f9c, n(s.views),
+        IconsaxPlusLinear.eye),
+    _Metric(l10n.brokerOwnerReportScreenDaa11b47, n(s.likes),
+        IconsaxPlusLinear.heart),
+    _Metric(l10n.brokerOwnerReportScreen066de4f8, n(s.saves),
+        IconsaxPlusLinear.archive),
     _Metric(l10n.brokerOwnerReportScreenD535641c, n(s.contactRequests),
         IconsaxPlusLinear.call),
     _Metric(l10n.brokerOwnerReportScreenA04be780, n(s.detailViews),
@@ -201,8 +221,8 @@ String _narrative(BuildContext context, RentalProperty property) {
     parts.add(l10n.brokerOwnerReportScreenFa6a4018(_formatNumber(s.saves)));
   }
   if (s.contactRequests > 0) {
-    parts.add(l10n.brokerOwnerReportScreen825b0fd8(
-        _formatNumber(s.contactRequests)));
+    parts.add(
+        l10n.brokerOwnerReportScreen825b0fd8(_formatNumber(s.contactRequests)));
   }
 
   if (parts.isEmpty) {
@@ -290,9 +310,7 @@ class _PropertyTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected
-                  ? AppColors.primary
-                  : AppColors.borderLight,
+              color: selected ? AppColors.primary : AppColors.borderLight,
               width: selected ? 2 : 1,
             ),
           ),
@@ -334,7 +352,7 @@ class _PropertyTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${property.priceLabel} · '
-                          '${AppLocalizations.of(context)!.brokerOwnerReportScreenD973da64(property.roomsLabel)}',
+                      '${AppLocalizations.of(context)!.brokerOwnerReportScreenD973da64(property.roomsLabel)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -605,8 +623,7 @@ class _SendSheet extends StatelessWidget {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content:
-                            Text(l10n.brokerOwnerReportScreen452f9d1a)),
+                        content: Text(l10n.brokerOwnerReportScreen452f9d1a)),
                   );
                 },
               ),
@@ -758,8 +775,10 @@ String _relativeDate(BuildContext context, DateTime when) {
   final l10n = AppLocalizations.of(context)!;
   final diff = DateTime.now().difference(when);
   if (diff.inMinutes < 60) return l10n.brokerOwnerReportScreenA170171d;
-  if (diff.inHours < 24) return l10n.brokerOwnerReportScreenC46e717b(diff.inHours);
+  if (diff.inHours < 24)
+    return l10n.brokerOwnerReportScreenC46e717b(diff.inHours);
   if (diff.inDays == 1) return l10n.brokerOwnerReportScreenBe285a01;
-  if (diff.inDays < 30) return l10n.brokerOwnerReportScreen0cfbdf39(diff.inDays);
+  if (diff.inDays < 30)
+    return l10n.brokerOwnerReportScreen0cfbdf39(diff.inDays);
   return '${when.day}.${when.month}.${when.year}';
 }

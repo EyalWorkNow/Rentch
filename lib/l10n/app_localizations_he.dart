@@ -2587,6 +2587,9 @@ class AppLocalizationsHe extends AppLocalizations {
   String get propertyDetailScreenDf4787e7 => 'פתח במפות';
 
   @override
+  String get propertyDetailScreenLoadingPois => 'טוען…';
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'עריכת נכס';
 
   @override
@@ -11531,4 +11534,110 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get propertyDetailScreenDescription => 'תיאור';
+
+  @override
+  String get smartSearchAmenityRenovated => '✦ משופצת';
+
+  @override
+  String get smartSearchAmenityPets => '🐾 ידידותי לחיות';
+
+  @override
+  String get smartSearchAmenityParking => '🅿️ חניה';
+
+  @override
+  String get smartSearchAmenityBalcony => '🌤️ מרפסת';
+
+  @override
+  String get smartSearchAmenityElevator => '🛗 מעלית';
+
+  @override
+  String get smartSearchAmenityFurnished => '🛋️ מרוהט';
+
+  @override
+  String get smartSearchAmenityMamad => '🛡️ ממ״ד';
+
+  @override
+  String get smartSearchAmenityGarden => '🌳 גינה';
+
+  @override
+  String get smartSearchAmenityAir => '❄️ מיזוג';
+
+  @override
+  String get smartSearchAmenityPool => '🏊 בריכה';
+
+  @override
+  String get smartSearchAmenityGym => '🏋️ חדר כושר';
+
+  @override
+  String get smartSearchAmenityStorage => '📦 מחסן';
+
+  @override
+  String get smartSearchAmenitySun => '☀️ מואר';
+
+  @override
+  String get smartSearchAmenitySafe => '🔒 ממוגן';
+
+  @override
+  String get smartSearchAmenityInternet => '🌐 אינטרנט';
+
+  @override
+  String get smartSearchAmenityLaundry => '🧺 כביסה';
+
+  @override
+  String get smartSearchAmenityAccessible => '♿ נגיש';
+
+  @override
+  String get smartSearchAmenityRoommates => '👥 שותפים';
+
+  @override
+  String get smartSearchForSale => '🏷️ למכירה';
+
+  @override
+  String get smartSearchForRent => '🔑 להשכרה';
+
+  @override
+  String smartSearchRoomsSuffix(String range) {
+    return '🛏️ $range חד׳';
+  }
+
+  @override
+  String get smartSearchNearTrain => '🚉 ליד הרכבת';
+
+  @override
+  String get smartSearchBestValue => '🏷️ הכי משתלם';
+
+  @override
+  String smartSearchRangeUpTo(String value) {
+    return 'עד $value';
+  }
+
+  @override
+  String smartSearchRangeFrom(String value) {
+    return 'מ-$value';
+  }
+
+  @override
+  String get gamificationHintAddPhoto => 'הוסף תמונת פרופיל (+20%)';
+
+  @override
+  String get gamificationHintWriteBio => 'כתוב קצת עליך (+20%)';
+
+  @override
+  String get gamificationHintSetBudget => 'הגדר תקציב (+15%)';
+
+  @override
+  String get gamificationHintMoveInDate => 'מתי נכנסים? (+15%)';
+
+  @override
+  String get gamificationHintAddRequirements => 'הוסף דרישות (+10%)';
+
+  @override
+  String get gamificationHintAddName => 'הוסף שם (+10%)';
+
+  @override
+  String get gamificationHintAlmostDone => 'הפרופיל כמעט מושלם!';
+
+  @override
+  String get panoramaCaptureScreenStillProcessing =>
+      'עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן';
 }

@@ -63,8 +63,14 @@ class _MarketBoardTemplate extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final signals = property.marketSignals;
-    // Watch so live view / like counts refresh the board as they arrive.
-    context.watch<DatingProvider>();
+    // No local watch<DatingProvider>() here: `property` is already handed
+    // down fresh by the parent's Selector<DatingProvider, _DetailWatch> in
+    // property_detail_screen.dart (its `property` field is
+    // `provider.propertyById(...)`, a new instance whenever this listing's
+    // marketSignals change — see DatingProvider._setPropertySignals /
+    // _invalidateCatalogCache). A broad watch here would re-subscribe this
+    // widget to EVERY notifyListeners() in the app on top of that, rebuilding
+    // it even when nothing it reads changed.
     final monthlyIncome =
         context.read<DatingProvider>().tenantProfile?.monthlyIncome;
     final topInset = MediaQuery.of(context).padding.top;
@@ -91,7 +97,7 @@ class _MarketBoardTemplate extends StatelessWidget {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 124),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -191,7 +197,8 @@ class _MarketBoardTemplate extends StatelessWidget {
                         icon: IconsaxPlusLinear.timer_1,
                         label: l10n.marketBoardTemplateD51f71fc,
                         value: signals.avgDetailStaySeconds > 0
-                            ? _compactDuration(signals.avgDetailStaySeconds, l10n)
+                            ? _compactDuration(
+                                signals.avgDetailStaySeconds, l10n)
                             : '—',
                         accent: accent,
                       ),
@@ -222,20 +229,28 @@ class _MarketBoardTemplate extends StatelessWidget {
                   monthlyIncome: monthlyIncome,
                 ),
                 const SizedBox(height: 26),
-                // ── Full shared parity block (gallery, facts, owner, tours,
-                //    map, match insight, CTA — single source, no duplicates) ──
-                _ParitySections(
-                  property: property,
-                  branding: branding,
-                  controller: controller,
-                  reviews: reviews,
-                  hasVirtualTour: hasVirtualTour,
-                  isLandlordPreview: isLandlordPreview,
-                  onShareTap: onShareTap,
-                  onTour: onTour,
-                ),
               ],
             ),
+          ),
+        ),
+        // ── Full shared parity block (gallery, facts, owner, tours, map,
+        //    match insight, CTA — single source, no duplicates) — split out
+        //    of the Column above into its own lazy sliver so Flutter only
+        //    builds/lays out each section as it scrolls into view. Padding
+        //    replicates what the removed outer Column padding used to give
+        //    this same content (16 horizontal, 124 bottom for the floating
+        //    bottom bar).
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 124),
+          sliver: _ParitySectionsSliver(
+            property: property,
+            branding: branding,
+            controller: controller,
+            reviews: reviews,
+            hasVirtualTour: hasVirtualTour,
+            isLandlordPreview: isLandlordPreview,
+            onShareTap: onShareTap,
+            onTour: onTour,
           ),
         ),
       ],
@@ -687,8 +702,7 @@ class _MarketSparkline extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
                   color: lineColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),

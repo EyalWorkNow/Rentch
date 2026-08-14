@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/services.dart';
+import 'package:dating_app/core/config/media_cdn.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'package:dating_app/core/finance/affordability.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
@@ -18,6 +21,8 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
 import 'package:dating_app/presentation/widgets/price_badge.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
+import 'package:dating_app/core/search/engine/feature_engineering.dart'
+    show IsraelGeoIndex, NearbyPlace;
 import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:dating_app/presentation/widgets/neighborhood_score_card.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
@@ -35,7 +40,8 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
+import 'package:dating_app/presentation/screens/add_property_screen.dart'
+    show EditPropertyScreen;
 import 'package:dating_app/presentation/screens/owner_listings_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
@@ -334,8 +340,27 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   }
 
   Widget _buildContent(BuildContext context) {
-    return Consumer<DatingProvider>(
-      builder: (context, provider, _) {
+    // Narrowed from a plain Consumer<DatingProvider>, which re-ran this
+    // whole (heavy) detail-page builder on EVERY DatingProvider
+    // notifyListeners() anywhere in the app — including the postFrame
+    // recordPropertyView/refreshPropertyTour/scan-state polls below, whose
+    // resolution used to cause visible flicker/jank shortly after the page
+    // opens even when they touched a different property (or nothing this
+    // page reads at all). Selector recomputes [_DetailWatch] on every
+    // notification but only actually rebuilds the subtree when one of its
+    // fields differs — every provider-derived value this builder reads is
+    // included so no legitimate update goes missing.
+    return Selector<DatingProvider, _DetailWatch>(
+      selector: (context, provider) => _DetailWatch(
+        isLandlordPreviewGone: widget.isLandlordPreview &&
+            !provider.myProperties.any((m) => m.id == widget.property.id),
+        property: provider.propertyById(widget.property.id) ?? widget.property,
+        reviews: provider.propertyReviews(widget.property.id),
+        brokerBranding: provider.brokerBranding,
+        isBroker: provider.isBroker,
+        monthlyIncome: provider.tenantProfile?.monthlyIncome,
+      ),
+      builder: (context, watch, _) {
         final l10n = AppLocalizations.of(context)!;
         // Landlord viewing their OWN listing's preview: if the app already
         // knows it's gone, myProperties is authoritative (unlike the general
@@ -344,8 +369,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         // time snapshot forever with fully "live" Edit/Boost/Share buttons for
         // a listing that no longer exists (this screen has no lifecycle/
         // route-resume hook to notice a deletion that happened elsewhere).
-        if (widget.isLandlordPreview &&
-            !provider.myProperties.any((m) => m.id == widget.property.id)) {
+        if (watch.isLandlordPreviewGone) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.property.address)),
             body: Center(
@@ -369,18 +393,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             ),
           );
         }
-        final p = provider.propertyById(widget.property.id) ?? widget.property;
+        final p = watch.property;
         final media = p.media;
-        final hasVirtualTour =
-            p.hasReadyVirtualTour || p.videoUrls.isNotEmpty || p.hasPanoramaTour;
+        final hasVirtualTour = p.hasReadyVirtualTour ||
+            p.videoUrls.isNotEmpty ||
+            p.hasPanoramaTour;
         final title = p.street.isNotEmpty
             ? (p.streetNumber > 0
                 ? l10n.propertyDetailScreenCfa0c95c(
                     p.propertyType, p.street, p.streetNumber)
                 : l10n.propertyDetailScreenC9a1c5dd(p.propertyType, p.street))
             : l10n.propertyDetailScreen0196a48c(p.propertyType, p.city);
-        final reviews = provider.propertyReviews(p.id);
-        final avgRating = provider.reviewAverage(reviews);
+        final reviews = watch.reviews;
+        final avgRating = context.read<DatingProvider>().reviewAverage(reviews);
         // Per-property design (chosen during listing creation) takes precedence
         // over user-level broker branding, and applies for ANY viewer (not just owner).
         final propertyBranding = p.hasCustomDesign
@@ -392,10 +417,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 },
               })
             : null;
-        final branding = propertyBranding ?? provider.brokerBranding;
+        final branding = propertyBranding ?? watch.brokerBranding;
         // A per-property design exists (any viewer), OR the viewer is a broker
         // whose user-level branding chooses a non-classic template.
-        final useTemplate = propertyBranding != null || provider.isBroker;
+        final useTemplate = propertyBranding != null || watch.isBroker;
 
         // "rentlyClassic" is NOT a broker template — it IS the Classic layout
         // rendered below. So we only enter the broker-template path when the
@@ -445,7 +470,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           avgRating: avgRating,
           hasVirtualTour: hasVirtualTour,
           isLandlordPreview: widget.isLandlordPreview,
-          monthlyIncome: provider.tenantProfile?.monthlyIncome,
+          monthlyIncome: watch.monthlyIncome,
           onBackTap: () {
             markInAppBack();
             Navigator.of(context).pop();
@@ -466,9 +491,57 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       },
     );
   }
-
 }
 
+/// Value watched by [_PropertyDetailScreenState._buildContent]'s Selector —
+/// every DatingProvider-derived field the builder actually reads. Selector
+/// recomputes this on every provider notifyListeners() but only rebuilds the
+/// subtree when it compares unequal to the previous value, so unrelated
+/// provider notifications (a different listing's polling, other screens'
+/// actions) no longer force a full rebuild of this (heavy) detail page.
+/// Uses `==`/hashCode (not a record) so it stays a valid Selector value type
+/// with an explicit, reviewable equality — [RentalProperty] and
+/// [BrokerBrandingConfig] have no value equality of their own, so field
+/// comparisons here are by reference identity, which DatingProvider's
+/// caching (rebuilds a fresh instance only for what actually changed) makes
+/// meaningful — see propertyById/_setPropertySignals.
+class _DetailWatch {
+  const _DetailWatch({
+    required this.isLandlordPreviewGone,
+    required this.property,
+    required this.reviews,
+    required this.brokerBranding,
+    required this.isBroker,
+    required this.monthlyIncome,
+  });
+
+  final bool isLandlordPreviewGone;
+  final RentalProperty property;
+  final List<AppReview> reviews;
+  final BrokerBrandingConfig brokerBranding;
+  final bool isBroker;
+  final int? monthlyIncome;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _DetailWatch &&
+      other.isLandlordPreviewGone == isLandlordPreviewGone &&
+      identical(other.property, property) &&
+      identical(other.reviews, reviews) &&
+      identical(other.brokerBranding, brokerBranding) &&
+      other.isBroker == isBroker &&
+      other.monthlyIncome == monthlyIncome;
+
+  @override
+  int get hashCode => Object.hash(
+        isLandlordPreviewGone,
+        identityHashCode(property),
+        identityHashCode(reviews),
+        identityHashCode(brokerBranding),
+        isBroker,
+        monthlyIncome,
+      );
+}
 
 // ─── Listing enrichment block (Ask Rently + price/neighborhood badges) ────────
 //
@@ -509,7 +582,12 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
   @override
   void initState() {
     super.initState();
-    _loadEnrichment();
+    // Defer the enrichment HTTP call until after the first paint so it
+    // doesn't compete with the very first build/layout pass of this screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadEnrichment();
+    });
   }
 
   /// Fetches the listing's enrichment payload defensively. Any failure (no
@@ -835,9 +913,8 @@ class _ImageGallery extends StatelessWidget {
                             saved
                                 ? IconsaxPlusBold.save_2
                                 : IconsaxPlusLinear.save_2,
-                            color: saved
-                                ? AppColors.primary
-                                : AppColors.slate900,
+                            color:
+                                saved ? AppColors.primary : AppColors.slate900,
                             size: 20,
                           ),
                         ),
@@ -890,8 +967,7 @@ class _ImageGallery extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                 ),
                 child: Text(
                   property.transactionLabel,
@@ -1091,7 +1167,6 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
         BrokerPropertyTemplate.cinematicGlass => branding.secondaryColor,
         BrokerPropertyTemplate.rentlyClassic => Colors.white,
       };
-
 }
 
 /// Renders the COMPLETE set of Rently-Classic content sections (specs grid,
@@ -1152,6 +1227,23 @@ class _ParitySections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _sections(context),
+      ),
+    );
+  }
+
+  /// The ordered list of section widgets (gallery thumbnails, facts,
+  /// enrichment, match insight, owner, tour/media, description, features,
+  /// reviews, map). Shared by [_ParitySections] (eager Column, for templates
+  /// where this content is nested inside a decorative single-child wrapper
+  /// that needs a measured child) and [_ParitySectionsSliver] (lazy
+  /// SliverList, for templates where it sits directly in the CustomScrollView
+  /// — only builds/lays out each section as it scrolls into view).
+  List<Widget> _sections(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final media = property.media;
     final children = <Widget>[];
@@ -1164,7 +1256,8 @@ class _ParitySections extends StatelessWidget {
 
     // ── Gallery thumbnails ────────────────────────────────────────────────
     if (media.isNotEmpty) {
-      children.add(_header(l10n.propertyDetailScreenEed2fbf3, IconsaxPlusLinear.gallery));
+      children.add(_header(
+          l10n.propertyDetailScreenEed2fbf3, IconsaxPlusLinear.gallery));
       children.add(
         SizedBox(
           height: 92,
@@ -1202,7 +1295,8 @@ class _ParitySections extends StatelessWidget {
     }
 
     // ── Property facts (rooms / size / floor / condition / parking / lift) ──
-    children.add(_header(l10n.propertyDetailScreen220d2733, IconsaxPlusLinear.building_3));
+    children.add(_header(
+        l10n.propertyDetailScreen220d2733, IconsaxPlusLinear.building_3));
     children.add(_PropertyFactsCard(property));
     children.add(const SizedBox(height: 26));
 
@@ -1220,7 +1314,9 @@ class _ParitySections extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _header(l10n.propertyDetailScreenCb66c16b, IconsaxPlusLinear.global)),
+            Expanded(
+                child: _header(l10n.propertyDetailScreenCb66c16b,
+                    IconsaxPlusLinear.global)),
             GestureDetector(
               onTap: () async {
                 await launchUrl(Uri.parse(property.url),
@@ -1253,13 +1349,15 @@ class _ParitySections extends StatelessWidget {
 
     // ── Why this match (scorecard) ────────────────────────────────────────
     if (!isLandlordPreview) {
-      children.add(_header(l10n.propertyDetailScreenDc721374, IconsaxPlusLinear.flash_1));
+      children.add(_header(
+          l10n.propertyDetailScreenDc721374, IconsaxPlusLinear.flash_1));
       children.add(_MatchInsightCard(property: property));
       children.add(const SizedBox(height: 26));
     }
 
     // ── Owner / contact (with verified badge inside the card) ─────────────
-    children.add(_header(l10n.propertyDetailScreenC1a89075, IconsaxPlusLinear.profile_2user));
+    children.add(_header(
+        l10n.propertyDetailScreenC1a89075, IconsaxPlusLinear.profile_2user));
     children.add(_OwnerCard(property: property));
     children.add(const SizedBox(height: 26));
 
@@ -1371,17 +1469,22 @@ class _ParitySections extends StatelessWidget {
     // no field in the app's model at all — silently dropped, never shown
     // anywhere. Now modeled (RentalProperty.description) and surfaced here.
     if (property.description.trim().isNotEmpty) {
-      children.add(_header(l10n.propertyDetailScreenDescription, IconsaxPlusLinear.document_text));
+      children.add(_header(l10n.propertyDetailScreenDescription,
+          IconsaxPlusLinear.document_text));
       children.add(Text(
         property.description.trim(),
-        style: TextStyle(fontSize: 14.5, height: 1.5, color: _onSurface.withValues(alpha: 0.85)),
+        style: TextStyle(
+            fontSize: 14.5,
+            height: 1.5,
+            color: _onSurface.withValues(alpha: 0.85)),
       ));
       children.add(const SizedBox(height: 26));
     }
 
     // ── Key features / amenities ──────────────────────────────────────────
     if (property.features.isNotEmpty) {
-      children.add(_header(l10n.propertyDetailScreen64680a66, IconsaxPlusLinear.flash_1));
+      children.add(_header(
+          l10n.propertyDetailScreen64680a66, IconsaxPlusLinear.flash_1));
       children.add(_FeatureWrap(features: property.features));
       children.add(const SizedBox(height: 26));
     }
@@ -1392,7 +1495,9 @@ class _ParitySections extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _header(l10n.propertyDetailScreen1c5efd6c, IconsaxPlusLinear.star_1)),
+            Expanded(
+                child: _header(l10n.propertyDetailScreen1c5efd6c,
+                    IconsaxPlusLinear.star_1)),
             Text(
               l10n.propertyDetailScreen16c30b46(reviews.length),
               style: TextStyle(
@@ -1409,14 +1514,64 @@ class _ParitySections extends StatelessWidget {
     }
 
     // ── Map / location ────────────────────────────────────────────────────
-    children.add(_header(l10n.propertyDetailScreen26d0e7de, IconsaxPlusLinear.location));
+    children.add(
+        _header(l10n.propertyDetailScreen26d0e7de, IconsaxPlusLinear.location));
     children.add(_MapSection(property: property));
 
-    return Padding(
+    return children;
+  }
+}
+
+/// Lazy sliver counterpart of [_ParitySections] — same ordered sections
+/// ([_ParitySections._sections]), but mounted/laid out only as they scroll
+/// near the viewport instead of all at once on the first frame. Used by
+/// templates whose parity block sits directly in a `CustomScrollView`
+/// (not nested inside a decorative single-child wrapper — e.g. a
+/// BackdropFilter/gradient panel — that needs a measured Column child).
+class _ParitySectionsSliver extends StatelessWidget {
+  const _ParitySectionsSliver({
+    required this.property,
+    required this.branding,
+    required this.controller,
+    required this.reviews,
+    required this.hasVirtualTour,
+    required this.isLandlordPreview,
+    required this.onShareTap,
+    required this.onTour,
+    this.dark = false,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final PageController controller;
+  final List<AppReview> reviews;
+  final bool hasVirtualTour;
+  final bool isLandlordPreview;
+  final VoidCallback onShareTap;
+  final VoidCallback onTour;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = _ParitySections(
+      property: property,
+      branding: branding,
+      controller: controller,
+      reviews: reviews,
+      hasVirtualTour: hasVirtualTour,
+      isLandlordPreview: isLandlordPreview,
+      onShareTap: onShareTap,
+      onTour: onTour,
+      dark: dark,
+    )._sections(context);
+
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => sections[index],
+          childCount: sections.length,
+        ),
       ),
     );
   }
@@ -1463,7 +1618,8 @@ class _TourEntryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: branding.primaryColor.withValues(alpha: 0.22)),
+          border:
+              Border.all(color: branding.primaryColor.withValues(alpha: 0.22)),
         ),
         child: Row(
           children: [
@@ -1974,10 +2130,13 @@ class _TemplateFactsWrap extends StatelessWidget {
       _TemplateFact(IconsaxPlusLinear.maximize_3,
           l10n.propertyDetailScreenFdb4eac7(property.sizeM2)),
       if (property.floor.isNotEmpty)
-        _TemplateFact(IconsaxPlusLinear.layer,
-            l10n.propertyDetailScreenD068bb57(property.floor)),
+        _TemplateFact(
+            IconsaxPlusLinear.layer,
+            l10n.propertyDetailScreenD068bb57(
+                floorLabel(property.floor, l10n))),
       if (property.condition.isNotEmpty)
-        _TemplateFact(IconsaxPlusLinear.star, property.condition),
+        _TemplateFact(
+            IconsaxPlusLinear.star, conditionLabel(property.condition, l10n)),
     ];
 
     return Wrap(
@@ -2131,7 +2290,9 @@ class _FloatingNavBtn extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
+          filter: ImageFilter.blur(
+              sigmaX: PlatformFx.blurSigma(18),
+              sigmaY: PlatformFx.blurSigma(18)),
           child: Container(
             width: 46,
             height: 46,
@@ -2223,14 +2384,8 @@ class _OwnerCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: isAgency
-                                ? [
-                                    AppColors.primary,
-                                    AppColors.primaryDark
-                                  ]
-                                : [
-                                    AppColors.slate600,
-                                    AppColors.inkSoft
-                                  ],
+                                ? [AppColors.primary, AppColors.primaryDark]
+                                : [AppColors.slate600, AppColors.inkSoft],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -2540,7 +2695,8 @@ class _MessageRequestButton extends StatelessWidget {
       ),
     );
     if (sent == true) {
-      await provider.requestToMessage(property, note: controller.text, l10n: l10n);
+      await provider.requestToMessage(property,
+          note: controller.text, l10n: l10n);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2600),
@@ -2805,6 +2961,70 @@ class _FeatureWrap extends StatelessWidget {
   }
 }
 
+/// Nearby-POI map layers, mirroring the web app's map layer picker
+/// (rently-map-web FeaturePanel.tsx `LAYERS`) — same keys, labels, and colors.
+class _MapLayer {
+  const _MapLayer(
+      this.key, this.label, this.color, this.poiCategory, this.icon);
+  final String key;
+  final String label;
+  final Color color;
+  // The category key the loaded POI data (see _MapSectionState._toggleLayer)
+  // is grouped under.
+  final String poiCategory;
+  // Same icon NearbyPlacesCard uses for this category (nearby_places_card.dart
+  // `_meta`) — keeps the two POI surfaces visually consistent.
+  final IconData icon;
+}
+
+// All 21 NearbyKind categories (core/search/nearby_relevance.dart) — same
+// icons NearbyPlacesCard uses per category (`_meta` above), one distinct
+// color each so simultaneously-active layers stay visually separable.
+const List<_MapLayer> _kMapLayers = [
+  _MapLayer('schools', 'בתי ספר', Color(0xFF3B82F6), 'schools',
+      IconsaxPlusLinear.teacher),
+  _MapLayer('kindergartens', 'גני ילדים', Color(0xFFF97316), 'kindergartens',
+      IconsaxPlusLinear.emoji_happy),
+  _MapLayer('clinics', 'מרפאות', Color(0xFFEF4444), 'clinics',
+      IconsaxPlusLinear.hospital),
+  _MapLayer('pharmacies', 'בתי מרקחת', Color(0xFF14B8A6), 'pharmacies',
+      IconsaxPlusLinear.health),
+  _MapLayer('shops', 'קניות', Color(0xFFF5A524), 'supermarkets',
+      IconsaxPlusLinear.shopping_cart),
+  _MapLayer(
+      'parks', 'פארקים', Color(0xFF27AE60), 'parks', IconsaxPlusLinear.tree),
+  _MapLayer('playgrounds', 'מגרשי משחקים', Color(0xFFEAB308), 'playgrounds',
+      IconsaxPlusLinear.game),
+  _MapLayer(
+      'dining', 'אוכל', Color(0xFFFF5A67), 'dining', IconsaxPlusLinear.reserve),
+  _MapLayer(
+      'gyms', 'חדרי כושר', Color(0xFF8B5CF6), 'gyms', IconsaxPlusLinear.weight),
+  _MapLayer('nightlife', 'חיי לילה', Color(0xFFDB2777), 'nightlife',
+      IconsaxPlusLinear.cup),
+  _MapLayer('synagogues', 'בתי כנסת', Color(0xFF7C3AED), 'synagogues',
+      IconsaxPlusLinear.buildings),
+  _MapLayer('culture', 'תרבות', Color(0xFFEC4899), 'culture',
+      IconsaxPlusLinear.gallery),
+  _MapLayer('hospitals', 'בתי חולים', Color(0xFFDC2626), 'hospitals',
+      IconsaxPlusLinear.heart),
+  _MapLayer(
+      'transit', 'תחבורה', Color(0xFF2C64E3), 'transit', IconsaxPlusLinear.bus),
+  _MapLayer('worship', 'בתי תפילה', Color(0xFF9333EA), 'worship',
+      IconsaxPlusLinear.courthouse),
+  _MapLayer(
+      'pools', 'בריכות', Color(0xFF06B6D4), 'pools', IconsaxPlusLinear.drop),
+  _MapLayer('dogParks', 'גינות כלבים', Color(0xFFA16207), 'dogParks',
+      IconsaxPlusLinear.pet),
+  _MapLayer('vets', 'וטרינרים', Color(0xFF0D9488), 'vets',
+      IconsaxPlusLinear.lifebuoy),
+  _MapLayer('bikeShare', 'אופניים', Color(0xFF65A30D), 'bikeShare',
+      IconsaxPlusLinear.routing),
+  _MapLayer('coworking', 'קוורקינג', Color(0xFF4B5563), 'coworking',
+      IconsaxPlusLinear.briefcase),
+  _MapLayer(
+      'parking', 'חניה', Color(0xFF1F2937), 'parking', IconsaxPlusLinear.car),
+];
+
 class _MapSection extends StatefulWidget {
   _MapSection({required this.property});
   final RentalProperty property;
@@ -2815,6 +3035,13 @@ class _MapSection extends StatefulWidget {
 
 class _MapSectionState extends State<_MapSection> {
   bool _ready = false;
+  bool _layersOpen = false;
+  bool _loadingPois = false;
+  Map<String, List<NearbyPlace>>? _poiData;
+  final Set<String> _activeLayers = {};
+  // The POI dot the user last tapped, with the layer it belongs to (for the
+  // popup's color/label) — null when no popup is showing.
+  (NearbyPlace place, _MapLayer layer)? _selectedPoi;
 
   @override
   void initState() {
@@ -2830,26 +3057,162 @@ class _MapSectionState extends State<_MapSection> {
     });
   }
 
+  /// Toggles a POI layer on/off, mirroring the web app's `onToggleLayer`.
+  ///
+  /// Data source: the BUNDLED gov+OSM POI index (`IsraelGeoIndex`), not the
+  /// live Overpass API. Overpass was the original choice (same source the
+  /// website's layer picker uses) but proved unreliable in practice — a live
+  /// test hit HTTP 504 on the primary endpoint and a 30s client timeout on
+  /// the fallback mirror, i.e. the public, rate-limited Overpass service can
+  /// simply fail to answer a heavy (1km, multi-category) query in reasonable
+  /// time. `IsraelGeoIndex` is a local asset, already used for these exact
+  /// categories elsewhere in the app (`NearbyPlacesCard`) — no network
+  /// dependency, so it can't have this failure mode.
+  Future<void> _toggleLayer(String key) async {
+    setState(() {
+      if (_activeLayers.contains(key)) {
+        _activeLayers.remove(key);
+      } else {
+        _activeLayers.add(key);
+      }
+    });
+    if (_poiData != null || _loadingPois || !_activeLayers.contains(key)) {
+      return;
+    }
+    setState(() => _loadingPois = true);
+    // Idempotent loaders — no-op if already loaded (e.g. NearbyPlacesCard
+    // further down this same page already triggered them). Same 5 calls
+    // NearbyPlacesCard uses to cover all 21 NearbyKind categories.
+    await Future.wait([
+      IsraelGeoIndex.loadSchools(),
+      IsraelGeoIndex.loadParks(),
+      IsraelGeoIndex.loadClinics(),
+      IsraelGeoIndex.loadSupermarkets(),
+      IsraelGeoIndex.loadLifestylePois(),
+    ]);
+    if (!mounted) return;
+    final lat = widget.property.lat;
+    final lon = widget.property.lon;
+    final data = <String, List<NearbyPlace>>{
+      'schools': IsraelGeoIndex.schoolsWithin(lat, lon, km: 1.0, cap: 40),
+      'kindergartens':
+          IsraelGeoIndex.kindergartensWithin(lat, lon, km: 1.0, cap: 40),
+      'clinics': IsraelGeoIndex.clinicsWithin(lat, lon, km: 1.0, cap: 40),
+      'pharmacies': IsraelGeoIndex.pharmaciesWithin(lat, lon, km: 1.0, cap: 40),
+      'supermarkets':
+          IsraelGeoIndex.supermarketsWithin(lat, lon, km: 1.0, cap: 40),
+      'parks': IsraelGeoIndex.parksWithin(lat, lon, km: 1.0, cap: 40),
+      'playgrounds':
+          IsraelGeoIndex.playgroundsWithin(lat, lon, km: 1.0, cap: 40),
+      'dining': IsraelGeoIndex.diningWithin(lat, lon, km: 1.0, cap: 40),
+      'gyms': IsraelGeoIndex.gymsWithin(lat, lon, km: 1.0, cap: 40),
+      'nightlife':
+          IsraelGeoIndex.nightlifeVenuesWithin(lat, lon, km: 1.0, cap: 40),
+      'synagogues': IsraelGeoIndex.synagoguesWithin(lat, lon, km: 1.0, cap: 40),
+      'culture': IsraelGeoIndex.cultureWithin(lat, lon, km: 1.0, cap: 40),
+      'hospitals': IsraelGeoIndex.hospitalsWithin(lat, lon, km: 1.0, cap: 40),
+      'transit': IsraelGeoIndex.transitStopsWithin(lat, lon, km: 1.0, cap: 40),
+      'worship': IsraelGeoIndex.worshipWithin(lat, lon, km: 1.0, cap: 40),
+      'pools': IsraelGeoIndex.poolsWithin(lat, lon, km: 1.0, cap: 40),
+      'dogParks': IsraelGeoIndex.dogParksWithin(lat, lon, km: 1.0, cap: 40),
+      'vets': IsraelGeoIndex.vetsWithin(lat, lon, km: 1.0, cap: 40),
+      'bikeShare': IsraelGeoIndex.bikeShareWithin(lat, lon, km: 1.0, cap: 40),
+      'coworking': IsraelGeoIndex.coworkingWithin(lat, lon, km: 1.0, cap: 40),
+      'parking': IsraelGeoIndex.parkingWithin(lat, lon, km: 1.0, cap: 40),
+    };
+    if (kDebugMode) {
+      debugPrint('_MapSection: loaded bundled POIs → '
+          '${data.map((k, v) => MapEntry(k, v.length))}');
+    }
+    setState(() {
+      _poiData = data;
+      _loadingPois = false;
+    });
+  }
+
+  List<Marker> _poiMarkers() {
+    final data = _poiData;
+    if (data == null || _activeLayers.isEmpty) return const [];
+    final markers = <Marker>[];
+    for (final layer in _kMapLayers) {
+      if (!_activeLayers.contains(layer.key)) continue;
+      final places = data[layer.poiCategory];
+      if (places == null) continue;
+      // Nearest-first list; cap so a dense city centre doesn't flood the
+      // tiny inline map with hundreds of dots.
+      for (final p in places.take(40)) {
+        final isSelected =
+            _selectedPoi != null && identical(_selectedPoi!.$1, p);
+        final size = isSelected ? 30.0 : 24.0;
+        markers.add(Marker(
+          point: LatLng(p.lat, p.lon),
+          width: size,
+          height: size,
+          child: GestureDetector(
+            // Tapping a pin opens the info popup instead of letting the tap
+            // fall through to the map's own pan/zoom gesture handling.
+            onTap: () => setState(() => _selectedPoi = (p, layer)),
+            child: Container(
+              decoration: BoxDecoration(
+                color: layer.color,
+                shape: BoxShape.circle,
+                border:
+                    Border.all(color: Colors.white, width: isSelected ? 3 : 2),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1)),
+                ],
+              ),
+              child: Icon(layer.icon,
+                  color: Colors.white, size: isSelected ? 16 : 13),
+            ),
+          ),
+        ));
+      }
+    }
+    return markers;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final property = widget.property;
-    return GestureDetector(
-      onTap: () => _openInMaps(property.lat, property.lon),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(
-          height: 200,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (_ready)
-                FlutterMap(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 280,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_ready)
+              FlutterMap(
                 options: MapOptions(
                   initialCenter: LatLng(property.lat, property.lon),
                   initialZoom: 15,
-                  interactionOptions:
-                      const InteractionOptions(flags: InteractiveFlag.none),
+                  // Interactive (drag/pinch-zoom/double-tap-zoom, no rotate —
+                  // keeps north-up so it stays legible at this small size).
+                  // This card lives inside the page's outer scroll view;
+                  // flutter_map's own gesture recognizer only claims pointer
+                  // events that start ON the map itself, so a drag starting
+                  // outside the map card still scrolls the page normally —
+                  // the same trade-off any embedded interactive map makes.
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.drag |
+                        InteractiveFlag.flingAnimation |
+                        InteractiveFlag.pinchZoom |
+                        InteractiveFlag.pinchMove |
+                        InteractiveFlag.doubleTapZoom,
+                  ),
+                  // Tapping empty map space dismisses the POI popup (tapping
+                  // a dot itself is handled by the marker's own
+                  // GestureDetector, which wins the gesture arena first).
+                  onTap: (_, __) {
+                    if (_selectedPoi != null) {
+                      setState(() => _selectedPoi = null);
+                    }
+                  },
                 ),
                 children: [
                   TileLayer(
@@ -2857,6 +3220,7 @@ class _MapSectionState extends State<_MapSection> {
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.rentch.app',
                   ),
+                  MarkerLayer(markers: _poiMarkers()),
                   MarkerLayer(
                     markers: [
                       Marker(
@@ -2870,7 +3234,8 @@ class _MapSectionState extends State<_MapSection> {
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.27),
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.27),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4)),
                             ],
@@ -2882,46 +3247,222 @@ class _MapSectionState extends State<_MapSection> {
                     ],
                   ),
                 ],
-                )
-              else
-                ColoredBox(
-                  color: AppColors.border,
-                  child: Center(
-                    child: RentlyIcon(IconsaxPlusLinear.map_1,
-                        color: AppColors.primary, size: 30),
-                  ),
+              )
+            else
+              ColoredBox(
+                color: AppColors.border,
+                child: Center(
+                  child: RentlyIcon(IconsaxPlusLinear.map_1,
+                      color: AppColors.primary, size: 30),
                 ),
-              // "Open in maps" hint pill
+              ),
+            // "Open in maps" hint pill — hidden while the POI popup is
+            // showing (same bottom-right corner, would overlap).
+            if (_selectedPoi == null)
               Positioned(
                 bottom: 12,
                 right: 12,
+                child: GestureDetector(
+                  onTap: () => _openInMaps(property.lat, property.lon),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const RentlyIcon(IconsaxPlusLinear.export_2,
+                            size: 13, color: Colors.white),
+                        const SizedBox(width: 5),
+                        Text(
+                          l10n.propertyDetailScreenDf4787e7,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            // Selected-POI popup — colored dot + name + category, with a
+            // button to open THAT point in Google Maps, and a close (x).
+            if (_selectedPoi != null)
+              Positioned(
+                bottom: 12,
+                left: 12,
+                right: 12,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.62),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const RentlyIcon(IconsaxPlusLinear.export_2,
-                          size: 13, color: Colors.white),
-                      const SizedBox(width: 5),
-                      Text(
-                        l10n.propertyDetailScreenDf4787e7,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _selectedPoi!.$2.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _selectedPoi!.$1.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            Text(
+                              _selectedPoi!.$2.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.slate500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _openInMaps(
+                            _selectedPoi!.$1.lat, _selectedPoi!.$1.lon),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: RentlyIcon(IconsaxPlusLinear.export_2,
+                              size: 15, color: AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedPoi = null),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const RentlyIcon(
+                              IconsaxPlusLinear.close_circle,
+                              size: 15,
+                              color: AppColors.slate500),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
+            // Layers toggle button — floating pill, top-start corner.
+            Positioned(
+              top: 12,
+              left: 12,
+              child: GestureDetector(
+                onTap: () => setState(() => _layersOpen = !_layersOpen),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: _layersOpen
+                        ? AppColors.primary
+                        : Colors.black.withValues(alpha: 0.62),
+                    shape: BoxShape.circle,
+                  ),
+                  child: RentlyIcon(IconsaxPlusLinear.layer,
+                      size: 16, color: Colors.white),
+                ),
+              ),
+            ),
+            // Layer chips panel — same 4 layers/colors as the web
+            // FeaturePanel, adapted to a compact glass strip for this
+            // inline card.
+            if (_layersOpen)
+              Positioned(
+                top: 52,
+                left: 12,
+                right: 12,
+                child: GestureDetector(
+                  // Absorb taps so they don't fall through to the outer
+                  // "open in maps" GestureDetector.
+                  onTap: () {},
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_loadingPois)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6, right: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 1.6, color: Colors.white70),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  l10n.propertyDetailScreenLoadingPois,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final layer in _kMapLayers) ...[
+                                _MapLayerChip(
+                                  layer: layer,
+                                  active: _activeLayers.contains(layer.key),
+                                  onTap: () => _toggleLayer(layer.key),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -2932,6 +3473,54 @@ class _MapSectionState extends State<_MapSection> {
       'https://www.google.com/maps/search/?api=1&query=$lat,$lon',
     );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// A single map-layer toggle pill: colored dot + label, filled-white when
+/// active / translucent-glass when inactive — matches the web app's
+/// FeaturePanel layer chips (rently-map-web), scaled down for this card.
+class _MapLayerChip extends StatelessWidget {
+  const _MapLayerChip({
+    required this.layer,
+    required this.active,
+    required this.onTap,
+  });
+  final _MapLayer layer;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active ? Colors.white : Colors.white.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(layer.icon,
+                size: 14, color: active ? layer.color : Colors.white),
+            const SizedBox(width: 5),
+            Text(
+              layer.label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.black : Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2957,7 +3546,8 @@ class _BottomBar extends StatelessWidget {
     final isProcessing = property.virtualTour?.isProcessing == true;
     return ClipRRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
+        filter: ImageFilter.blur(
+            sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
         child: Container(
           padding: EdgeInsets.fromLTRB(
               20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
@@ -2979,9 +3569,11 @@ class _BottomBar extends StatelessWidget {
                   child: isLandlordPreview
                       ? OutlinedButton.icon(
                           onPressed: onEdit,
-                          icon: const RentlyIcon(IconsaxPlusLinear.edit, size: 18),
+                          icon: const RentlyIcon(IconsaxPlusLinear.edit,
+                              size: 18),
                           label: Text(l10n.propertyDetailScreen9e8d9316,
-                              style: const TextStyle(fontWeight: FontWeight.w700)),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.slate900,
                             side: const BorderSide(color: AppColors.slate200),
@@ -2992,9 +3584,11 @@ class _BottomBar extends StatelessWidget {
                         )
                       : OutlinedButton.icon(
                           onPressed: onLike,
-                          icon: const RentlyIcon(IconsaxPlusLinear.heart, size: 18),
+                          icon: const RentlyIcon(IconsaxPlusLinear.heart,
+                              size: 18),
                           label: Text(l10n.propertyDetailScreen38bf5edd,
-                              style: const TextStyle(fontWeight: FontWeight.w700)),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.slate900,
                             side: const BorderSide(color: AppColors.slate200),
@@ -3345,8 +3939,13 @@ class _InteractiveTourScreen extends StatelessWidget {
   bool get _isImageVisualization {
     final f = tour.format.trim().toLowerCase();
     if (f == 'image') return true;
-    if (f == 'video' || f == 'glb' || f == 'gltf' || f == 'usdz' ||
-        f == 'splat' || f == 'mesh' || f == '3d') {
+    if (f == 'video' ||
+        f == 'glb' ||
+        f == 'gltf' ||
+        f == 'usdz' ||
+        f == 'splat' ||
+        f == 'mesh' ||
+        f == '3d') {
       return false;
     }
     final u = (tour.previewImageUrl.trim().isNotEmpty
@@ -3492,9 +4091,10 @@ class _InteractiveTourScreen extends StatelessWidget {
   // visualization in-app rather than a 3D-tour placeholder + external browser.
   Widget _buildImageVisualization(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final url = tour.previewImageUrl.trim().isNotEmpty
+    final rawUrl = tour.previewImageUrl.trim().isNotEmpty
         ? tour.previewImageUrl.trim()
         : tour.viewerUrl.trim();
+    final url = MediaCdn.url(rawUrl);
     return Scaffold(
       backgroundColor: AppColors.ink,
       body: SafeArea(
@@ -3528,7 +4128,8 @@ class _InteractiveTourScreen extends StatelessWidget {
                                     color: Colors.white38, size: 54),
                                 const SizedBox(height: 10),
                                 Text(l10n.propertyDetailScreenB29bd206,
-                                    style: const TextStyle(color: Colors.white60)),
+                                    style:
+                                        const TextStyle(color: Colors.white60)),
                               ],
                             ),
                           ),
@@ -3691,7 +4292,8 @@ class _AffordabilityStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              RentlyIcon(IconsaxPlusLinear.wallet_money, size: 18, color: color),
+              RentlyIcon(IconsaxPlusLinear.wallet_money,
+                  size: 18, color: color),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -3780,7 +4382,8 @@ class _AffordabilityStrip extends StatelessWidget {
                   size: 16, color: AppColors.primary),
               label: Text(
                 l10n.propertyDetailScreen4afd38ca,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800),
               ),
             ),
           ),
@@ -3967,7 +4570,9 @@ class _PropertyFactsCard extends StatelessWidget {
                 offset: const Offset(0.0, 25.0),
                 child: _FactItemCard(
                   IconsaxPlusLinear.layer,
-                  property.floor.isNotEmpty ? property.floor : '-',
+                  property.floor.isNotEmpty
+                      ? floorLabel(property.floor, l10n)
+                      : '-',
                   l10n.propertyDetailScreen047e630b,
                 ),
               ),
@@ -3986,7 +4591,7 @@ class _PropertyFactsCard extends StatelessWidget {
                 child: _FactItemCard(
                   IconsaxPlusLinear.magicpen,
                   property.condition.isNotEmpty
-                      ? property.condition
+                      ? conditionLabel(property.condition, l10n)
                       : l10n.propertyDetailScreen3e20e30e,
                   l10n.propertyDetailScreen357b4923,
                 ),
@@ -4295,9 +4900,8 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
             padding: const EdgeInsets.only(top: 14),
             child: _MatchInsightCard(property: widget.property),
           ),
-          crossFadeState: _expanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
+          crossFadeState:
+              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 220),
         ),
         const SizedBox(height: 18),

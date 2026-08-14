@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
+import 'package:dating_app/presentation/widgets/language_picker.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 
 /// The entry flow (onboarding/auth) is ALWAYS the source teal brand, never the
@@ -292,6 +293,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                       ),
+                      // Clear, self-labelled CTA (globe icon + language name +
+                      // chevron) — previously a small top-corner pill that
+                      // read as unclear decoration next to the debug badge.
+                      if (_page == 0) ...[
+                        const SizedBox(height: 18),
+                        const LanguageDropdown(),
+                      ],
                       const SizedBox(height: 20),
                       BreatheAnimation(
                         child: SvgPicture.asset(

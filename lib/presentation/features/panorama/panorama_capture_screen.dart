@@ -374,6 +374,13 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
           return;
         }
       }
+      // Poll loop exhausted (5 minutes) without the job ever reaching a
+      // terminal state - previously this fell straight through to `finally`
+      // with no feedback at all, leaving the user staring at a progress
+      // dialog that had already been silently dismissed. Say so.
+      if (mounted) {
+        _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
+      }
     } catch (_) {
       _toast(AppLocalizations.of(context)!.panoramaCaptureScreenAiTwoPhotoFailed);
     } finally {
@@ -861,7 +868,12 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       }
     }
     // Timed out this session — keep the record (within _maxAge) so a later
-    // resume can still pick up a slow job.
+    // resume can still pick up a slow job. Still worth telling the user if
+    // they were actively watching a progress modal for it, rather than
+    // leaving them with silence after minutes of waiting.
+    if (showedModal && mounted) {
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreenStillProcessing);
+    }
   }
 
   // On capture-screen entry, resume any persisted enhance jobs whose node is in

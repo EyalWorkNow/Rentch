@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -907,7 +908,7 @@ class _CompareTable extends StatelessWidget {
           (p) => p.sizeM2 > 0 ? p.sizeM2.toDouble() : null,
           (p) => p.sizeM2 > 0 ? l10n.compareScreenD8b6113c(p.sizeM2) : '—',
           best: _Best.max),
-      _CompareRow.text(l10n.compareScreen047e630b, _floorLabel),
+      _CompareRow.text(l10n.compareScreen047e630b, (p) => _floorLabel(p, l10n)),
       _CompareRow.flag(l10n.compareScreen8d058056, l10n.compareScreen4175f994,
           l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('elevator')),
       _CompareRow.flag(l10n.compareScreenA9655ab3, l10n.compareScreen4175f994,
@@ -917,7 +918,9 @@ class _CompareTable extends StatelessWidget {
       _CompareRow.flag(l10n.compareScreenE1cca9ff, l10n.compareScreen4175f994,
           l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('mamad')),
       _CompareRow.text(l10n.compareScreenFcf022d8,
-          (p) => p.condition.trim().isEmpty ? '—' : p.condition.trim()),
+          (p) => p.condition.trim().isEmpty
+              ? '—'
+              : conditionLabel(p.condition.trim(), l10n)),
       _CompareRow.number(
         l10n.compareScreen206ee003,
         (p) => provider.displayMatchScore(p)?.toDouble(),
@@ -960,11 +963,12 @@ String _perM2Label(RentalProperty p) {
   return '₪${(p.price / p.sizeM2).round()}';
 }
 
-String _floorLabel(RentalProperty p) {
+String _floorLabel(RentalProperty p, AppLocalizations l10n) {
   final floor = p.floor.trim();
   if (floor.isEmpty) return '—';
   final total = p.totalFloors.trim();
-  return total.isEmpty ? floor : '$floor/$total';
+  final label = floorLabel(floor, l10n);
+  return total.isEmpty ? label : '$label/$total';
 }
 
 String _where(RentalProperty p) {

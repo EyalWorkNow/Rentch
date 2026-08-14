@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dating_app/core/ui/platform_fx.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -130,10 +131,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       // city + that nearby areas are included (the engine widens to the metro
       // ring when the exact city is sparse).
       final city = query.city?.trim() ?? '';
+      final l10n = AppLocalizations.of(context)!;
       _nlSummary = city.isEmpty
-          ? query.describe()
-          : AppLocalizations.of(context)!
-              .discoverScreenC5c195f6(query.describe(), city);
+          ? query.describe(l10n)
+          : l10n.discoverScreenC5c195f6(query.describe(l10n), city);
     });
   }
 
@@ -742,7 +743,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         children: [
           ClipOval(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(10),
+                sigmaY: PlatformFx.blurSigma(10),
+              ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 height: 42,
@@ -5192,7 +5196,8 @@ class _PropertyPreviewCard extends StatelessWidget {
                                         .discoverScreenCcc5c5a6
                                     : AppLocalizations.of(context)!
                                         .discoverScreenD068bb57(
-                                            property.floor),
+                                            floorLabel(property.floor,
+                                                AppLocalizations.of(context)!)),
                               ),
                             ],
                           ),

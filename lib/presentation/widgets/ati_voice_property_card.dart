@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:dating_app/core/ui/platform_fx.dart';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -191,7 +192,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
         ? '${p.neighborhood}, ${p.city}'
         : p.city;
     final floorText = p.floor.isNotEmpty
-        ? l10n.atiVoicePropertyCard77d9ac8f(p.floor)
+        ? l10n.atiVoicePropertyCard77d9ac8f(floorLabel(p.floor, l10n))
         : l10n.atiVoicePropertyCard5bf47d1e;
 
     return ClipRRect(

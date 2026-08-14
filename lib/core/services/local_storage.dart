@@ -99,12 +99,12 @@ class LocalStorageService {
   Future<Map<String, dynamic>?> loadAppState() async {
     final preferences = await SharedPreferences.getInstance();
     final rawLocalState = await _readStateLocal(preferences);
-    final localState = _decodeState(rawLocalState);
+    final localState = await _decodeState(rawLocalState);
 
     final remoteState = await _loadRemoteState(preferences);
     if (remoteState != null) {
       final mergedState = _mergeLocalMedia(remoteState, localState);
-      await _writeStateLocal(preferences, jsonEncode(mergedState));
+      await _writeStateLocal(preferences, await compute(jsonEncode, mergedState));
       return mergedState;
     }
 
@@ -120,7 +120,16 @@ class LocalStorageService {
     bool syncRemote = true,
   }) async {
     final preferences = await SharedPreferences.getInstance();
-    final encodedState = jsonEncode(state);
+    // jsonEncode of the full state snapshot (matches/reviews/customProperties
+    // etc, all re-serialized on every call - see _persist()'s doc comment)
+    // is real, synchronous CPU work that used to run directly on the UI
+    // isolate, on the same call stack as whatever user action (a swipe, a
+    // filter change) triggered this write - i.e. on the critical path for
+    // frame rendering. compute() runs it on a background isolate instead;
+    // the write itself stays immediate/awaited (not debounced) exactly as
+    // before, so the "must not lose data" guarantee this comment describes
+    // is unchanged - only WHERE the encoding happens moves.
+    final encodedState = await compute(jsonEncode, state);
     await _writeStateLocal(preferences, encodedState);
     if (!syncRemote) return;
     await _saveRemoteState(preferences, state);
@@ -166,13 +175,37 @@ class LocalStorageService {
     await preferences.remove(_remoteStateIdKey);
   }
 
-  Map<String, dynamic>? _decodeState(String? rawState) {
+  // A structural deep copy for JSON-shaped data (Map/List/primitives) -
+  // _stateForRemoteSync and _mergeLocalMedia both need a mutable copy of an
+  // already-decoded state map so they can scrub/merge nested fields without
+  // touching the caller's original, and previously got that via
+  // jsonDecode(jsonEncode(x)) - a full serialize-to-text-then-reparse pass
+  // used purely as a deep-copy trick. For a state blob that can run to
+  // hundreds of KB (matches/customProperties/reviews), that's real,
+  // avoidable CPU work; walking the tree directly is equivalent but skips
+  // the string round-trip entirely.
+  dynamic _deepCopy(dynamic value) {
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k, _deepCopy(v)));
+    }
+    if (value is List) {
+      return value.map(_deepCopy).toList();
+    }
+    return value; // String/num/bool/null - already immutable
+  }
+
+  // jsonDecode of the full state blob (matches/customProperties/reviews etc)
+  // can run to hundreds of KB and used to run synchronously on the UI
+  // isolate, mirroring the encode-side compute() usage above (saveAppState).
+  // compute() needs a top-level/static function reference rather than a
+  // closure, so jsonDecode (already top-level) is passed directly.
+  Future<Map<String, dynamic>?> _decodeState(String? rawState) async {
     if (rawState == null || rawState.isEmpty) {
       return null;
     }
 
     try {
-      final decoded = jsonDecode(rawState);
+      final decoded = await compute(jsonDecode, rawState);
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
@@ -192,14 +225,24 @@ class LocalStorageService {
     if (!AppConfig.canUseRemoteState) return null;
 
     try {
-      final row = await tables.getRow(
-        databaseId: appwriteDatabaseId,
-        tableId: appwriteAppStateCollectionId,
-        rowId: await _remoteStateDocumentId(preferences),
-      );
+      // This is awaited synchronously on the app-startup critical path
+      // (DatingProvider.initialize() blocks on it before the splash screen
+      // releases) — an unbounded call here means a slow/flaky network makes
+      // EVERY relaunch after the first slow, growing worse as the synced
+      // state (properties/media/matches) accumulates. A bounded timeout caps
+      // the worst case instead of leaving the user staring at a spinner for
+      // however long the network takes; on timeout we just fall back to the
+      // local cache like any other remote-fetch failure below.
+      final row = await tables
+          .getRow(
+            databaseId: appwriteDatabaseId,
+            tableId: appwriteAppStateCollectionId,
+            rowId: await _remoteStateDocumentId(preferences),
+          )
+          .timeout(const Duration(seconds: 4));
       final payload = row.data[_payloadField];
       if (payload is String) {
-        return _decodeState(payload);
+        return await _decodeState(payload);
       }
     } catch (error) {
       _logRemoteError('load', error);
@@ -236,7 +279,7 @@ class LocalStorageService {
   }
 
   Map<String, dynamic> _stateForRemoteSync(Map<String, dynamic> state) {
-    final decoded = jsonDecode(jsonEncode(state));
+    final decoded = _deepCopy(state);
     if (decoded is! Map<String, dynamic>) return state;
 
     final tenantProfile = decoded['tenantProfile'];
@@ -275,7 +318,7 @@ class LocalStorageService {
   ) {
     if (localState == null) return remoteState;
 
-    final merged = jsonDecode(jsonEncode(remoteState));
+    final merged = _deepCopy(remoteState);
     if (merged is! Map<String, dynamic>) return remoteState;
 
     final localTenant = localState['tenantProfile'];

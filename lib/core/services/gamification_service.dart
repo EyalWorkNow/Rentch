@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GamificationService {
@@ -54,16 +55,16 @@ class GamificationService {
     return min(pct, 100);
   }
 
-  static String nextCompletionHint(TenantProfile profile) {
-    if (profile.photoUrls.isEmpty) return 'הוסף תמונת פרופיל (+20%)';
-    if (profile.bio.trim().length < 15) return 'כתוב קצת עליך (+20%)';
-    if (profile.budgetMax >= 9000) return 'הגדר תקציב (+15%)';
+  static String nextCompletionHint(TenantProfile profile, AppLocalizations l10n) {
+    if (profile.photoUrls.isEmpty) return l10n.gamificationHintAddPhoto;
+    if (profile.bio.trim().length < 15) return l10n.gamificationHintWriteBio;
+    if (profile.budgetMax >= 9000) return l10n.gamificationHintSetBudget;
     if (profile.moveInWindow.isEmpty || profile.moveInWindow == 'גמיש') {
-      return 'מתי נכנסים? (+15%)';
+      return l10n.gamificationHintMoveInDate;
     }
-    if (profile.importantDetails.isEmpty) return 'הוסף דרישות (+10%)';
-    if (profile.name.trim().length < 2) return 'הוסף שם (+10%)';
-    return 'הפרופיל כמעט מושלם!';
+    if (profile.importantDetails.isEmpty) return l10n.gamificationHintAddRequirements;
+    if (profile.name.trim().length < 2) return l10n.gamificationHintAddName;
+    return l10n.gamificationHintAlmostDone;
   }
 
   // ─── Super Likes ───────────────────────────────────────────────────────────

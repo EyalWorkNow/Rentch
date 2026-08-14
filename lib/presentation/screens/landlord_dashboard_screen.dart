@@ -233,8 +233,16 @@ class _DashboardHeader extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         // Right: Notification bell + Avatar
-        Row(
-          children: [
+        // Flexible here (not a bare Row) because this Row's own child
+        // (_AssistantChip) is wrapped in Flexible below — a Flexible child
+        // needs a bounded-width parent, and as a plain unwrapped sibling of
+        // the outer Row this Row never got one, crashing layout with
+        // "RenderFlex children have non-zero flex but incoming width
+        // constraints are unbounded" and blanking the whole dashboard.
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Real, working notifications bell (opens the inbox). Shown only
             // here on the agent/landlord dashboard — replaces the old fake icon.
             NotificationBell(
@@ -264,7 +272,8 @@ class _DashboardHeader extends StatelessWidget {
             // NOT const: its gradient is the swappable accent; a const widget
             // never rebuilds and would freeze on the first-build accent.
             Flexible(child: _AssistantChip()),
-          ],
+            ],
+          ),
         ),
       ],
     );

@@ -343,7 +343,17 @@ Resources:
       Runtime: nodejs20.x
       Handler: index.handler
       Role: !GetAtt RouterRole.Arn
-      Timeout: 20
+      # 20s is plenty for normal synchronous API-Gateway-fronted requests
+      # (which API Gateway itself hard-caps at 29s regardless of this value),
+      # but the AI-panorama generation path self-invokes this SAME function
+      # asynchronously (Event invocation, op:'aiGenerate') to run the actual
+      # gpt-image-2 call, which realistically takes 50-150s+. At Timeout: 20
+      # that worker invocation was getting SIGKILL'd mid-request every time -
+      # no catchable exception, so the job's status never got written as
+      # 'failed' either; it just sat at 'processing' forever (only a lazy
+      # 15-minute staleness check in getPanorama() ever noticed). 300s
+      # matches PanoStitchFunction's timeout below for the same reason.
+      Timeout: 300
       MemorySize: 256
       Code:
         S3Bucket: !Ref CodeBucket

@@ -90,10 +90,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         textDirection: Directionality.of(context),
         child: AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: Text(
             l10n.subscriptionScreen2b7d5edc,
-            style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
           ),
           content: Text(
             l10n.subscriptionScreenD9eefdcc,
@@ -109,7 +111,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(
                 l10n.subscriptionScreen00a5e771,
-                style: const TextStyle(color: AppColors.coral, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: AppColors.coral, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -123,8 +126,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Future<void> _resume() async {
     final l10n = AppLocalizations.of(context)!;
-    await _run(
-        AwsApiClient.instance.resumeSubscription(), l10n.subscriptionScreenA3c4c747);
+    await _run(AwsApiClient.instance.resumeSubscription(),
+        l10n.subscriptionScreenA3c4c747);
   }
 
   Future<void> _run(Future<void> action, String okMessage) async {
@@ -164,7 +167,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sub = context.watch<DatingProvider>().subscription;
+    // `subscription` is a plain field getter (only reassigned when the
+    // subscription actually changes), so a narrow select avoids rebuilding
+    // this screen on unrelated notifyListeners() calls elsewhere in
+    // DatingProvider (chat, swipes, view counts, etc).
+    final sub =
+        context.select<DatingProvider, Subscription?>((p) => p.subscription);
 
     return Directionality(
       textDirection: Directionality.of(context),
@@ -193,7 +201,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(12),
@@ -365,7 +374,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       children: [
         _StatusPill(sub: sub),
         const SizedBox(height: 16),
-        _InfoCard(sub: sub, planLabel: _planLabel, shekel: _shekel, date: _date),
+        _InfoCard(
+            sub: sub, planLabel: _planLabel, shekel: _shekel, date: _date),
         const SizedBox(height: 20),
         _buildAction(sub),
         if (_invoices.isNotEmpty) ...[
@@ -418,11 +428,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.2, color: Color(0xFF4F46E5)),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.2, color: Color(0xFF4F46E5)),
               )
             : Text(
                 label,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
       ),
     );
@@ -438,10 +450,22 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final (label, color, bg) = sub.cancelAtPeriodEnd
-        ? (l10n.subscriptionScreen6b44102c, const Color(0xFFEA580C), const Color(0xFFFFEDD5))
+        ? (
+            l10n.subscriptionScreen6b44102c,
+            const Color(0xFFEA580C),
+            const Color(0xFFFFEDD5)
+          )
         : sub.entitled
-            ? (l10n.subscriptionScreen09900e25, const Color(0xFF16A34A), const Color(0xFFDCFCE7))
-            : (l10n.subscriptionScreen98e268e7, const Color(0xFF64748B), const Color(0xFFF1F5F9));
+            ? (
+                l10n.subscriptionScreen09900e25,
+                const Color(0xFF16A34A),
+                const Color(0xFFDCFCE7)
+              )
+            : (
+                l10n.subscriptionScreen98e268e7,
+                const Color(0xFF64748B),
+                const Color(0xFFF1F5F9)
+              );
     return Align(
       alignment: Alignment.centerRight,
       child: Container(

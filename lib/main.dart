@@ -141,60 +141,73 @@ class _BackNavigationObserver extends NavigatorObserver {
   }
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Startup must never throw before runApp — a failure here is the classic
-  // cause of a launch crash on TestFlight/release. Every step is guarded so the
-  // app always reaches runApp(); degraded features fail soft instead.
-  if (AppConfig.enableGoogleSignIn) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    } catch (error) {
-      // Never rethrow on launch — Firebase Auth can still recover later.
-      debugPrint('Firebase initialization skipped: $error');
-    }
-
-    // Push notifications (e.g. "your 3D tour is ready"). Fail-soft: handlers are
-    // wired once, and the device token is (re)registered with the backend
-    // whenever a user is signed in, so the server-side tour poller can reach
-    // them while the app is closed.
-    try {
-      // Show incoming pushes even while the app is OPEN (the OS won't auto-show
-      // them in the foreground) — otherwise the user "gets no notifications".
-      PushNotificationService.instance.onForegroundMessage = (message) {
-        final n = message.notification;
-        final title = (n?.title ?? message.data['title'] ?? '').toString();
-        final body = (n?.body ?? message.data['body'] ?? '').toString();
-        NotificationService.instance.showForegroundPush(title, body);
-        // A match/message push means a new conversation exists server-side —
-        // re-pull matches so it appears in the list now, not on next relaunch.
-        final type = (message.data['type'] ?? '').toString();
-        if (type == 'match' || type == 'message') {
-          try {
-            appNavigatorKey.currentContext
-                ?.read<DatingProvider>()
-                .refreshMatchesFromBackend();
-          } catch (_) {/* provider not ready yet — resume hook will catch it */}
-        }
-      };
-      await PushNotificationService.instance.initialize();
-      FirebaseAuth.instance.authStateChanges().listen((user) {
-        if (user != null) PushNotificationService.instance.registerForUser();
-      });
-    } catch (error) {
-      debugPrint('Push notifications skipped: $error');
-    }
+// Firebase must finish first (Push depends on it — FirebaseMessaging needs
+// Firebase.initializeApp() already done), so this stays one sequential
+// chain internally. It has no dependency on Scaniverse below, though, so the
+// two run concurrently via Future.wait in main() instead of one strictly
+// after the other — previously three independent-ish steps here ran fully
+// sequentially and their latencies summed instead of overlapping, all
+// blocking the very first frame.
+Future<void> _initFirebaseAndPush() async {
+  if (!AppConfig.enableGoogleSignIn) return;
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (error) {
+    // Never rethrow on launch — Firebase Auth can still recover later.
+    debugPrint('Firebase initialization skipped: $error');
+    return; // Push needs Firebase — nothing more to do here if it failed.
   }
 
+  // Push notifications (e.g. "your 3D tour is ready"). Fail-soft: handlers are
+  // wired once, and the device token is (re)registered with the backend
+  // whenever a user is signed in, so the server-side tour poller can reach
+  // them while the app is closed.
+  try {
+    // Show incoming pushes even while the app is OPEN (the OS won't auto-show
+    // them in the foreground) — otherwise the user "gets no notifications".
+    PushNotificationService.instance.onForegroundMessage = (message) {
+      final n = message.notification;
+      final title = (n?.title ?? message.data['title'] ?? '').toString();
+      final body = (n?.body ?? message.data['body'] ?? '').toString();
+      NotificationService.instance.showForegroundPush(title, body);
+      // A match/message push means a new conversation exists server-side —
+      // re-pull matches so it appears in the list now, not on next relaunch.
+      final type = (message.data['type'] ?? '').toString();
+      if (type == 'match' || type == 'message') {
+        try {
+          appNavigatorKey.currentContext
+              ?.read<DatingProvider>()
+              .refreshMatchesFromBackend();
+        } catch (_) {/* provider not ready yet — resume hook will catch it */}
+      }
+    };
+    await PushNotificationService.instance.initialize();
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) PushNotificationService.instance.registerForUser();
+    });
+  } catch (error) {
+    debugPrint('Push notifications skipped: $error');
+  }
+}
+
+Future<void> _initScaniverse() async {
   // Scaniverse is optional; a failure must not block launch.
   try {
     await ScaniverseService.instance.initialize();
   } catch (error) {
     debugPrint('Scaniverse initialization skipped: $error');
   }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Startup must never throw before runApp — a failure here is the classic
+  // cause of a launch crash on TestFlight/release. Every step is guarded so the
+  // app always reaches runApp(); degraded features fail soft instead.
+  await Future.wait([_initFirebaseAndPush(), _initScaniverse()]);
 
   // Draw edge-to-edge so the system nav bar (esp. Samsung One UI's 3-button /
   // gesture bar) becomes a transparent overlay and MediaQuery.viewPadding.bottom

@@ -337,6 +337,19 @@ class DatingProvider extends ChangeNotifier {
   List<RentalProperty>? _allPropertiesCache;
   Map<String, RentalProperty>? _propertyByIdCache;
   List<RentalProperty>? _filteredPropertiesCache;
+  // previewFilteredProperties() cache — mirrors filteredProperties' cache
+  // above but is keyed on the (filters, limit) pair passed in, since callers
+  // (map preview / draft-filter markers) pass an arbitrary SearchFilters
+  // rather than always reading the provider's own [_filters]. SearchFilters
+  // has no value equality, so identity of the last-seen instance is used —
+  // callers reuse the same instance across rebuilds until the user actually
+  // edits a filter, so this still hits on repeated calls triggered by
+  // unrelated provider state changes.
+  List<RentalProperty>? _previewFilteredPropertiesCache;
+  SearchFilters? _previewFilteredPropertiesCacheFilters;
+  int _previewFilteredPropertiesCacheLimit = -1;
+  int _previewFilteredCatalogRevision = -1;
+  int _previewFilteredFilterRevision = -1;
   // The deck's best-match score per property from the last sort — the PREDICTION
   // that ordered the card, attached to the swipe outcome so each swipe is a
   // (prediction, label) calibration row.
@@ -851,9 +864,9 @@ class DatingProvider extends ChangeNotifier {
       ? 0
       : GamificationService.computeProfileCompletion(_tenantProfile!);
 
-  String get profileCompletionHint => _tenantProfile == null
+  String profileCompletionHint(AppLocalizations l10n) => _tenantProfile == null
       ? ''
-      : GamificationService.nextCompletionHint(_tenantProfile!);
+      : GamificationService.nextCompletionHint(_tenantProfile!, l10n);
   RentalProperty? get pendingMatchProperty =>
       propertyById(_pendingMatchPropertyId);
   List<RentalProperty> get myProperties => _customProperties
@@ -1210,6 +1223,16 @@ class DatingProvider extends ChangeNotifier {
     int limit = 500,
   }) {
     if (_searchAreas.isEmpty || limit <= 0) return const [];
+
+    final cached = _previewFilteredPropertiesCache;
+    if (cached != null &&
+        identical(_previewFilteredPropertiesCacheFilters, filters) &&
+        _previewFilteredPropertiesCacheLimit == limit &&
+        _previewFilteredCatalogRevision == _catalogRevision &&
+        _previewFilteredFilterRevision == _filterRevision) {
+      return cached;
+    }
+
     final now = DateTime.now();
     final area = _areaFor(filters);
     final preview = <RentalProperty>[];
@@ -1219,6 +1242,12 @@ class DatingProvider extends ChangeNotifier {
         if (preview.length >= limit) break;
       }
     }
+
+    _previewFilteredPropertiesCache = preview;
+    _previewFilteredPropertiesCacheFilters = filters;
+    _previewFilteredPropertiesCacheLimit = limit;
+    _previewFilteredCatalogRevision = _catalogRevision;
+    _previewFilteredFilterRevision = _filterRevision;
     return preview;
   }
 
@@ -2366,10 +2395,22 @@ class DatingProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    // Start the first-page catalog fetch (20s cap) and the app-state load
+    // (which itself does a bounded, up-to-4s remote fetch) together instead
+    // of awaiting one before starting the other — total startup wait is now
+    // max(20s, 4s) rather than their sum. Each keeps its own independent
+    // error handling exactly as before (a catalog-fetch timeout must not
+    // affect the app-state load, and vice versa), so they're awaited
+    // separately below rather than combined via Future.wait (which would
+    // fail-fast and discard the other's already-available result the
+    // moment either future throws).
+    final firstPageFuture = _rentalDataService
+        .loadFirstPage(areaId: _filters.areaId)
+        .timeout(const Duration(seconds: 20));
+    final storedStateFuture = _localStorageService.loadAppState();
+
     try {
-      final firstPage = await _rentalDataService
-          .loadFirstPage(areaId: _filters.areaId)
-          .timeout(const Duration(seconds: 20));
+      final firstPage = await firstPageFuture;
       _baseProperties = firstPage.items;
       _hasMoreProperties = firstPage.hasMore;
       _propertiesOffset = firstPage.items.length;
@@ -2397,7 +2438,7 @@ class DatingProvider extends ChangeNotifier {
       }
     }
 
-    final storedState = await _localStorageService.loadAppState();
+    final storedState = await storedStateFuture;
     if (storedState == null || storedState['schema'] != 'rental_match_v2') {
       _seedInitialState();
       _hasActiveSession = false;
@@ -4221,7 +4262,16 @@ class DatingProvider extends ChangeNotifier {
     if (_swipeHistory.length > 10) _swipeHistory.removeAt(0);
     _removeFromFilteredCache(property.id);
 
-    await _persist();
+    // NOT awaited: flutter_card_swiper's _handleCompleteSwipe awaits this
+    // whole method (widget.onSwipe?.call(...)) before it advances the
+    // visible card index — an awaited _persist() here (full state snapshot +
+    // SharedPreferences write) blocked EVERY swipe from revealing the next
+    // card until the write finished, which is exactly the "delay before the
+    // next card appears" felt on the deck. Every other call site in this
+    // file already fires _persist() unawaited; this was the one outlier on
+    // the hottest path. The state mutations above are already synchronous,
+    // so notifyListeners() below doesn't need to wait for the write either.
+    unawaited(_persist());
     notifyListeners();
 
     // Proactively fetch next page when the deck is getting short.

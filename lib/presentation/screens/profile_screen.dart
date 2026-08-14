@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
+import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
+import 'package:dating_app/presentation/widgets/language_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
@@ -695,6 +697,29 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
+
+                    // App Language — tenants have no route into the
+                    // landlord/broker Settings sub-page, so this is the only
+                    // place a tenant account can switch language.
+                    Text(
+                      l10n.profileScreenF48e9723,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.slate900,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.slate200),
+                      ),
+                      child: const LanguagePicker(),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Actions Container
                     Container(
@@ -1760,12 +1785,10 @@ class _LandlordProfileScreen extends StatelessWidget {
             height: 48,
             child: ElevatedButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    duration: const Duration(milliseconds: 2500),
-                    content: Text(l10n.profileScreen95ef5abd),
-                  ),
-                );
+                Navigator.of(context).push(MaterialPageRoute(
+                  settings: const RouteSettings(name: 'PaywallScreen'),
+                  builder: (_) => const PaywallScreen(),
+                ));
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -3770,29 +3793,36 @@ class _PreferenceTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.slate900,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.slate900,
+                ),
               ),
             ),
             const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isEmpty
-                    ? AppColors.primary.withValues(alpha: 0.08)
-                    : AppColors.slate100,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: isEmpty ? AppColors.primary : AppColors.slate600,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isEmpty
+                      ? AppColors.primary.withValues(alpha: 0.08)
+                      : AppColors.slate100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  value,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: isEmpty ? AppColors.primary : AppColors.slate600,
+                  ),
                 ),
               ),
             ),

@@ -4767,6 +4767,12 @@ abstract class AppLocalizations {
   /// **'פתח במפות'**
   String get propertyDetailScreenDf4787e7;
 
+  /// No description provided for @propertyDetailScreenLoadingPois.
+  ///
+  /// In he, this message translates to:
+  /// **'טוען…'**
+  String get propertyDetailScreenLoadingPois;
+
   /// No description provided for @propertyDetailScreen9e8d9316.
   ///
   /// In he, this message translates to:
@@ -20392,6 +20398,204 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'תיאור'**
   String get propertyDetailScreenDescription;
+
+  /// No description provided for @smartSearchAmenityRenovated.
+  ///
+  /// In he, this message translates to:
+  /// **'✦ משופצת'**
+  String get smartSearchAmenityRenovated;
+
+  /// No description provided for @smartSearchAmenityPets.
+  ///
+  /// In he, this message translates to:
+  /// **'🐾 ידידותי לחיות'**
+  String get smartSearchAmenityPets;
+
+  /// No description provided for @smartSearchAmenityParking.
+  ///
+  /// In he, this message translates to:
+  /// **'🅿️ חניה'**
+  String get smartSearchAmenityParking;
+
+  /// No description provided for @smartSearchAmenityBalcony.
+  ///
+  /// In he, this message translates to:
+  /// **'🌤️ מרפסת'**
+  String get smartSearchAmenityBalcony;
+
+  /// No description provided for @smartSearchAmenityElevator.
+  ///
+  /// In he, this message translates to:
+  /// **'🛗 מעלית'**
+  String get smartSearchAmenityElevator;
+
+  /// No description provided for @smartSearchAmenityFurnished.
+  ///
+  /// In he, this message translates to:
+  /// **'🛋️ מרוהט'**
+  String get smartSearchAmenityFurnished;
+
+  /// No description provided for @smartSearchAmenityMamad.
+  ///
+  /// In he, this message translates to:
+  /// **'🛡️ ממ״ד'**
+  String get smartSearchAmenityMamad;
+
+  /// No description provided for @smartSearchAmenityGarden.
+  ///
+  /// In he, this message translates to:
+  /// **'🌳 גינה'**
+  String get smartSearchAmenityGarden;
+
+  /// No description provided for @smartSearchAmenityAir.
+  ///
+  /// In he, this message translates to:
+  /// **'❄️ מיזוג'**
+  String get smartSearchAmenityAir;
+
+  /// No description provided for @smartSearchAmenityPool.
+  ///
+  /// In he, this message translates to:
+  /// **'🏊 בריכה'**
+  String get smartSearchAmenityPool;
+
+  /// No description provided for @smartSearchAmenityGym.
+  ///
+  /// In he, this message translates to:
+  /// **'🏋️ חדר כושר'**
+  String get smartSearchAmenityGym;
+
+  /// No description provided for @smartSearchAmenityStorage.
+  ///
+  /// In he, this message translates to:
+  /// **'📦 מחסן'**
+  String get smartSearchAmenityStorage;
+
+  /// No description provided for @smartSearchAmenitySun.
+  ///
+  /// In he, this message translates to:
+  /// **'☀️ מואר'**
+  String get smartSearchAmenitySun;
+
+  /// No description provided for @smartSearchAmenitySafe.
+  ///
+  /// In he, this message translates to:
+  /// **'🔒 ממוגן'**
+  String get smartSearchAmenitySafe;
+
+  /// No description provided for @smartSearchAmenityInternet.
+  ///
+  /// In he, this message translates to:
+  /// **'🌐 אינטרנט'**
+  String get smartSearchAmenityInternet;
+
+  /// No description provided for @smartSearchAmenityLaundry.
+  ///
+  /// In he, this message translates to:
+  /// **'🧺 כביסה'**
+  String get smartSearchAmenityLaundry;
+
+  /// No description provided for @smartSearchAmenityAccessible.
+  ///
+  /// In he, this message translates to:
+  /// **'♿ נגיש'**
+  String get smartSearchAmenityAccessible;
+
+  /// No description provided for @smartSearchAmenityRoommates.
+  ///
+  /// In he, this message translates to:
+  /// **'👥 שותפים'**
+  String get smartSearchAmenityRoommates;
+
+  /// No description provided for @smartSearchForSale.
+  ///
+  /// In he, this message translates to:
+  /// **'🏷️ למכירה'**
+  String get smartSearchForSale;
+
+  /// No description provided for @smartSearchForRent.
+  ///
+  /// In he, this message translates to:
+  /// **'🔑 להשכרה'**
+  String get smartSearchForRent;
+
+  /// No description provided for @smartSearchRoomsSuffix.
+  ///
+  /// In he, this message translates to:
+  /// **'🛏️ {range} חד׳'**
+  String smartSearchRoomsSuffix(String range);
+
+  /// No description provided for @smartSearchNearTrain.
+  ///
+  /// In he, this message translates to:
+  /// **'🚉 ליד הרכבת'**
+  String get smartSearchNearTrain;
+
+  /// No description provided for @smartSearchBestValue.
+  ///
+  /// In he, this message translates to:
+  /// **'🏷️ הכי משתלם'**
+  String get smartSearchBestValue;
+
+  /// No description provided for @smartSearchRangeUpTo.
+  ///
+  /// In he, this message translates to:
+  /// **'עד {value}'**
+  String smartSearchRangeUpTo(String value);
+
+  /// No description provided for @smartSearchRangeFrom.
+  ///
+  /// In he, this message translates to:
+  /// **'מ-{value}'**
+  String smartSearchRangeFrom(String value);
+
+  /// No description provided for @gamificationHintAddPhoto.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסף תמונת פרופיל (+20%)'**
+  String get gamificationHintAddPhoto;
+
+  /// No description provided for @gamificationHintWriteBio.
+  ///
+  /// In he, this message translates to:
+  /// **'כתוב קצת עליך (+20%)'**
+  String get gamificationHintWriteBio;
+
+  /// No description provided for @gamificationHintSetBudget.
+  ///
+  /// In he, this message translates to:
+  /// **'הגדר תקציב (+15%)'**
+  String get gamificationHintSetBudget;
+
+  /// No description provided for @gamificationHintMoveInDate.
+  ///
+  /// In he, this message translates to:
+  /// **'מתי נכנסים? (+15%)'**
+  String get gamificationHintMoveInDate;
+
+  /// No description provided for @gamificationHintAddRequirements.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסף דרישות (+10%)'**
+  String get gamificationHintAddRequirements;
+
+  /// No description provided for @gamificationHintAddName.
+  ///
+  /// In he, this message translates to:
+  /// **'הוסף שם (+10%)'**
+  String get gamificationHintAddName;
+
+  /// No description provided for @gamificationHintAlmostDone.
+  ///
+  /// In he, this message translates to:
+  /// **'הפרופיל כמעט מושלם!'**
+  String get gamificationHintAlmostDone;
+
+  /// No description provided for @panoramaCaptureScreenStillProcessing.
+  ///
+  /// In he, this message translates to:
+  /// **'עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן'**
+  String get panoramaCaptureScreenStillProcessing;
 }
 
 class _AppLocalizationsDelegate

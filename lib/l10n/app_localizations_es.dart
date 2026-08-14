@@ -2666,6 +2666,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get propertyDetailScreenDf4787e7 => 'Abrir en Mapas';
 
   @override
+  String get propertyDetailScreenLoadingPois => 'Cargando…';
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'Editar propiedad';
 
   @override
@@ -11893,4 +11896,110 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get propertyDetailScreenDescription => 'Descripción';
+
+  @override
+  String get smartSearchAmenityRenovated => '✦ Renovado';
+
+  @override
+  String get smartSearchAmenityPets => '🐾 Admite mascotas';
+
+  @override
+  String get smartSearchAmenityParking => '🅿️ Estacionamiento';
+
+  @override
+  String get smartSearchAmenityBalcony => '🌤️ Balcón';
+
+  @override
+  String get smartSearchAmenityElevator => '🛗 Ascensor';
+
+  @override
+  String get smartSearchAmenityFurnished => '🛋️ Amueblado';
+
+  @override
+  String get smartSearchAmenityMamad => '🛡️ Cuarto seguro';
+
+  @override
+  String get smartSearchAmenityGarden => '🌳 Jardín';
+
+  @override
+  String get smartSearchAmenityAir => '❄️ Aire acondicionado';
+
+  @override
+  String get smartSearchAmenityPool => '🏊 Piscina';
+
+  @override
+  String get smartSearchAmenityGym => '🏋️ Gimnasio';
+
+  @override
+  String get smartSearchAmenityStorage => '📦 Trastero';
+
+  @override
+  String get smartSearchAmenitySun => '☀️ Luminoso';
+
+  @override
+  String get smartSearchAmenitySafe => '🔒 Seguro';
+
+  @override
+  String get smartSearchAmenityInternet => '🌐 Internet';
+
+  @override
+  String get smartSearchAmenityLaundry => '🧺 Lavandería';
+
+  @override
+  String get smartSearchAmenityAccessible => '♿ Accesible';
+
+  @override
+  String get smartSearchAmenityRoommates => '👥 Compañeros de piso';
+
+  @override
+  String get smartSearchForSale => '🏷️ En venta';
+
+  @override
+  String get smartSearchForRent => '🔑 En alquiler';
+
+  @override
+  String smartSearchRoomsSuffix(String range) {
+    return '🛏️ $range habitaciones';
+  }
+
+  @override
+  String get smartSearchNearTrain => '🚉 Cerca del tren';
+
+  @override
+  String get smartSearchBestValue => '🏷️ Mejor relación calidad-precio';
+
+  @override
+  String smartSearchRangeUpTo(String value) {
+    return 'hasta $value';
+  }
+
+  @override
+  String smartSearchRangeFrom(String value) {
+    return 'desde $value';
+  }
+
+  @override
+  String get gamificationHintAddPhoto => 'Añade una foto de perfil (+20%)';
+
+  @override
+  String get gamificationHintWriteBio => 'Escribe algo sobre ti (+20%)';
+
+  @override
+  String get gamificationHintSetBudget => 'Establece un presupuesto (+15%)';
+
+  @override
+  String get gamificationHintMoveInDate => '¿Cuándo te mudas? (+15%)';
+
+  @override
+  String get gamificationHintAddRequirements => 'Añade tus requisitos (+10%)';
+
+  @override
+  String get gamificationHintAddName => 'Añade tu nombre (+10%)';
+
+  @override
+  String get gamificationHintAlmostDone => '¡Tu perfil está casi completo!';
+
+  @override
+  String get panoramaCaptureScreenStillProcessing =>
+      'Aún procesando - te avisaremos cuando esté listo';
 }

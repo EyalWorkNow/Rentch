@@ -74,9 +74,19 @@ class PushNotificationService {
         return;
       }
       // On iOS the APNs token must be available before the FCM token resolves.
+      // On a FRESH install it can take several seconds to provision, so poll
+      // instead of giving up on the first null — the old behavior silently
+      // skipped registration forever whenever APNs wasn't ready at that exact
+      // instant (relying on onTokenRefresh, which never fires if getToken() is
+      // never reached). This is the #1 reason a reinstalled device got no push.
       if (Platform.isIOS) {
-        final apns = await _messaging.getAPNSToken();
-        if (apns == null) return; // not provisioned yet; onTokenRefresh covers it
+        String? apns;
+        for (var i = 0; i < 12; i++) {
+          apns = await _messaging.getAPNSToken();
+          if (apns != null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
+        }
+        if (apns == null) return; // gave up after ~18s; onTokenRefresh may catch it later
       }
       final token = await _messaging.getToken();
       if (token != null) await _registerToken(token);

@@ -57,7 +57,7 @@ class _AuraHeroTemplate extends StatelessWidget {
           // Edge-to-edge: no top padding so the hero reaches the very top; the
           // top bar is overlaid inside the status-bar safe area.
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 128),
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -116,30 +116,36 @@ class _AuraHeroTemplate extends StatelessWidget {
                   child: _GlassFilterPill(
                     icon: IconsaxPlusLinear.layer,
                     label: property.floor.isEmpty
-                        ? property.propertyType
-                        : AppLocalizations.of(context)!
-                            .auraHeroTemplateD068bb57(property.floor),
+                        ? propertyTypeLabel(
+                            property.propertyType, AppLocalizations.of(context)!)
+                        : AppLocalizations.of(context)!.auraHeroTemplateD068bb57(
+                            floorLabel(property.floor, AppLocalizations.of(context)!)),
                     branding: branding,
                     aura: aura,
                   ),
                 ),
                 const SizedBox(height: 24),
-                // ── Shared full-parity content (no duplicates) ──────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: _ParitySections(
-                    property: property,
-                    branding: branding,
-                    controller: controller,
-                    reviews: reviews,
-                    hasVirtualTour: hasVirtualTour,
-                    isLandlordPreview: isLandlordPreview,
-                    onShareTap: onShareTap,
-                    onTour: onTour,
-                  ),
-                ),
               ],
             ),
+          ),
+        ),
+        // ── Shared full-parity content (no duplicates) — split out of the
+        //    Column above into its own lazy sliver so Flutter only
+        //    builds/lays out each section as it scrolls into view. Padding
+        //    replicates what the removed wrapper + outer Column padding used
+        //    to give this same content (18 horizontal, 128 bottom for the
+        //    floating bottom bar).
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 128),
+          sliver: _ParitySectionsSliver(
+            property: property,
+            branding: branding,
+            controller: controller,
+            reviews: reviews,
+            hasVirtualTour: hasVirtualTour,
+            isLandlordPreview: isLandlordPreview,
+            onShareTap: onShareTap,
+            onTour: onTour,
           ),
         ),
       ],
@@ -520,7 +526,9 @@ class _AcidPriceCard extends StatelessWidget {
                 _AuraStatDivider(),
                 _AuraStat(
                   icon: IconsaxPlusBold.layer,
-                  value: property.floor.isEmpty ? '—' : property.floor,
+                  value: property.floor.isEmpty
+                      ? '—'
+                      : floorLabel(property.floor, AppLocalizations.of(context)!),
                   label: AppLocalizations.of(context)!.auraHeroTemplate047e630b,
                 ),
               ],

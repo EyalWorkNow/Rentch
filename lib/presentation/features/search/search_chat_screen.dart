@@ -327,7 +327,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
     for (final a in _query.amenities) {
       // Strip the emoji prefix the tag carries — the chip now uses an iconsax icon.
-      final label = SmartSearch.amenityTag(a)
+      final label = SmartSearch.amenityTag(a, l10n)
           .replaceFirst(RegExp(r'^[^֐-׿a-zA-Z]+'), '')
           .trim();
       items.add(_removableChip(
@@ -864,7 +864,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       out.add(l10n.searchChatScreen35e94525(p));
     }
     for (final a in q.amenities) {
-      out.add(SmartSearch.amenityTag(a));
+      out.add(SmartSearch.amenityTag(a, l10n));
     }
     if (q.nearTrain) out.add(l10n.searchChatScreen840a3a9f);
     return out;

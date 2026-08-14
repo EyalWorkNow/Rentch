@@ -406,7 +406,7 @@ class _GlassStatsRail extends StatelessWidget {
       if (property.floor.trim().isNotEmpty)
         _StatItem(
           icon: IconsaxPlusLinear.building_4,
-          value: property.floor.trim(),
+          value: floorLabel(property.floor.trim(), AppLocalizations.of(context)!),
           label: AppLocalizations.of(context)!.cinematicGlassTemplate047e630b,
         ),
     ];

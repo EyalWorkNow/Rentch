@@ -100,8 +100,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     if (!mounted) return;
     if (pickable.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text(l10n.brokerClientsScreenNoContactsWithPhoneFound)));
+          content: Text(l10n.brokerClientsScreenNoContactsWithPhoneFound)));
       return;
     }
     final selected = await showModalBottomSheet<List<Contact>>(
@@ -154,7 +153,12 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     // Rebuild on listing changes so the "X נכסים מתאימים" counts stay live.
-    final properties = context.watch<DatingProvider>().allProperties;
+    // `allProperties` is backed by a cache that's only invalidated when the
+    // property set actually changes (see DatingProvider._allPropertiesCache),
+    // so a plain `select` with default (identity) equality correctly skips
+    // rebuilds for unrelated notifyListeners() calls (chat, swipes, etc).
+    final properties = context
+        .select<DatingProvider, List<RentalProperty>>((p) => p.allProperties);
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -180,9 +184,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
           label: Text(
             l10n.brokerClientsScreenNewClient,
             style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold),
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
           ),
         ),
         body: _loading
@@ -276,7 +278,8 @@ class _HotMatchesStrip extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         count > 0
-                            ? l10n.brokerClientsScreenStrongMatchesWaiting(count)
+                            ? l10n
+                                .brokerClientsScreenStrongMatchesWaiting(count)
                             : l10n.brokerClientsScreenPropertiesThatFitClients,
                         style: TextStyle(
                             fontSize: 14, color: AppColors.textSecondary),
@@ -287,7 +290,8 @@ class _HotMatchesStrip extends StatelessWidget {
                 if (count > 0)
                   Container(
                     margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppColors.primaryDark,
                       borderRadius: BorderRadius.circular(999),
@@ -432,18 +436,19 @@ class _ClientCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                      matchCount > 0
-                          ? l10n.brokerClientsScreenMatchingProperties(matchCount)
-                          : l10n.brokerClientsScreenNoMatchingPropertiesNow,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: matchCount > 0
-                            ? AppColors.primaryDark
-                            : AppColors.textSecondary,
-                      ),
+                        matchCount > 0
+                            ? l10n.brokerClientsScreenMatchingProperties(
+                                matchCount)
+                            : l10n.brokerClientsScreenNoMatchingPropertiesNow,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: matchCount > 0
+                              ? AppColors.primaryDark
+                              : AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -477,8 +482,7 @@ class _ClientMatchesScreen extends StatelessWidget {
           elevation: 0,
           title: Text(
             l10n.brokerClientsScreenPropertiesForClient(client.name),
-            style:
-                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
         body: matches.isEmpty
@@ -546,8 +550,8 @@ class _MatchRow extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(20),
@@ -614,16 +618,16 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
       TextEditingController(text: widget.client?.name ?? '');
   late final TextEditingController _phone =
       TextEditingController(text: widget.client?.phone ?? '');
-  late final TextEditingController _areas = TextEditingController(
-      text: widget.client?.areas.join(', ') ?? '');
-  late final TextEditingController _mustHaves = TextEditingController(
-      text: widget.client?.mustHaves.join(', ') ?? '');
+  late final TextEditingController _areas =
+      TextEditingController(text: widget.client?.areas.join(', ') ?? '');
+  late final TextEditingController _mustHaves =
+      TextEditingController(text: widget.client?.mustHaves.join(', ') ?? '');
   late final TextEditingController _notes =
       TextEditingController(text: widget.client?.notes ?? '');
-  late final TextEditingController _budgetMin = TextEditingController(
-      text: widget.client?.budgetMin?.toString() ?? '');
-  late final TextEditingController _budgetMax = TextEditingController(
-      text: widget.client?.budgetMax?.toString() ?? '');
+  late final TextEditingController _budgetMin =
+      TextEditingController(text: widget.client?.budgetMin?.toString() ?? '');
+  late final TextEditingController _budgetMax =
+      TextEditingController(text: widget.client?.budgetMax?.toString() ?? '');
   late final TextEditingController _minRooms = TextEditingController(
       text: widget.client?.minRooms == null
           ? ''
@@ -655,14 +659,13 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.brokerClientsScreenEnterClientName)),
+            content: Text(AppLocalizations.of(context)!
+                .brokerClientsScreenEnterClientName)),
       );
       return;
     }
     final client = BrokerClient(
-      id: widget.client?.id ??
-          'bc_${DateTime.now().microsecondsSinceEpoch}',
+      id: widget.client?.id ?? 'bc_${DateTime.now().microsecondsSinceEpoch}',
       name: name,
       phone: _phone.text.trim(),
       transactionType: _transactionType,
@@ -727,12 +730,14 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
                 Row(
                   children: [
                     Expanded(
-                      child: _field(_budgetMin, l10n.brokerClientsScreenBudgetFrom,
+                      child: _field(
+                          _budgetMin, l10n.brokerClientsScreenBudgetFrom,
                           keyboard: TextInputType.number),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _field(_budgetMax, l10n.brokerClientsScreenBudgetTo,
+                      child: _field(
+                          _budgetMax, l10n.brokerClientsScreenBudgetTo,
                           keyboard: TextInputType.number),
                     ),
                   ],
@@ -740,7 +745,8 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
                 _field(_minRooms, l10n.brokerClientsScreenMinRooms,
                     keyboard: TextInputType.number),
                 _field(_areas, l10n.brokerClientsScreenAreasCommaSeparated),
-                _field(_mustHaves, l10n.brokerClientsScreenMustHaveCommaSeparated),
+                _field(
+                    _mustHaves, l10n.brokerClientsScreenMustHaveCommaSeparated),
                 _field(_notes, l10n.brokerClientsScreenNotes, maxLines: 3),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -876,7 +882,8 @@ class _EmptyState extends StatelessWidget {
             Text(
               l10n.brokerClientsScreenEmptyStateBody,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 16, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -949,8 +956,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                         style: const TextStyle(
                             fontSize: 19, fontWeight: FontWeight.bold)),
                   ),
-                  Text(
-                      l10n.brokerClientsScreenSelectedCount(_selected.length),
+                  Text(l10n.brokerClientsScreenSelectedCount(_selected.length),
                       style: const TextStyle(color: AppColors.textSecondary)),
                 ],
               ),
@@ -980,13 +986,12 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                       value: on,
                       activeColor: AppColors.primary,
                       title: Text(c.displayName ?? '',
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600)),
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: Text(
                           c.phones.isNotEmpty ? c.phones.first.number : '',
                           textDirection: TextDirection.ltr),
-                      onChanged: (_) => setState(() =>
-                          on ? _selected.remove(id) : _selected.add(id)),
+                      onChanged: (_) => setState(
+                          () => on ? _selected.remove(id) : _selected.add(id)),
                     );
                   },
                 ),

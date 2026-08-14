@@ -102,7 +102,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     return ErikState.idle;
   }
 
-
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
     final l10n = AppLocalizations.of(context)!;
@@ -168,7 +167,8 @@ class _AssistantScreenState extends State<AssistantScreen>
       curve: Curves.easeOutBack,
     ));
 
-    _service.ttsVoice = 'onyx'; // עזרא — a natural male voice (אתי stays 'coral')
+    _service.ttsVoice =
+        'onyx'; // עזרא — a natural male voice (אתי stays 'coral')
     _loadTranscript();
 
     // Hands-free by default: the voice conversation starts on its own so the
@@ -454,7 +454,8 @@ class _AssistantScreenState extends State<AssistantScreen>
         property.city,
       ].where((e) => e.isNotEmpty).join(' ');
       final l10n = AppLocalizations.of(context)!;
-      final msg = '${addr.isNotEmpty ? l10n.assistantScreen07192f57(addr) : l10n.assistantScreen0ad71611}\n'
+      final msg =
+          '${addr.isNotEmpty ? l10n.assistantScreen07192f57(addr) : l10n.assistantScreen0ad71611}\n'
           '${l10n.assistantScreen76c2c7b1}\n'
           '${l10n.assistantScreen539101b0}';
       setState(() {
@@ -595,7 +596,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     _conversationMode = false;
     if (mounted) Navigator.of(context).maybePop();
   }
-
 
   // ── UI ───────────────────────────────────────────────────────────────────────
 
@@ -742,7 +742,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.3)),
                   Text(l10n.assistantScreen154094c9,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ],
@@ -911,7 +912,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 
-
   // ── Minimal draft sheet (uses the existing publish flow) ──────────────────────
 
   /// When Erik builds a property draft in the typed/hands-free flow, surface it
@@ -948,170 +948,178 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   Widget _buildUploadPanel() {
     final l10n = AppLocalizations.of(context)!;
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(22), sigmaY: PlatformFx.blurSigma(22)),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
-          decoration: BoxDecoration(
-            color: _kBgMid.withValues(alpha: 0.94),
-            border: const Border(top: BorderSide(color: _kLineStrong)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.82,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: _kMuted.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
+    // This panel is always wrapped in a SlideTransition (driven by
+    // _uploadPanelCtrl) by the caller — RepaintBoundary keeps the blur from
+    // being redone on every frame of the open/close slide animation.
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+              sigmaX: PlatformFx.blurSigma(22),
+              sigmaY: PlatformFx.blurSigma(22)),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+            decoration: BoxDecoration(
+              color: _kBgMid.withValues(alpha: 0.94),
+              border: const Border(top: BorderSide(color: _kLineStrong)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.82,
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      l10n.assistantScreenC9b9ffef,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _closeUploadPanel,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(IconsaxPlusLinear.close_circle,
-                            color: Colors.white70, size: 20),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                if (_photoUrls.isEmpty)
-                  Container(
-                    height: 80,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _kLine),
-                    ),
-                    child: Text(
-                      l10n.assistantScreen75705b64,
-                      style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: 80,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _photoUrls.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) => Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: _thumb(_photoUrls[i]),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: _kMuted.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _photoUrls.removeAt(i);
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  IconsaxPlusLinear.close_circle,
-                                  color: Colors.white,
-                                  size: 14,
-                                ),
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            l10n.assistantScreenC9b9ffef,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _closeUploadPanel,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Icon(IconsaxPlusLinear.close_circle,
+                                  color: Colors.white70, size: 20),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _panelActionBtn(
-                        icon: IconsaxPlusBold.camera,
-                        label: l10n.assistantScreenFeddf7c6,
-                        color: _kAccent,
-                        onTap: () => _pickPhoto(ImageSource.camera),
+                      const SizedBox(height: 18),
+                      if (_photoUrls.isEmpty)
+                        Container(
+                          height: 80,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: _kLine),
+                          ),
+                          child: Text(
+                            l10n.assistantScreen75705b64,
+                            style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 80,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _photoUrls.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (_, i) => Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: _thumb(_photoUrls[i]),
+                                ),
+                                Positioned(
+                                  top: 2,
+                                  right: 2,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _photoUrls.removeAt(i);
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        IconsaxPlusLinear.close_circle,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _panelActionBtn(
+                              icon: IconsaxPlusBold.camera,
+                              label: l10n.assistantScreenFeddf7c6,
+                              color: _kAccent,
+                              onTap: () => _pickPhoto(ImageSource.camera),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _panelActionBtn(
+                              icon: IconsaxPlusBold.gallery,
+                              label: l10n.assistantScreenEed2fbf3,
+                              color: AppColors.superLike,
+                              onTap: () => _pickPhoto(ImageSource.gallery),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _panelActionBtn(
+                              icon: IconsaxPlusBold.video_play,
+                              label: l10n.assistantScreen26b77aa9,
+                              color: AppColors.coral,
+                              onTap: () => _pickVideo(ImageSource.camera),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _panelActionBtn(
-                        icon: IconsaxPlusBold.gallery,
-                        label: l10n.assistantScreenEed2fbf3,
-                        color: AppColors.superLike,
-                        onTap: () => _pickPhoto(ImageSource.gallery),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _kUserSurface,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: _closeUploadPanel,
+                        child: Text(
+                          l10n.assistantScreen4668a8a4,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _panelActionBtn(
-                        icon: IconsaxPlusBold.video_play,
-                        label: l10n.assistantScreen26b77aa9,
-                        color: AppColors.coral,
-                        onTap: () => _pickVideo(ImageSource.camera),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _kUserSurface,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    ],
                   ),
-                  onPressed: _closeUploadPanel,
-                  child: Text(
-                    l10n.assistantScreen4668a8a4,
-                    style:
-                        const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ],
                 ),
               ),
             ),
@@ -1187,7 +1195,9 @@ class _AssistantScreenState extends State<AssistantScreen>
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(20), sigmaY: PlatformFx.blurSigma(20)),
+          filter: ImageFilter.blur(
+              sigmaX: PlatformFx.blurSigma(20),
+              sigmaY: PlatformFx.blurSigma(20)),
           child: Container(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             decoration: BoxDecoration(
@@ -1302,14 +1312,16 @@ class _DraftSheet extends StatelessWidget {
       if (v('price').isNotEmpty) l10n.assistantScreen8a8c75e3(v('price')),
       if (v('sizeM2').isNotEmpty) l10n.assistantScreen5f7c4ea0(v('sizeM2')),
       if (v('condition').isNotEmpty) '✨  ${v('condition')}',
-      if (v('entryDate').isNotEmpty) l10n.assistantScreenF534575e(v('entryDate')),
+      if (v('entryDate').isNotEmpty)
+        l10n.assistantScreenF534575e(v('entryDate')),
     ];
     final hasPhotos = photoCount > 0;
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(22), sigmaY: PlatformFx.blurSigma(22)),
+        filter: ImageFilter.blur(
+            sigmaX: PlatformFx.blurSigma(22), sigmaY: PlatformFx.blurSigma(22)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           decoration: BoxDecoration(
@@ -1324,140 +1336,141 @@ class _DraftSheet extends StatelessWidget {
               ),
               child: SingleChildScrollView(
                 child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 18),
-                    decoration: BoxDecoration(
-                      color: _kMuted.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      l10n.assistantScreen87975ccc,
-                      style: const TextStyle(
-                        color: _kInk,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _kAccent.withValues(alpha: 0.16),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(IconsaxPlusBold.house_2,
-                          color: _kAccent, size: 20),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                ...lines.map((l) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.5),
-                      child: Text(
-                        l,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          color: _kInk,
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.3,
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 18),
+                        decoration: BoxDecoration(
+                          color: _kMuted.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    )),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      hasPhotos
-                          ? l10n.assistantScreenA61a9170(photoCount)
-                          : l10n.assistantScreen2e6b8dd3,
-                      style: TextStyle(
-                          color: hasPhotos ? _kAccent : AppColors.coral,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                        hasPhotos
-                            ? IconsaxPlusBold.tick_circle
-                            : IconsaxPlusBold.gallery,
-                        color: hasPhotos ? _kAccent : AppColors.coral,
-                        size: 20),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: onAddPhotos,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kAccent,
-                    backgroundColor: Colors.white.withValues(alpha: 0.08),
-                    side: BorderSide(
-                        color: _kAccent.withValues(alpha: 0.35), width: 1.3),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13)),
-                  ),
-                  icon: const Icon(IconsaxPlusBold.gallery_add, size: 20),
-                  label: Text(l10n.assistantScreen2628dacb,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ErikTokens.userSurface,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: publishing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          l10n.assistantScreen87975ccc,
+                          style: const TextStyle(
+                            color: _kInk,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
                           ),
-                        )
-                      : const Icon(IconsaxPlusBold.tick_circle, size: 20),
-                  label: Text(
-                    publishing
-                        ? l10n.assistantScreen89ac1e56
-                        : l10n.assistantScreenF3db670c,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w900),
-                  ),
-                  onPressed: publishing ? null : onPublish,
-                ),
-                Center(
-                  child: TextButton(
-                    onPressed: publishing ? null : onEdit,
-                    child: Text(
-                      l10n.assistantScreenE4c51425,
-                      style: const TextStyle(
-                        color: _kMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _kAccent.withValues(alpha: 0.16),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(IconsaxPlusBold.house_2,
+                              color: _kAccent, size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ...lines.map((l) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.5),
+                          child: Text(
+                            l,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              color: _kInk,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
+                          ),
+                        )),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          hasPhotos
+                              ? l10n.assistantScreenA61a9170(photoCount)
+                              : l10n.assistantScreen2e6b8dd3,
+                          style: TextStyle(
+                              color: hasPhotos ? _kAccent : AppColors.coral,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                            hasPhotos
+                                ? IconsaxPlusBold.tick_circle
+                                : IconsaxPlusBold.gallery,
+                            color: hasPhotos ? _kAccent : AppColors.coral,
+                            size: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: onAddPhotos,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kAccent,
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
+                        side: BorderSide(
+                            color: _kAccent.withValues(alpha: 0.35),
+                            width: 1.3),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(13)),
+                      ),
+                      icon: const Icon(IconsaxPlusBold.gallery_add, size: 20),
+                      label: Text(l10n.assistantScreen2628dacb,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ErikTokens.userSurface,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: publishing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(IconsaxPlusBold.tick_circle, size: 20),
+                      label: Text(
+                        publishing
+                            ? l10n.assistantScreen89ac1e56
+                            : l10n.assistantScreenF3db670c,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w900),
+                      ),
+                      onPressed: publishing ? null : onPublish,
+                    ),
+                    Center(
+                      child: TextButton(
+                        onPressed: publishing ? null : onEdit,
+                        child: Text(
+                          l10n.assistantScreenE4c51425,
+                          style: const TextStyle(
+                            color: _kMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
                 ),
               ),
             ),
@@ -1596,15 +1609,22 @@ class _AuroraBackgroundState extends State<_AuroraBackground>
                     size: Size.infinite,
                   ),
                 ),
+              // Wrapped in its own RepaintBoundary: this whole Stack sits
+              // inside an AnimatedBuilder ticking every frame for the 3s
+              // intro (driving the sibling _AuroraRibbonPainter above), and
+              // without a boundary the sibling's repaint would force this
+              // blur to be redone too.
               if (t < 0.99)
                 Positioned.fill(
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(
-                          sigmaX: PlatformFx.blurSigma(14),
-                          sigmaY: PlatformFx.blurSigma(14)),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.16),
+                  child: RepaintBoundary(
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                            sigmaX: PlatformFx.blurSigma(14),
+                            sigmaY: PlatformFx.blurSigma(14)),
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.16),
+                        ),
                       ),
                     ),
                   ),
@@ -1651,7 +1671,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathCyan = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.85 - (x / w) * (h * 0.75);
-      final y = baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
+      final y =
+          baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
       if (x == -50) {
         pathCyan.moveTo(x, y);
       } else {
@@ -1663,7 +1684,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathGreen = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.92 - (x / w) * (h * 0.82);
-      final y = baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
+      final y =
+          baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
       if (x == -50) {
         pathGreen.moveTo(x, y);
       } else {
@@ -1675,7 +1697,8 @@ class _AuroraRibbonPainter extends CustomPainter {
     final pathPurple = Path();
     for (double x = -50; x <= w + 50; x += 10) {
       final baseY = h * 0.78 - (x / w) * (h * 0.68);
-      final y = baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
+      final y =
+          baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
       if (x == -50) {
         pathPurple.moveTo(x, y);
       } else {

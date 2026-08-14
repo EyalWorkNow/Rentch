@@ -21,6 +21,41 @@ class SafeImage extends StatefulWidget {
 
   @override
   State<SafeImage> createState() => _SafeImageState();
+
+  /// Warms the framework [ImageCache] for [source] at [width] px, using the
+  /// EXACT same [ImageProvider] construction [_SafeImageState._build] uses
+  /// (same CachedNetworkImageProvider vs NetworkImage branch, same request
+  /// headers, same [ResizeImage] wrapping, same [MediaCdn.thumb] URL).
+  ///
+  /// Callers (e.g. ProfileCard's neighbor precache) used to build their own
+  /// `NetworkImage(...)` + `ResizeImage(...)` here — a DIFFERENT provider
+  /// class than the `CachedNetworkImageProvider` this widget actually
+  /// resolves through. Flutter's ImageCache key includes the provider's own
+  /// `obtainKey()`, and `NetworkImage`/`CachedNetworkImageProvider` never
+  /// compare equal to each other (different runtimeType) even for the same
+  /// URL — so that precache warmed a cache slot the real widget could never
+  /// hit, AND `NetworkImage` doesn't write through cached_network_image's
+  /// disk cache at all, so it didn't even pre-fetch the bytes the real
+  /// widget would read from disk. Net effect: the "precache" was a no-op for
+  /// the real load, which then paid the full network fetch + decode when the
+  /// image actually became visible — the flicker/reload this was meant to
+  /// prevent. Routing through this single shared helper keeps both call
+  /// sites permanently in sync.
+  static void precache(BuildContext context, String source, int width) {
+    final cleaned = InputSanitizer.sanitizeImageUrl(source);
+    if (cleaned == null || cleaned.isEmpty) return;
+    if (cleaned.startsWith('/') || cleaned.startsWith('file://')) return;
+    final remote = MediaCdn.thumb(cleaned, width);
+    final ImageProvider netProvider =
+        Platform.environment.containsKey('FLUTTER_TEST')
+            ? NetworkImage(remote,
+                headers: _SafeImageState._imageRequestHeaders(remote))
+            : CachedNetworkImageProvider(remote,
+                headers: _SafeImageState._imageRequestHeaders(remote));
+    final ImageProvider provider =
+        ResizeImage.resizeIfNeeded(width, null, netProvider);
+    precacheImage(provider, context, onError: (_, __) {});
+  }
 }
 
 class _SafeImageState extends State<SafeImage> {

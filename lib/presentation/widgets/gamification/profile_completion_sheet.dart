@@ -27,7 +27,7 @@ class ProfileCompletionSheet {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _ProfileCompletionSheet(
         percent: pct,
-        hint: provider.profileCompletionHint,
+        hint: provider.profileCompletionHint(AppLocalizations.of(context)!),
         onComplete: () {
           Navigator.of(ctx).pop();
           Navigator.of(context).push(MaterialPageRoute(

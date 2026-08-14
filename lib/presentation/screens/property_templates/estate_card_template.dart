@@ -61,7 +61,7 @@ class _EstateCardTemplate extends StatelessWidget {
           child: Padding(
             // No top inset — the image bleeds to the very top; the top bar
             // carries the status-bar safe area instead.
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -133,20 +133,26 @@ class _EstateCardTemplate extends StatelessWidget {
                       cardOverlap +
                       18,
                 ),
-
-                // ── Shared full-parity content (single source of all data) ───
-                _ParitySections(
-                  property: property,
-                  branding: branding,
-                  controller: controller,
-                  reviews: reviews,
-                  hasVirtualTour: hasVirtualTour,
-                  isLandlordPreview: isLandlordPreview,
-                  onShareTap: onShareTap,
-                  onTour: onTour,
-                ),
               ],
             ),
+          ),
+        ),
+        // ── Shared full-parity content (single source of all data) — split
+        //    out of the Column above into its own lazy sliver so Flutter
+        //    only builds/lays out each section as it scrolls into view.
+        //    Bottom padding (120) moved here from the removed outer Column
+        //    padding, since this sliver is now the trailing content.
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
+          sliver: _ParitySectionsSliver(
+            property: property,
+            branding: branding,
+            controller: controller,
+            reviews: reviews,
+            hasVirtualTour: hasVirtualTour,
+            isLandlordPreview: isLandlordPreview,
+            onShareTap: onShareTap,
+            onTour: onTour,
           ),
         ),
       ],
@@ -508,9 +514,9 @@ class _EstateFactChips extends StatelessWidget {
           l10n.estateCardTemplateFdb4eac7(property.sizeM2)),
       if (property.floor.trim().isNotEmpty)
         _TemplateFact(IconsaxPlusLinear.layer,
-            l10n.estateCardTemplateD068bb57(property.floor)),
+            l10n.estateCardTemplateD068bb57(floorLabel(property.floor, l10n))),
       if (property.condition.trim().isNotEmpty)
-        _TemplateFact(IconsaxPlusLinear.star, property.condition),
+        _TemplateFact(IconsaxPlusLinear.star, conditionLabel(property.condition, l10n)),
     ];
 
     return Wrap(

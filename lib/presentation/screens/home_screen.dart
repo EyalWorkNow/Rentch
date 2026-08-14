@@ -110,312 +110,335 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DatingProvider>(
-      builder: (context, provider, _) {
-        final isLandlord = provider.isLandlord;
-        void openLandlordTab(int index) => _onTabTap(index, provider);
+    // This shell wraps EVERY tab's screen via IndexedStack below, so
+    // watching the whole DatingProvider here (as a Consumer previously did)
+    // meant literally any state change anywhere in the app - a chat message,
+    // a swipe, a filter tweak, any of DatingProvider's 75 notifyListeners()
+    // call sites - rebuilt all four tab screens' widgets, not just whichever
+    // one actually owns the state that changed. context.select only
+    // rebuilds this widget when one of these SPECIFIC derived values
+    // actually changes; provider itself is read once (no rebuild trigger)
+    // purely for calling methods below.
+    final provider = context.read<DatingProvider>();
+    final isLandlord =
+        context.select<DatingProvider, bool>((p) => p.isLandlord);
+    final pendingMatch = context
+        .select<DatingProvider, RentalProperty?>((p) => p.pendingMatchProperty);
+    final currentTabIndex =
+        context.select<DatingProvider, int>((p) => p.currentTabIndex);
+    final unseenMatchCount =
+        context.select<DatingProvider, int>((p) => p.unseenMatchCount);
+    final ownerLeadsCount =
+        context.select<DatingProvider, int>((p) => p.ownerLeads.length);
+    final profileCompletion =
+        context.select<DatingProvider, int>((p) => p.profileCompletion);
+    {
+      void openLandlordTab(int index) => _onTabTap(index, provider);
 
-        // On a role change, reset to the first tab — but NEVER call
-        // setTabIndex (which notifies listeners) during build. Doing so is the
-        // classic "notifyListeners during build" trap: in release it can pin the
-        // tab to 0 on every rebuild if the role ever flips (unstable async role
-        // load), which presents exactly as "the navbar won't switch pages".
-        // safeIndex clamping already prevents an out-of-range index, so this is
-        // purely the reset UX and is safe to defer to after the frame.
-        if (_cachedIsLandlord != null && _cachedIsLandlord != isLandlord) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) provider.setTabIndex(0);
-          });
-        }
-        _cachedIsLandlord = isLandlord;
+      // On a role change, reset to the first tab — but NEVER call
+      // setTabIndex (which notifies listeners) during build. Doing so is the
+      // classic "notifyListeners during build" trap: in release it can pin the
+      // tab to 0 on every rebuild if the role ever flips (unstable async role
+      // load), which presents exactly as "the navbar won't switch pages".
+      // safeIndex clamping already prevents an out-of-range index, so this is
+      // purely the reset UX and is safe to defer to after the frame.
+      if (_cachedIsLandlord != null && _cachedIsLandlord != isLandlord) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) provider.setTabIndex(0);
+        });
+      }
+      _cachedIsLandlord = isLandlord;
 
-        // Keep the landlord's incoming likes fresh (throttled in the provider),
-        // so a tenant's like shows up as a pending candidate without a relaunch.
-        if (isLandlord) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              provider.refreshIncomingLikes();
-              provider.refreshOwnedEngagement();
-            }
-          });
-        }
+      // Keep the landlord's incoming likes fresh (throttled in the provider),
+      // so a tenant's like shows up as a pending candidate without a relaunch.
+      if (isLandlord) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            provider.refreshIncomingLikes();
+            provider.refreshOwnedEngagement();
+          }
+        });
+      }
 
-        // Global match detection — works regardless of which tab is active.
-        final pendingMatch = provider.pendingMatchProperty;
-        if (pendingMatch != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            _showMatchOverlay(context, pendingMatch);
-            provider.clearPendingMatch();
-          });
-        }
+      // Global match detection — works regardless of which tab is active.
+      if (pendingMatch != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          _showMatchOverlay(context, pendingMatch);
+          provider.clearPendingMatch();
+        });
+      }
 
-        final screens = isLandlord
-            ? <Widget>[
-                LandlordDashboardScreen(
-                  // Candidates + conversations are one merged tab now, so both
-                  // deep-links land on it (segment defaults to candidates).
-                  onOpenSwipes: () => openLandlordTab(_landlordLeadsTabIndex),
-                  onOpenMatches: () => openLandlordTab(_landlordLeadsTabIndex),
-                  onOpenProperties: () =>
-                      openLandlordTab(_landlordPropertiesTabIndex),
-                ),
-                const LeadsInboxScreen(),
-                const LandlordPropertiesScreen(),
-                const ProfileScreen(),
-              ]
-            : const <Widget>[
-                DiscoverScreen(),
-                MatchesScreen(),
-                SearchChatScreen(),
-                ProfileScreen()
-              ];
-
-        final l10n = AppLocalizations.of(context)!;
-        final items =
-            isLandlord ? _landlordItems(l10n) : _tenantItems(l10n);
-        final safeIndex = provider.currentTabIndex.clamp(0, screens.length - 1);
-        // The merged "לקוחות" tab (landlord, index 1) reflects BOTH pending
-        // candidates and unread conversations; the tenant "התאמות" tab (also
-        // index 1) reflects unread conversations only.
-        final unseenCount = isLandlord
-            ? provider.unseenMatchCount + provider.ownerLeads.length
-            : provider.unseenMatchCount;
-
-        return Scaffold(
-          extendBody: true,
-          // RepaintBoundary isolates the (often animating) body from the
-          // bottomNavigationBar's BackdropFilter, so body frames don't force the
-          // navbar to recomposite — keeps the bar responsive under load.
-          body: Stack(
-            children: [
-              RepaintBoundary(
-                child: IndexedStack(
-                  key: ValueKey(isLandlord),
-                  index: safeIndex,
-                  children: screens,
-                ),
+      final screens = isLandlord
+          ? <Widget>[
+              LandlordDashboardScreen(
+                // Candidates + conversations are one merged tab now, so both
+                // deep-links land on it (segment defaults to candidates).
+                onOpenSwipes: () => openLandlordTab(_landlordLeadsTabIndex),
+                onOpenMatches: () => openLandlordTab(_landlordLeadsTabIndex),
+                onOpenProperties: () =>
+                    openLandlordTab(_landlordPropertiesTabIndex),
               ),
-              // Notifications now live inside the discover 3-dots menu (tenant)
-              // and the dashboard header (landlord/agent), so no floating bell
-              // is drawn over the deck here.
-            ],
-          ),
-          bottomNavigationBar: Theme(
-            data: Theme.of(context).copyWith(
-              canvasColor: Colors.transparent,
-            ),
-            child: SafeArea(
-              // Android: let SafeArea consume the REAL system-nav inset — works
-              // for 3-button, gesture AND Samsung One UI, whatever its height —
-              // so the floating bar always clears it (manual viewPadding math with
-              // a hard cap was clipping Samsung's taller bar). iOS: keep
-              // bottom:false for the tight 12px home-indicator float.
-              bottom: Platform.isAndroid,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: Platform.isAndroid ? 10 : 12,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(100),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(100),
-                        child: BackdropFilter(
-                          // 20 blur gives a premium liquid-glass refraction; on
-                          // Android/Impeller this bar floats over the animating
-                          // swipe deck and re-blurs the moving backdrop every
-                          // frame, so trim it there via PlatformFx (iOS unchanged).
-                          filter: ImageFilter.blur(
-                              sigmaX: PlatformFx.blurSigma(20),
-                              sigmaY: PlatformFx.blurSigma(20)),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOutCubic,
-                            padding: EdgeInsets.all(
-                                (safeIndex != 0 ? 9.0 : 8.0) *
-                                    (Platform.isAndroid ? 0.85 : 1.0)),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.30),
-                                  Colors.black.withValues(alpha: 0.15),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(100),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.24),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(items.length, (index) {
-                                final item = items[index];
-                                final isSelected = index == safeIndex;
-                                final isEtti = item.isAssistant;
-                                final showBadge =
-                                    index == 1 && unseenCount > 0;
-                                // Profile tab: a progress ring around the circle
-                                // showing how complete the tenant's profile is.
-                                final profilePct = provider.profileCompletion;
-                                final showCompletionRing = index == 3 &&
-                                    !isLandlord &&
-                                    profilePct > 0 &&
-                                    profilePct < 100;
-                                final isCompact = items.length >= 5;
-                                final isNotDiscover = safeIndex != 0;
-                                final double baseCircle = isCompact
-                                    ? (isNotDiscover ? 58.3 : 53.0)
-                                    : (isNotDiscover ? 66.0 : 60.0);
-                                // Android: a touch smaller than iOS (iOS unchanged).
-                                final double circleSize = Platform.isAndroid
-                                    ? baseCircle * 0.9
-                                    : baseCircle;
+              const LeadsInboxScreen(),
+              const LandlordPropertiesScreen(),
+              const ProfileScreen(),
+            ]
+          : const <Widget>[
+              DiscoverScreen(),
+              MatchesScreen(),
+              SearchChatScreen(),
+              ProfileScreen()
+            ];
 
-                                return ScaleBounce(
-                                  key: Key('nav_tab_$index'),
-                                  onTap: () => _onTabTap(index, provider),
-                                  scaleDownTo: 0.90,
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 250),
-                                    curve: Curves.easeOutCubic,
-                                    width: circleSize,
-                                    height: circleSize,
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 1.0),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.ink,
-                                      // תכלת stroke marks ONLY the אתי CTA circle.
-                                      border: isEtti
-                                          ? Border.all(
-                                              color: AppColors.primaryLight,
-                                              width: 1.8)
-                                          : null,
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: AppColors.primary.withValues(alpha: 0.45),
-                                                blurRadius: 10,
-                                                spreadRadius: 2,
-                                              )
-                                            ]
-                                          : [],
-                                    ),
-                                    child: Center(
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          // אתי's circle: her PHOTO during the 3s
-                                          // entry peek AND whenever her tab is active
-                                          // (permanent on her page); an AI icon
-                                          // otherwise. The photo RISES in with a
-                                          // springy micro-animation.
-                                          AnimatedScale(
-                                            scale: isSelected ? 1.12 : 1.0,
-                                            duration: const Duration(milliseconds: 300),
-                                            curve: Curves.elasticOut,
-                                            child: RentlyIcon(
-                                              isSelected ? item.activeIcon : item.icon,
-                                              color: Colors.white,
-                                              size: isCompact
-                                                  ? (isNotDiscover ? 26.0 : 24.0)
-                                                  : (isNotDiscover ? 31.0 : 28.0),
+      final l10n = AppLocalizations.of(context)!;
+      final items = isLandlord ? _landlordItems(l10n) : _tenantItems(l10n);
+      final safeIndex = currentTabIndex.clamp(0, screens.length - 1);
+      // The merged "לקוחות" tab (landlord, index 1) reflects BOTH pending
+      // candidates and unread conversations; the tenant "התאמות" tab (also
+      // index 1) reflects unread conversations only.
+      final unseenCount =
+          isLandlord ? unseenMatchCount + ownerLeadsCount : unseenMatchCount;
+
+      return Scaffold(
+        extendBody: true,
+        // RepaintBoundary isolates the (often animating) body from the
+        // bottomNavigationBar's BackdropFilter, so body frames don't force the
+        // navbar to recomposite — keeps the bar responsive under load.
+        body: Stack(
+          children: [
+            RepaintBoundary(
+              child: IndexedStack(
+                key: ValueKey(isLandlord),
+                index: safeIndex,
+                children: screens,
+              ),
+            ),
+            // Notifications now live inside the discover 3-dots menu (tenant)
+            // and the dashboard header (landlord/agent), so no floating bell
+            // is drawn over the deck here.
+          ],
+        ),
+        bottomNavigationBar: Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: Colors.transparent,
+          ),
+          child: SafeArea(
+            // Android: let SafeArea consume the REAL system-nav inset — works
+            // for 3-button, gesture AND Samsung One UI, whatever its height —
+            // so the floating bar always clears it (manual viewPadding math with
+            // a hard cap was clipping Samsung's taller bar). iOS: keep
+            // bottom:false for the tight 12px home-indicator float.
+            bottom: Platform.isAndroid,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: Platform.isAndroid ? 10 : 12,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: BackdropFilter(
+                        // 20 blur gives a premium liquid-glass refraction; on
+                        // Android/Impeller this bar floats over the animating
+                        // swipe deck and re-blurs the moving backdrop every
+                        // frame, so trim it there via PlatformFx (iOS unchanged).
+                        filter: ImageFilter.blur(
+                            sigmaX: PlatformFx.blurSigma(20),
+                            sigmaY: PlatformFx.blurSigma(20)),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          padding: EdgeInsets.all((safeIndex != 0 ? 9.0 : 8.0) *
+                              (Platform.isAndroid ? 0.85 : 1.0)),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.30),
+                                Colors.black.withValues(alpha: 0.15),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(100),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.24),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List.generate(items.length, (index) {
+                              final item = items[index];
+                              final isSelected = index == safeIndex;
+                              final isEtti = item.isAssistant;
+                              final showBadge = index == 1 && unseenCount > 0;
+                              // Profile tab: a progress ring around the circle
+                              // showing how complete the tenant's profile is.
+                              final profilePct = profileCompletion;
+                              final showCompletionRing = index == 3 &&
+                                  !isLandlord &&
+                                  profilePct > 0 &&
+                                  profilePct < 100;
+                              final isCompact = items.length >= 5;
+                              final isNotDiscover = safeIndex != 0;
+                              final double baseCircle = isCompact
+                                  ? (isNotDiscover ? 58.3 : 53.0)
+                                  : (isNotDiscover ? 66.0 : 60.0);
+                              // Android: a touch smaller than iOS (iOS unchanged).
+                              final double circleSize = Platform.isAndroid
+                                  ? baseCircle * 0.9
+                                  : baseCircle;
+
+                              return ScaleBounce(
+                                key: Key('nav_tab_$index'),
+                                onTap: () => _onTabTap(index, provider),
+                                scaleDownTo: 0.90,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 250),
+                                      curve: Curves.easeOutCubic,
+                                      width: circleSize,
+                                      height: circleSize,
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 1.0),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.ink,
+                                        // תכלת stroke marks ONLY the אתי CTA circle.
+                                        border: isEtti
+                                            ? Border.all(
+                                                color: AppColors.primaryLight,
+                                                width: 1.8)
+                                            : null,
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.primary
+                                                      .withValues(alpha: 0.45),
+                                                  blurRadius: 10,
+                                                  spreadRadius: 2,
+                                                )
+                                              ]
+                                            : [],
+                                      ),
+                                      child: Center(
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            // אתי's circle: her PHOTO during the 3s
+                                            // entry peek AND whenever her tab is active
+                                            // (permanent on her page); an AI icon
+                                            // otherwise. The photo RISES in with a
+                                            // springy micro-animation.
+                                            AnimatedScale(
+                                              scale: isSelected ? 1.12 : 1.0,
+                                              duration: const Duration(
+                                                  milliseconds: 300),
+                                              curve: Curves.elasticOut,
+                                              child: RentlyIcon(
+                                                isSelected
+                                                    ? item.activeIcon
+                                                    : item.icon,
+                                                color: Colors.white,
+                                                size: isCompact
+                                                    ? (isNotDiscover
+                                                        ? 26.0
+                                                        : 24.0)
+                                                    : (isNotDiscover
+                                                        ? 31.0
+                                                        : 28.0),
+                                              ),
                                             ),
-                                          ),
-                                          if (showBadge)
-                                            Positioned(
-                                              top: -4,
-                                              right: -4,
-                                              child: ScaleBopBadge(
-                                                value: unseenCount,
-                                                child: Container(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                          minWidth: 16,
-                                                          minHeight: 16),
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 4),
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                    color: AppColors.coral,
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: Center(
-                                                    child: Text(
-                                                      unseenCount > 9
-                                                          ? '9+'
-                                                          : '$unseenCount',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 9,
-                                                        fontWeight:
-                                                            FontWeight.w900,
+                                            if (showBadge)
+                                              Positioned(
+                                                top: -4,
+                                                right: -4,
+                                                child: ScaleBopBadge(
+                                                  value: unseenCount,
+                                                  child: Container(
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                            minWidth: 16,
+                                                            minHeight: 16),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 4),
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                      color: AppColors.coral,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Center(
+                                                      child: Text(
+                                                        unseenCount > 9
+                                                            ? '9+'
+                                                            : '$unseenCount',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 9,
+                                                          fontWeight:
+                                                              FontWeight.w900,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  // Profile-completion ring hugging the circle.
-                                  if (showCompletionRing)
-                                    IgnorePointer(
-                                      child: SizedBox(
-                                        width: circleSize + 6,
-                                        height: circleSize + 6,
-                                        child: CircularProgressIndicator(
-                                          value: profilePct / 100.0,
-                                          strokeWidth: 2.6,
-                                          backgroundColor:
-                                              AppColors.ink.withValues(alpha: 0.25),
-                                          valueColor:
-                                              const AlwaysStoppedAnimation(
-                                                  AppColors.superLike),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ),
+                                    // Profile-completion ring hugging the circle.
+                                    if (showCompletionRing)
+                                      IgnorePointer(
+                                        child: SizedBox(
+                                          width: circleSize + 6,
+                                          height: circleSize + 6,
+                                          child: CircularProgressIndicator(
+                                            value: profilePct / 100.0,
+                                            strokeWidth: 2.6,
+                                            backgroundColor: AppColors.ink
+                                                .withValues(alpha: 0.25),
+                                            valueColor:
+                                                const AlwaysStoppedAnimation(
+                                                    AppColors.superLike),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    }
   }
 }
 
@@ -562,8 +585,8 @@ class _EttiCircleContentState extends State<_EttiCircleContent>
                   Opacity(
                     opacity: photoV.clamp(0.0, 1.0),
                     child: Transform.translate(
-                      offset: Offset(
-                          0, (1.0 - photoV.clamp(0.0, 1.0)) * widget.size * 0.5),
+                      offset: Offset(0,
+                          (1.0 - photoV.clamp(0.0, 1.0)) * widget.size * 0.5),
                       child: Transform.scale(
                         scale: photoV,
                         child: widget.photo,

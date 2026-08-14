@@ -36,6 +36,16 @@ void main() {
     );
     await _pumpDetail(tester, property);
 
+    // Classic's below-the-fold content (specs, enrichment, description,
+    // features, owner, reviews, map) renders in a lazy SliverList — off-
+    // screen sections aren't built until scrolled into view, so scroll the
+    // description into view first (same as the broker-template case below).
+    await tester.scrollUntilVisible(
+      find.text('דירה מקסימה עם נוף לים, קרובה לתחבורה ציבורית.'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
     expect(find.text('דירה מקסימה עם נוף לים, קרובה לתחבורה ציבורית.'),
         findsOneWidget);
     await _settle(tester);
@@ -51,6 +61,38 @@ void main() {
     // otherwise an older listing with no description would show an empty
     // "תיאור" block with nothing under it.
     expect(find.text('תיאור'), findsNothing);
+    await _settle(tester);
+  });
+
+  // A property with a custom design (hasCustomDesign: true — set whenever a
+  // landlord/broker picks a non-classic template) routes to a completely
+  // different widget tree (_BrokerPropertyDetailTemplate → _ParitySections),
+  // not _ClassicTemplate. The two trees have separate description code —
+  // covering only one leaves the other unverified.
+  testWidgets(
+      'broker/custom-design template also shows the description when present',
+      (tester) async {
+    final property = _property(
+      id: 'with-desc-broker',
+      description: 'דירה מקסימה עם נוף לים, קרובה לתחבורה ציבורית.',
+      designTemplate: 'galleryEditorial',
+    );
+    await _pumpDetail(tester, property);
+
+    // This template renders its below-the-fold sections (including the
+    // description) in a lazy SliverList — unlike the Classic template above,
+    // off-screen sections aren't built until scrolled into view, so a plain
+    // find.text() (no scroll) would find nothing even though the section IS
+    // there. Scroll the sliver into view first, matching what a real user
+    // would have to do.
+    await tester.scrollUntilVisible(
+      find.text('דירה מקסימה עם נוף לים, קרובה לתחבורה ציבורית.'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('דירה מקסימה עם נוף לים, קרובה לתחבורה ציבורית.'),
+        findsOneWidget);
     await _settle(tester);
   });
 }
@@ -84,7 +126,11 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
-RentalProperty _property({required String id, required String description}) {
+RentalProperty _property({
+  required String id,
+  required String description,
+  String designTemplate = '',
+}) {
   return RentalProperty(
     id: id,
     url: 'https://example.com/$id',
@@ -105,6 +151,7 @@ RentalProperty _property({required String id, required String description}) {
     ownerName: 'בעל הדירה',
     agencyListing: false,
     description: description,
+    designTemplate: designTemplate,
     features: const [],
     // Empty on purpose — a real image URL triggers a real (failing, in a
     // test sandbox with no network) image load whose fallback widget

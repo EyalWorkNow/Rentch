@@ -1,9 +1,10 @@
 import 'package:dating_app/core/constants/app_colors.dart';
-import 'package:dating_app/core/security/input_sanitizer.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/verification_info_sheet.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,20 @@ class ProfileCard extends StatefulWidget {
 class _ProfileCardState extends State<ProfileCard> {
   int _currentImage = 0;
 
+  // Memoized static content (image + gradient + badges + price/address/stat
+  // pills — everything that does NOT depend on the per-drag-frame
+  // horizontalOffsetPercentage). CardSwiper's cardBuilder is invoked on every
+  // pointer-move frame while dragging, which rebuilds this whole StatefulWidget
+  // via didUpdateWidget → build(). Recomputing ~15 widgets (Row/Column layouts,
+  // several TextPainter layouts) at 60fps was the drag jank. Since the content
+  // itself never changes mid-drag, we cache the built Widget INSTANCE keyed by
+  // everything it actually depends on: when only the offset changes, build()
+  // reuses the identical instance, and Flutter's element diffing (`identical`
+  // check in Element.updateChild) skips rebuilding/relaying that subtree
+  // entirely instead of just skipping our own build() call.
+  Widget? _cachedContent;
+  Object? _cachedContentSignature;
+
   RentalProperty get p => widget.property;
 
   @override
@@ -55,6 +70,15 @@ class _ProfileCardState extends State<ProfileCard> {
     return index.clamp(0, mediaLength - 1).toInt();
   }
 
+  // The card sits inside `Padding(EdgeInsets.symmetric(horizontal: 8))` (see
+  // build() below) — its actual content box is 16px narrower than the raw
+  // screen width. Matched here so the precache computes the same pixel width
+  // SafeImage's own LayoutBuilder will see; a mismatched width is a different
+  // ResizeImage decode-cache key even for the identical URL, i.e. a silent
+  // cache miss that still shows the fade-in flicker this precache exists to
+  // prevent.
+  static const double _kCardHorizontalPadding = 16.0;
+
   /// Decode the current image + its immediate neighbors ahead of time so the
   /// AnimatedSwitcher always crossfades between already-loaded images instead of
   /// fading to a still-loading (blank) one — the cause of the flicker.
@@ -64,7 +88,7 @@ class _ProfileCardState extends State<ProfileCard> {
     // Decode neighbours at the card's DISPLAY width (matches SafeImage's own
     // cacheWidth so it's a cache HIT, not a second full-res decode). Full-res
     // here meant 3 × ~48 MB bitmaps per swipe — the worst Android memory spike.
-    final w = (MediaQuery.sizeOf(context).width *
+    final w = ((MediaQuery.sizeOf(context).width - _kCardHorizontalPadding) *
             MediaQuery.devicePixelRatioOf(context))
         .round()
         .clamp(64, 2048);
@@ -73,11 +97,12 @@ class _ProfileCardState extends State<ProfileCard> {
       if (idx < 0 || idx >= media.length) continue;
       final m = media[idx];
       if (!m.isImage) continue;
-      final url = InputSanitizer.sanitizeImageUrl(m.url);
-      if (url == null || url.isEmpty) continue;
-      if (url.startsWith('/') || url.startsWith('file://')) continue;
-      precacheImage(ResizeImage(NetworkImage(url), width: w), context,
-          onError: (_, __) {});
+      // SafeImage.precache mirrors SafeImage's own ImageProvider construction
+      // exactly (same CachedNetworkImageProvider, same request headers, same
+      // MediaCdn.thumb URL) — using a plain NetworkImage here (as before)
+      // built a cache entry the real widget's CachedNetworkImageProvider
+      // could never match, silently defeating this precache entirely.
+      SafeImage.precache(context, m.url, w);
     }
   }
 
@@ -129,8 +154,6 @@ class _ProfileCardState extends State<ProfileCard> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<DatingProvider>();
-    final isLiking = widget.horizontalOffsetPercentage > 10;
-    final isPassing = widget.horizontalOffsetPercentage < -10;
     final media = p.media;
     final hasMultiple = media.length > 1;
     final safeCurrentImage = _safeImageIndex(_currentImage);
@@ -142,10 +165,42 @@ class _ProfileCardState extends State<ProfileCard> {
     final score = provider.displayMatchScore(p);
     final priceCtx = provider.priceContext(p);
     final isSale = p.transactionType == PropertyTransactionType.sale;
-    final properties = provider.filteredProperties;
-    final isGuest = provider.isGuestMode;
-    final isFirst = isGuest && properties.isNotEmpty && p.id == properties.first.id;
-    final isSecond = isGuest && properties.length > 1 && p.id == properties[1].id;
+
+    // Everything below depends only on (p, safeCurrentImage, score, priceCtx,
+    // isSale, l10n) — NOT on horizontalOffsetPercentage. Memoize the built
+    // Widget instance keyed on those so a drag frame (which only changes the
+    // offset) reuses the identical instance instead of rebuilding/relaying the
+    // image + gradient + badges + price/address/stat-pill subtree ~60x/sec.
+    final signature = Object.hash(
+      p.id,
+      safeCurrentImage,
+      score,
+      priceCtx,
+      isSale,
+      p.isUltraBoosted,
+      p.isBoosted,
+      p.isVerifiedListing,
+      hasMultiple,
+      media.length,
+      identityHashCode(l10n),
+    );
+    if (_cachedContent == null || _cachedContentSignature != signature) {
+      _cachedContentSignature = signature;
+      _cachedContent = RepaintBoundary(
+        child: _buildStaticContent(
+          context: context,
+          l10n: l10n,
+          media: media,
+          hasMultiple: hasMultiple,
+          safeCurrentImage: safeCurrentImage,
+          currentMedia: currentMedia,
+          score: score,
+          priceCtx: priceCtx,
+          isSale: isSale,
+        ),
+      );
+    }
+    final content = _cachedContent!;
 
     final dragFactor = (widget.horizontalOffsetPercentage.abs() / 100.0).clamp(0.0, 1.0);
     final blurRadius = 18.0 + (14.0 * dragFactor);
@@ -205,278 +260,302 @@ class _ProfileCardState extends State<ProfileCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-              // Background image. The old AnimatedSwitcher crossfade dipped to the
-              // background mid-transition (both layers ~50% opacity) — that was the
-              // flicker. Now a single stable element: gaplessPlayback (in SafeImage)
-              // holds the current frame until the next is decoded, and we precache
-              // neighbors, so tapping through photos swaps instantly with no flash.
-              // Isolate the image in its own raster layer so the frequent
-              // drag-driven repaints of the gradient/badges/tap-zones above it
-              // never repaint (and never blink) the photo. Combined with the
-              // stable ValueKey, a photo swap only changes the provider —
-              // gaplessPlayback in SafeImage holds the old frame until the new
-              // one decodes, so the swap is instant with no flicker.
-              RepaintBoundary(
-                child: _CardImage(
-                  key: ValueKey<String>('cardimg:${p.id}'),
-                  media: currentMedia,
-                  city: p.city,
-                ),
-              ),
+                // Memoized static content (image/gradient/badges/price/etc — see
+                // signature above). Already wrapped in its own RepaintBoundary so
+                // that when this AnimatedContainer's border/shadow repaints every
+                // drag frame, the cached content layer is reused instead of being
+                // redrawn (text glyphs, gradient, badges) on every frame too.
+                content,
 
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.92),
-                      Colors.black.withValues(alpha: 0.65),
-                      Colors.black.withValues(alpha: 0.28),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.32, 0.60, 0.82],
-                  ),
-                ),
-              ),
-
-              // Image navigation tap zones (upper 55% of card)
-              if (hasMultiple)
-                Positioned.fill(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        flex: 55,
-                        child: Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Row(
-                            children: [
-                              // Left tap -> prev
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _prevImage,
-                                  behavior: HitTestBehavior.translucent,
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                              // Right tap -> next
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _nextImage,
-                                  behavior: HitTestBehavior.translucent,
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ],
+                // Swipe labels with smooth scale-in and fade-in stamp animation.
+                // Left OUTSIDE the memoized/RepaintBoundary content since this is
+                // the one piece that's genuinely supposed to animate every frame.
+                if (widget.horizontalOffsetPercentage != 0)
+                  Positioned(
+                    top: 50,
+                    left: widget.horizontalOffsetPercentage < 0 ? 24 : null,
+                    right: widget.horizontalOffsetPercentage > 0 ? 24 : null,
+                    child: Transform.rotate(
+                      angle: widget.horizontalOffsetPercentage > 0 ? -0.18 : 0.18,
+                      child: Opacity(
+                        opacity: (widget.horizontalOffsetPercentage.abs() / 30.0).clamp(0.0, 1.0),
+                        child: Transform.scale(
+                          scale: (widget.horizontalOffsetPercentage.abs() / 40.0).clamp(0.85, 1.2),
+                          child: _SwipeBadge(
+                            label: widget.horizontalOffsetPercentage > 0
+                                ? l10n.profileCardB9fe4671
+                                : l10n.profileCard80a413c5,
+                            color: widget.horizontalOffsetPercentage > 0 ? AppColors.primary : AppColors.coral,
                           ),
-                        ),
-                      ),
-                      const Expanded(flex: 45, child: SizedBox.shrink()),
-                    ],
-                  ),
-                ),
-
-              // Tap bottom area → detail page
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: MediaQuery.sizeOf(context).height * 0.28,
-                child: GestureDetector(
-                  onTap: () => _openDetail(context),
-                  onDoubleTap: () => _likeCard(context),
-                  behavior: HitTestBehavior.translucent,
-                ),
-              ),
-
-              // Progress bars — Stories-style image counter at very top
-              if (hasMultiple)
-                Positioned(
-                  top: 12,
-                  left: 14,
-                  right: 14,
-                  child: _ImageProgressBars(
-                    count: media.length,
-                    current: safeCurrentImage,
-                  ),
-                ),
-
-
-
-              // Swipe labels with smooth scale-in and fade-in stamp animation
-              if (widget.horizontalOffsetPercentage != 0)
-                Positioned(
-                  top: 50,
-                  left: widget.horizontalOffsetPercentage < 0 ? 24 : null,
-                  right: widget.horizontalOffsetPercentage > 0 ? 24 : null,
-                  child: Transform.rotate(
-                    angle: widget.horizontalOffsetPercentage > 0 ? -0.18 : 0.18,
-                    child: Opacity(
-                      opacity: (widget.horizontalOffsetPercentage.abs() / 30.0).clamp(0.0, 1.0),
-                      child: Transform.scale(
-                        scale: (widget.horizontalOffsetPercentage.abs() / 40.0).clamp(0.85, 1.2),
-                        child: _SwipeBadge(
-                          label: widget.horizontalOffsetPercentage > 0
-                              ? l10n.profileCardB9fe4671
-                              : l10n.profileCard80a413c5,
-                          color: widget.horizontalOffsetPercentage > 0 ? AppColors.primary : AppColors.coral,
                         ),
                       ),
                     ),
                   ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Everything visually inside the card that does NOT depend on the
+  /// per-drag-frame horizontalOffsetPercentage: image, dark gradient, photo
+  /// tap-zones, progress bars, and the bottom price/address/stat-pill overlay.
+  /// Pulled out of build() so it can be memoized (see `_cachedContent` above)
+  /// and skipped entirely on drag frames that only move the card.
+  Widget _buildStaticContent({
+    required BuildContext context,
+    required AppLocalizations l10n,
+    required List<PropertyMedia> media,
+    required bool hasMultiple,
+    required int safeCurrentImage,
+    required PropertyMedia? currentMedia,
+    required int? score,
+    required PriceContext priceCtx,
+    required bool isSale,
+  }) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Background image. The old AnimatedSwitcher crossfade dipped to the
+        // background mid-transition (both layers ~50% opacity) — that was the
+        // flicker. Now a single stable element: gaplessPlayback (in SafeImage)
+        // holds the current frame until the next is decoded, and we precache
+        // neighbors, so tapping through photos swaps instantly with no flash.
+        RepaintBoundary(
+          child: _CardImage(
+            key: ValueKey<String>('cardimg:${p.id}'),
+            media: currentMedia,
+            city: p.city,
+          ),
+        ),
+
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.92),
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.28),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.32, 0.60, 0.82],
+            ),
+          ),
+        ),
+
+        // Image navigation tap zones (upper 55% of card)
+        if (hasMultiple)
+          Positioned.fill(
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 55,
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(
+                      children: [
+                        // Left tap -> prev
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _prevImage,
+                            behavior: HitTestBehavior.translucent,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                        // Right tap -> next
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _nextImage,
+                            behavior: HitTestBehavior.translucent,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              // Content overlay (bottom layout directly on the dark gradient).
-              // Lowered so title/price/tags sit ~10px above the action-buttons
-              // row (which floats at bottom:140 and is ~78px tall).
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 100,
-                child: GestureDetector(
-                  onTap: () => _openDetail(context),
-                  onDoubleTap: () => _likeCard(context),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                const Expanded(flex: 45, child: SizedBox.shrink()),
+              ],
+            ),
+          ),
+
+        // Tap bottom area → detail page
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: MediaQuery.sizeOf(context).height * 0.28,
+          child: GestureDetector(
+            onTap: () => _openDetail(context),
+            onDoubleTap: () => _likeCard(context),
+            behavior: HitTestBehavior.translucent,
+          ),
+        ),
+
+        // Progress bars — Stories-style image counter at very top
+        if (hasMultiple)
+          Positioned(
+            top: 12,
+            left: 14,
+            right: 14,
+            child: _ImageProgressBars(
+              count: media.length,
+              current: safeCurrentImage,
+            ),
+          ),
+
+        // Content overlay (bottom layout directly on the dark gradient).
+        // Lowered so title/price/tags sit ~10px above the action-buttons
+        // row (which floats at bottom:140 and is ~78px tall).
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 100,
+          child: GestureDetector(
+            onTap: () => _openDetail(context),
+            onDoubleTap: () => _likeCard(context),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      Flexible(
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Flexible(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (p.isUltraBoosted) ...[
-                                    const _BoostBadge(ultra: true),
-                                    const SizedBox(width: 6),
-                                  ] else if (p.isBoosted) ...[
-                                    const _BoostBadge(ultra: false),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  if (isSale) ...[
-                                    const _SaleBadge(),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  if (p.isVerifiedListing) ...[
-                                    Flexible(
-                                      child: GestureDetector(
-                                        onTap: () =>
-                                            VerificationInfoSheet.show(
-                                                context),
-                                        child: _VerifiedListingBadge(),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  if (priceCtx != PriceContext.average)
-                                    _PriceContextBadge(ctx: priceCtx),
-                                ],
-                              ),
-                            ),
-                            if (score != null)
-                              Flexible(child: _MatchScoreBadge(score: score))
-                            else
-                              const SizedBox.shrink(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              p.priceLabel,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              p.priceSuffixLabel,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            RentlyIcon(
-                              IconsaxPlusLinear.location,
-                              size: 14,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                p.address,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w600,
+                            if (p.isUltraBoosted) ...[
+                              const _BoostBadge(ultra: true),
+                              const SizedBox(width: 6),
+                            ] else if (p.isBoosted) ...[
+                              const _BoostBadge(ultra: false),
+                              const SizedBox(width: 6),
+                            ],
+                            if (isSale) ...[
+                              const _SaleBadge(),
+                              const SizedBox(width: 6),
+                            ],
+                            if (p.isVerifiedListing) ...[
+                              Flexible(
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      VerificationInfoSheet.show(context),
+                                  child: _VerifiedListingBadge(),
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (priceCtx != PriceContext.average)
+                              _PriceContextBadge(ctx: priceCtx),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            _StatPill(
-                                icon: IconsaxPlusLinear.building,
-                                label: l10n.profileCardF0f71ca3(p.roomsLabel)),
-                            const SizedBox(width: 6),
-                            _StatPill(
-                                icon: IconsaxPlusLinear.maximize_3,
-                                label: l10n.profileCardD8b6113c(p.sizeM2)),
-                            if (p.floor.isNotEmpty) ...[
-                              const SizedBox(width: 6),
-                              _StatPill(
-                                  icon: IconsaxPlusLinear.layer,
-                                  label: l10n.profileCard77d9ac8f(p.floor)),
-                            ],
-                            if (p.sizeM2 > 0) ...[
-                              const SizedBox(width: 6),
-                              _StatPill(
-                                icon: IconsaxPlusLinear.moneys,
-                                label: l10n.profileCardF069621c(
-                                    (p.price / p.sizeM2).round()),
-                              ),
-                            ],
-                          ],
+                      if (score != null)
+                        Flexible(child: _MatchScoreBadge(score: score))
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        p.priceLabel,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        p.priceSuffixLabel,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      RentlyIcon(
+                        IconsaxPlusLinear.location,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          p.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      _StatPill(
+                          icon: IconsaxPlusLinear.building,
+                          label: l10n.profileCardF0f71ca3(p.roomsLabel)),
+                      const SizedBox(width: 6),
+                      _StatPill(
+                          icon: IconsaxPlusLinear.maximize_3,
+                          label: l10n.profileCardD8b6113c(p.sizeM2)),
+                      if (p.floor.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        _StatPill(
+                            icon: IconsaxPlusLinear.layer,
+                            label: l10n.profileCard77d9ac8f(
+                                floorLabel(p.floor, l10n))),
+                      ],
+                      if (p.sizeM2 > 0) ...[
+                        const SizedBox(width: 6),
+                        _StatPill(
+                          icon: IconsaxPlusLinear.moneys,
+                          label: l10n.profileCardF069621c(
+                              (p.price / p.sizeM2).round()),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      ),
+      ],
     );
   }
 }

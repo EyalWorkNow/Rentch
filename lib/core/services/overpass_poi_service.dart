@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dating_app/core/search/engine/feature_engineering.dart'
     show IsraelGeoIndex, NearbyPlace;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// Live, COMPREHENSIVE nearby-POI lookup from OpenStreetMap via the Overpass API.
@@ -49,11 +50,32 @@ class OverpassPoiService {
         final res = await _http
             .post(Uri.parse(ep), headers: _headers, body: query)
             .timeout(const Duration(seconds: 30));
-        if (res.statusCode != 200) continue;
+        if (res.statusCode != 200) {
+          if (kDebugMode) {
+            debugPrint(
+                'OverpassPoiService: $ep returned HTTP ${res.statusCode}');
+          }
+          continue;
+        }
         final body = jsonDecode(utf8.decode(res.bodyBytes));
-        if (body is! Map || body['elements'] is! List) continue;
-        return _group(body['elements'] as List, lat, lon);
-      } catch (_) {
+        if (body is! Map || body['elements'] is! List) {
+          if (kDebugMode) {
+            debugPrint('OverpassPoiService: $ep returned unexpected body '
+                '(no elements list)');
+          }
+          continue;
+        }
+        final grouped = _group(body['elements'] as List, lat, lon);
+        if (kDebugMode) {
+          debugPrint('OverpassPoiService: $ep → '
+              '${(body['elements'] as List).length} raw elements, grouped '
+              '${grouped.map((k, v) => MapEntry(k, v.length))}');
+        }
+        return grouped;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('OverpassPoiService: $ep failed: $e');
+        }
         // try the next mirror
       }
     }

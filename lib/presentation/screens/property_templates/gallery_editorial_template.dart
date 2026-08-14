@@ -64,7 +64,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
     if (property.street.trim().isNotEmpty) {
       final number = property.streetNumber > 0 ? ' ${property.streetNumber}' : '';
       return l10n.galleryEditorialTemplate17773b7f(
-          property.propertyType, property.street, number);
+          propertyTypeLabel(property.propertyType, l10n), property.street, number);
     }
     return property.address;
   }
@@ -79,17 +79,20 @@ class _GalleryEditorialTemplate extends StatelessWidget {
     }
     if (property.floor.trim().isNotEmpty) {
       final total = property.totalFloors.trim();
+      final floor = floorLabel(property.floor, l10n);
       parts.add(total.isNotEmpty
-          ? l10n.galleryEditorialTemplateCa554bb0(property.floor, total)
-          : l10n.galleryEditorialTemplateD068bb57(property.floor));
+          ? l10n.galleryEditorialTemplateCa554bb0(floor, total)
+          : l10n.galleryEditorialTemplateD068bb57(floor));
     }
-    if (property.condition.trim().isNotEmpty) parts.add(property.condition.trim());
+    if (property.condition.trim().isNotEmpty) {
+      parts.add(conditionLabel(property.condition.trim(), l10n));
+    }
     final spec = parts.join(' · ');
     final place = property.neighborhood.trim().isNotEmpty
         ? '${property.neighborhood.trim()}, ${property.city}'
         : property.city;
     return l10n.galleryEditorialTemplate19aad790(
-        property.propertyType, place, spec);
+        propertyTypeLabel(property.propertyType, l10n), place, spec);
   }
 
   @override
@@ -103,8 +106,7 @@ class _GalleryEditorialTemplate extends StatelessWidget {
           child: Padding(
             // Edge-to-edge hero: no top padding so the image reaches the very
             // top; the top bar is overlaid inside the status-bar safe area.
-            // Bottom padding clears the floating bottom bar.
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 124),
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -116,18 +118,26 @@ class _GalleryEditorialTemplate extends StatelessWidget {
                   accent: branding.primaryColor,
                 ),
                 const SizedBox(height: 20),
-                _ParitySections(
-                  property: property,
-                  branding: branding,
-                  controller: controller,
-                  reviews: reviews,
-                  hasVirtualTour: hasVirtualTour,
-                  isLandlordPreview: isLandlordPreview,
-                  onShareTap: onShareTap,
-                  onTour: onTour,
-                ),
               ],
             ),
+          ),
+        ),
+        // Below-the-fold content as a lazy sliver (was the tail of the Column
+        // above) so Flutter only builds/lays out each section as it scrolls
+        // into view instead of all at once on first frame. Bottom padding
+        // clears the floating bottom bar (moved from the Column's own
+        // padding since it now needs to trail the sliver, not the hero).
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 124),
+          sliver: _ParitySectionsSliver(
+            property: property,
+            branding: branding,
+            controller: controller,
+            reviews: reviews,
+            hasVirtualTour: hasVirtualTour,
+            isLandlordPreview: isLandlordPreview,
+            onShareTap: onShareTap,
+            onTour: onTour,
           ),
         ),
       ],
@@ -391,7 +401,7 @@ class _SpecLedger extends StatelessWidget {
       if (property.sizeM2 > 0)
         _SpecEntry('${property.sizeM2}', l10n.galleryEditorialTemplateD3b9013b),
       if (property.floor.trim().isNotEmpty)
-        _SpecEntry(property.floor, l10n.galleryEditorialTemplate047e630b),
+        _SpecEntry(floorLabel(property.floor, l10n), l10n.galleryEditorialTemplate047e630b),
       if (property.totalFloors.trim().isNotEmpty)
         _SpecEntry(property.totalFloors, l10n.galleryEditorialTemplate71c5f6b5),
     ];

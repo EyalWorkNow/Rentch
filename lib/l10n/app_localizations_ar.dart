@@ -2621,6 +2621,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get propertyDetailScreenDf4787e7 => 'فتح في الخرائط';
 
   @override
+  String get propertyDetailScreenLoadingPois => 'جارٍ التحميل…';
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'تعديل العقار';
 
   @override
@@ -11654,4 +11657,110 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get propertyDetailScreenDescription => 'الوصف';
+
+  @override
+  String get smartSearchAmenityRenovated => '✦ مجدّد';
+
+  @override
+  String get smartSearchAmenityPets => '🐾 يسمح بالحيوانات الأليفة';
+
+  @override
+  String get smartSearchAmenityParking => '🅿️ موقف سيارات';
+
+  @override
+  String get smartSearchAmenityBalcony => '🌤️ شرفة';
+
+  @override
+  String get smartSearchAmenityElevator => '🛗 مصعد';
+
+  @override
+  String get smartSearchAmenityFurnished => '🛋️ مفروش';
+
+  @override
+  String get smartSearchAmenityMamad => '🛡️ غرفة آمنة';
+
+  @override
+  String get smartSearchAmenityGarden => '🌳 حديقة';
+
+  @override
+  String get smartSearchAmenityAir => '❄️ تكييف';
+
+  @override
+  String get smartSearchAmenityPool => '🏊 مسبح';
+
+  @override
+  String get smartSearchAmenityGym => '🏋️ صالة رياضية';
+
+  @override
+  String get smartSearchAmenityStorage => '📦 مخزن';
+
+  @override
+  String get smartSearchAmenitySun => '☀️ مشمس';
+
+  @override
+  String get smartSearchAmenitySafe => '🔒 آمن';
+
+  @override
+  String get smartSearchAmenityInternet => '🌐 إنترنت';
+
+  @override
+  String get smartSearchAmenityLaundry => '🧺 غسيل';
+
+  @override
+  String get smartSearchAmenityAccessible => '♿ مؤهل لذوي الاحتياجات';
+
+  @override
+  String get smartSearchAmenityRoommates => '👥 مناسب لشركاء السكن';
+
+  @override
+  String get smartSearchForSale => '🏷️ للبيع';
+
+  @override
+  String get smartSearchForRent => '🔑 للإيجار';
+
+  @override
+  String smartSearchRoomsSuffix(String range) {
+    return '🛏️ $range غرف';
+  }
+
+  @override
+  String get smartSearchNearTrain => '🚉 قريب من القطار';
+
+  @override
+  String get smartSearchBestValue => '🏷️ الأفضل قيمة';
+
+  @override
+  String smartSearchRangeUpTo(String value) {
+    return 'حتى $value';
+  }
+
+  @override
+  String smartSearchRangeFrom(String value) {
+    return 'من $value';
+  }
+
+  @override
+  String get gamificationHintAddPhoto => 'أضف صورة شخصية (+20%)';
+
+  @override
+  String get gamificationHintWriteBio => 'اكتب نبذة عنك (+20%)';
+
+  @override
+  String get gamificationHintSetBudget => 'حدد الميزانية (+15%)';
+
+  @override
+  String get gamificationHintMoveInDate => 'متى تنتقل؟ (+15%)';
+
+  @override
+  String get gamificationHintAddRequirements => 'أضف متطلباتك (+10%)';
+
+  @override
+  String get gamificationHintAddName => 'أضف اسمك (+10%)';
+
+  @override
+  String get gamificationHintAlmostDone => 'ملفك الشخصي أوشك على الاكتمال!';
+
+  @override
+  String get panoramaCaptureScreenStillProcessing =>
+      'لا تزال المعالجة جارية - سنعلمك عندما تكون جاهزة';
 }

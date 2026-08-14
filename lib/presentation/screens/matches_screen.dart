@@ -446,10 +446,14 @@ class _MatchesScreenState extends State<MatchesScreen> {
                           Expanded(
                             child: (filtered.isEmpty && requestPairs.isEmpty)
                                 ? _EmptyFilterResults(onClear: _clearFilters)
-                                : ListView(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 12, 16, 120),
-                                    children: [
+                                : Builder(builder: (context) {
+                                    // Same ordered widget list the previous
+                                    // ListView(children: [...]) produced via
+                                    // its inline if/for spread — only the
+                                    // widget itself changes below (eager
+                                    // ListView -> lazy ListView.builder), not
+                                    // the ordering/content of items.
+                                    final listChildren = <Widget>[
                                       if (_showRequests &&
                                           requestPairs.isNotEmpty) ...[
                                         _MessagesSectionHeader(
@@ -510,8 +514,15 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                             ),
                                           ),
                                         ),
-                                    ],
-                                  ),
+                                    ];
+                                    return ListView.builder(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 12, 16, 120),
+                                      itemCount: listChildren.length,
+                                      itemBuilder: (context, index) =>
+                                          listChildren[index],
+                                    );
+                                  }),
                           ),
                         ],
                       ),

@@ -5,7 +5,9 @@ import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/search_intent.dart';
+import 'package:dating_app/core/utils/helpers/property_label_helper.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 
 // Helper for fuzzy locality matching
 class LocalityMatcher {
@@ -283,29 +285,32 @@ class SearchQuery {
       propertyType != null ||
       transactionType != TransactionTypeFilter.any;
 
-  String describe() {
+  String describe([AppLocalizations? l10n]) {
     final parts = <String>[];
     if (transactionType == TransactionTypeFilter.sale) {
-      parts.add('🏷️ למכירה');
+      parts.add(l10n?.smartSearchForSale ?? '🏷️ למכירה');
     } else if (transactionType == TransactionTypeFilter.rent) {
-      parts.add('🔑 להשכרה');
+      parts.add(l10n?.smartSearchForRent ?? '🔑 להשכרה');
     }
     if (neighborhood != null) {
       parts.add('📍 $neighborhood${city != null ? ', $city' : ''}');
     } else if (city != null) {
       parts.add('📍 $city');
     }
-    if (propertyType != null) parts.add('🏠 $propertyType');
+    if (propertyType != null) {
+      parts.add('🏠 ${l10n != null ? propertyTypeLabel(propertyType!, l10n) : propertyType}');
+    }
     if (minRooms != null || maxRooms != null) {
-      parts.add('🛏️ ${_roomsRangeLabel(minRooms, maxRooms)} חד׳');
+      final range = _roomsRangeLabel(minRooms, maxRooms, l10n);
+      parts.add(l10n?.smartSearchRoomsSuffix(range) ?? '🛏️ $range חד׳');
     }
     if (minPrice != null || maxPrice != null) {
-      parts.add('💰 ${_priceRangeLabel(minPrice, maxPrice)}');
+      parts.add('💰 ${_priceRangeLabel(minPrice, maxPrice, l10n)}');
     }
-    if (nearTrain) parts.add('🚉 ליד הרכבת');
-    if (cheapPreference) parts.add('🏷️ הכי משתלם');
+    if (nearTrain) parts.add(l10n?.smartSearchNearTrain ?? '🚉 ליד הרכבת');
+    if (cheapPreference) parts.add(l10n?.smartSearchBestValue ?? '🏷️ הכי משתלם');
     for (final a in amenities) {
-      parts.add(SmartSearch.amenityTag(a));
+      parts.add(SmartSearch.amenityTag(a, l10n));
     }
     return parts.join('  ·  ');
   }
@@ -1455,44 +1460,45 @@ class SmartSearch {
     'הדר': 'חיפה', 'כרמל': 'חיפה', 'ואדי ניסנס': 'חיפה', 'קרית חיים': 'חיפה',
   };
 
-  static String amenityTag(String key) {
+  static String amenityTag(String key, [AppLocalizations? l10n]) {
+    if (l10n == null) return key.replaceFirst('feat_', '');
     switch (key) {
       case 'feat_renovated':
-        return '✦ משופצת';
+        return l10n.smartSearchAmenityRenovated;
       case 'feat_pets':
-        return '🐾 ידידותי לחיות';
+        return l10n.smartSearchAmenityPets;
       case 'feat_parking':
-        return '🅿️ חניה';
+        return l10n.smartSearchAmenityParking;
       case 'feat_balcony':
-        return '🌤️ מרפסת';
+        return l10n.smartSearchAmenityBalcony;
       case 'feat_elevator':
-        return '🛗 מעלית';
+        return l10n.smartSearchAmenityElevator;
       case 'feat_furnished':
-        return '🛋️ מרוהט';
+        return l10n.smartSearchAmenityFurnished;
       case 'feat_mamad':
-        return '🛡️ ממ״ד';
+        return l10n.smartSearchAmenityMamad;
       case 'feat_garden':
-        return '🌳 גינה';
+        return l10n.smartSearchAmenityGarden;
       case 'feat_air':
-        return '❄️ מיזוג';
+        return l10n.smartSearchAmenityAir;
       case 'feat_pool':
-        return '🏊 בריכה';
+        return l10n.smartSearchAmenityPool;
       case 'feat_gym':
-        return '🏋️ חדר כושר';
+        return l10n.smartSearchAmenityGym;
       case 'feat_storage':
-        return '📦 מחסן';
+        return l10n.smartSearchAmenityStorage;
       case 'feat_sun':
-        return '☀️ מואר';
+        return l10n.smartSearchAmenitySun;
       case 'feat_safe':
-        return '🔒 ממוגן';
+        return l10n.smartSearchAmenitySafe;
       case 'feat_internet':
-        return '🌐 אינטרנט';
+        return l10n.smartSearchAmenityInternet;
       case 'feat_laundry':
-        return '🧺 כביסה';
+        return l10n.smartSearchAmenityLaundry;
       case 'feat_accessible':
-        return '♿ נגיש';
+        return l10n.smartSearchAmenityAccessible;
       case 'feat_roommates':
-        return '👥 שותפים';
+        return l10n.smartSearchAmenityRoommates;
       default:
         return key.replaceFirst('feat_', '');
     }
@@ -1665,16 +1671,16 @@ class SmartSearch {
       v == true || v == 1 || v == '1' || v.toString().toLowerCase() == 'true';
 }
 
-String _roomsRangeLabel(double? lo, double? hi) {
+String _roomsRangeLabel(double? lo, double? hi, [AppLocalizations? l10n]) {
   String f(double r) => r % 1 == 0 ? r.toInt().toString() : r.toString();
   if (lo != null && hi != null) return lo == hi ? f(lo) : '${f(lo)}-${f(hi)}';
   if (lo != null) return '${f(lo)}+';
-  return 'עד ${f(hi!)}';
+  return l10n?.smartSearchRangeUpTo(f(hi!)) ?? 'עד ${f(hi!)}';
 }
 
-String _priceRangeLabel(int? lo, int? hi) {
+String _priceRangeLabel(int? lo, int? hi, [AppLocalizations? l10n]) {
   String m(int v) => '₪${v.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (x) => '${x[1]},')}';
   if (lo != null && hi != null) return '${m(lo)}–${m(hi)}';
-  if (hi != null) return 'עד ${m(hi)}';
-  return 'מ-${m(lo!)}';
+  if (hi != null) return l10n?.smartSearchRangeUpTo(m(hi)) ?? 'עד ${m(hi)}';
+  return l10n?.smartSearchRangeFrom(m(lo!)) ?? 'מ-${m(lo!)}';
 }
