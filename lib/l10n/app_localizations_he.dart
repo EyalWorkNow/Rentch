@@ -2590,6 +2590,27 @@ class AppLocalizationsHe extends AppLocalizations {
   String get propertyDetailScreenLoadingPois => 'טוען…';
 
   @override
+  String get propertyDetailScreenAddLayers => 'הוספת שכבות';
+
+  @override
+  String get propertyDetailScreenRecenterMap => 'מרכוז מפה';
+
+  @override
+  String propertyDetailScreenDistanceMeters(Object value) {
+    return '$value מ׳';
+  }
+
+  @override
+  String propertyDetailScreenDistanceKm(Object value) {
+    return '$value ק״מ';
+  }
+
+  @override
+  String propertyDetailScreenWalkMinutes(Object minutes) {
+    return '$minutes דק׳ הליכה';
+  }
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'עריכת נכס';
 
   @override

@@ -2639,6 +2639,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get propertyDetailScreenLoadingPois => 'Loading…';
 
   @override
+  String get propertyDetailScreenAddLayers => 'Add layers';
+
+  @override
+  String get propertyDetailScreenRecenterMap => 'Recenter map';
+
+  @override
+  String propertyDetailScreenDistanceMeters(Object value) {
+    return '$value m';
+  }
+
+  @override
+  String propertyDetailScreenDistanceKm(Object value) {
+    return '$value km';
+  }
+
+  @override
+  String propertyDetailScreenWalkMinutes(Object minutes) {
+    return '$minutes min walk';
+  }
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'Edit Listing';
 
   @override

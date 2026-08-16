@@ -4773,6 +4773,36 @@ abstract class AppLocalizations {
   /// **'טוען…'**
   String get propertyDetailScreenLoadingPois;
 
+  /// No description provided for @propertyDetailScreenAddLayers.
+  ///
+  /// In he, this message translates to:
+  /// **'הוספת שכבות'**
+  String get propertyDetailScreenAddLayers;
+
+  /// No description provided for @propertyDetailScreenRecenterMap.
+  ///
+  /// In he, this message translates to:
+  /// **'מרכוז מפה'**
+  String get propertyDetailScreenRecenterMap;
+
+  /// No description provided for @propertyDetailScreenDistanceMeters.
+  ///
+  /// In he, this message translates to:
+  /// **'{value} מ׳'**
+  String propertyDetailScreenDistanceMeters(Object value);
+
+  /// No description provided for @propertyDetailScreenDistanceKm.
+  ///
+  /// In he, this message translates to:
+  /// **'{value} ק״מ'**
+  String propertyDetailScreenDistanceKm(Object value);
+
+  /// No description provided for @propertyDetailScreenWalkMinutes.
+  ///
+  /// In he, this message translates to:
+  /// **'{minutes} דק׳ הליכה'**
+  String propertyDetailScreenWalkMinutes(Object minutes);
+
   /// No description provided for @propertyDetailScreen9e8d9316.
   ///
   /// In he, this message translates to:

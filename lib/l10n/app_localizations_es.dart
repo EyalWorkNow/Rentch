@@ -2669,6 +2669,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get propertyDetailScreenLoadingPois => 'Cargando…';
 
   @override
+  String get propertyDetailScreenAddLayers => 'Añadir capas';
+
+  @override
+  String get propertyDetailScreenRecenterMap => 'Centrar mapa';
+
+  @override
+  String propertyDetailScreenDistanceMeters(Object value) {
+    return '$value m';
+  }
+
+  @override
+  String propertyDetailScreenDistanceKm(Object value) {
+    return '$value km';
+  }
+
+  @override
+  String propertyDetailScreenWalkMinutes(Object minutes) {
+    return '$minutes min a pie';
+  }
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'Editar propiedad';
 
   @override

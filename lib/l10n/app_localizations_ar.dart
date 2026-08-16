@@ -2624,6 +2624,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get propertyDetailScreenLoadingPois => 'جارٍ التحميل…';
 
   @override
+  String get propertyDetailScreenAddLayers => 'إضافة طبقات';
+
+  @override
+  String get propertyDetailScreenRecenterMap => 'توسيط الخريطة';
+
+  @override
+  String propertyDetailScreenDistanceMeters(Object value) {
+    return '$value م';
+  }
+
+  @override
+  String propertyDetailScreenDistanceKm(Object value) {
+    return '$value كم';
+  }
+
+  @override
+  String propertyDetailScreenWalkMinutes(Object minutes) {
+    return '$minutes دقيقة سيرًا';
+  }
+
+  @override
   String get propertyDetailScreen9e8d9316 => 'تعديل العقار';
 
   @override

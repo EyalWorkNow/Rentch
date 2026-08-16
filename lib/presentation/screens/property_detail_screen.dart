@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
@@ -135,6 +136,28 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     unawaited(provider.refreshScanProcessingCache());
   }
 
+  /// Warms the image cache for the photos adjacent to [index] so swiping to
+  /// them is instant instead of a cold network fetch + decode behind the
+  /// 300ms fade-in — nothing precached the gallery's neighbors before, so
+  /// every swipe to a not-yet-seen photo showed a blank frame for a beat.
+  /// Uses the exact same provider [SafeImage] itself resolves through (see
+  /// [SafeImage.precache]) so this actually warms the slot the real widget
+  /// hits, not a differently-keyed one.
+  void _precacheGalleryNeighbors(int index) {
+    final media = widget.property.media;
+    if (media.isEmpty) return;
+    final width = (MediaQuery.of(context).size.width *
+            MediaQuery.of(context).devicePixelRatio)
+        .round()
+        .clamp(64, 2048);
+    for (final i in [index - 1, index + 1]) {
+      if (i < 0 || i >= media.length) continue;
+      final m = media[i];
+      if (!m.isImage) continue;
+      SafeImage.precache(context, m.url, width);
+    }
+  }
+
   void _onScroll(ScrollMetrics m) {
     if (widget.isLandlordPreview) return;
     final max = m.maxScrollExtent;
@@ -233,6 +256,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   void initState() {
     super.initState();
     _viewStopwatch.start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _precacheGalleryNeighbors(_currentPage);
+    });
     if (!widget.isLandlordPreview) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -314,7 +340,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   }
 
   void _handleGalleryPageChanged(String propertyId, int index) {
-    setState(() => _currentPage = index);
+    // Plain assignment, not setState: the gallery widgets track the
+    // PageController directly now (see _ImageGallery/_TemplateHeroMedia), so
+    // this no longer needs to rebuild the whole detail screen on every swipe
+    // — that full-page rebuild (specs, match insight, map, reviews…) was
+    // exactly what made the photo transition hitch. `_currentPage` still
+    // matters as the initial page value if this screen rebuilds for an
+    // unrelated reason.
+    _currentPage = index;
+    _precacheGalleryNeighbors(index);
     if (!widget.isLandlordPreview) {
       // Distinct photos paged through = highest page index reached + 1.
       final reached = index + 1;
@@ -766,11 +800,18 @@ class _ImageGallery extends StatelessWidget {
   final VoidCallback onBackTap;
   final VoidCallback onShareTap;
 
+  // Reads the live page off the controller when it's attached (mid-drag or
+  // just-settled), falling back to the `currentPage` prop otherwise (first
+  // frame, or before the PageView has attached its scroll position).
+  int _liveCurrentPage(List<PropertyMedia> media) {
+    if (media.isEmpty) return 0;
+    final live = controller.hasClients ? controller.page?.round() : null;
+    return (live ?? currentPage).clamp(0, media.length - 1).toInt();
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = property.media;
-    final safeCurrentPage =
-        media.isEmpty ? 0 : currentPage.clamp(0, media.length - 1).toInt();
 
     return Stack(
       fit: StackFit.expand,
@@ -780,6 +821,11 @@ class _ImageGallery extends StatelessWidget {
             : PageView.builder(
                 controller: controller,
                 onPageChanged: onPageChanged,
+                // Pre-builds the adjacent page before the user starts
+                // dragging (default PageView only builds it once the drag
+                // begins), so its SafeImage starts fetching/decoding ahead
+                // of time instead of cold, mid-swipe.
+                allowImplicitScrolling: true,
                 itemCount: media.length,
                 itemBuilder: (_, i) => SafeMedia(
                   media: media[i],
@@ -790,7 +836,9 @@ class _ImageGallery extends StatelessWidget {
                 ),
               ),
 
-        // Invisible tap zones for gallery navigation
+        // Invisible tap zones for gallery navigation. The current-page check
+        // is read lazily at tap time (not rebuilt per frame) — nothing here
+        // needs to redraw while the controller scrolls.
         if (media.length > 1)
           Positioned.fill(
             child: Directionality(
@@ -801,7 +849,7 @@ class _ImageGallery extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () {
-                        if (safeCurrentPage > 0) {
+                        if (_liveCurrentPage(media) > 0) {
                           controller.previousPage(
                             duration: const Duration(milliseconds: 280),
                             curve: Curves.easeInOut,
@@ -814,7 +862,7 @@ class _ImageGallery extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () {
-                        if (safeCurrentPage < media.length - 1) {
+                        if (_liveCurrentPage(media) < media.length - 1) {
                           controller.nextPage(
                             duration: const Duration(milliseconds: 280),
                             curve: Curves.easeInOut,
@@ -991,16 +1039,22 @@ class _ImageGallery extends StatelessWidget {
           ),
         ),
 
-        // Carousel indicator dots
+        // Carousel indicator dots — the one piece that actually needs to
+        // redraw as the controller scrolls, so only this small subtree
+        // listens to it (not the whole gallery Stack: buttons, gradient,
+        // price badge etc. stay static and don't rebuild on drag frames).
         if (media.length > 1)
           Positioned(
             bottom: 8,
             left: 0,
             right: 0,
             child: IgnorePointer(
-              child: _CarouselDots(
-                count: media.length,
-                current: safeCurrentPage,
+              child: AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) => _CarouselDots(
+                  count: media.length,
+                  current: _liveCurrentPage(media),
+                ),
               ),
             ),
           ),
@@ -1939,8 +1993,6 @@ class _TemplateHeroMedia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = property.media;
-    final safeCurrent =
-        media.isEmpty ? 0 : currentPage.clamp(0, media.length - 1).toInt();
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: SizedBox(
@@ -1953,6 +2005,10 @@ class _TemplateHeroMedia extends StatelessWidget {
                 : PageView.builder(
                     controller: controller,
                     onPageChanged: onPageChanged,
+                    // Pre-builds the adjacent page before the drag starts
+                    // (default PageView only builds it once dragging begins)
+                    // so its SafeImage starts loading ahead of time.
+                    allowImplicitScrolling: true,
                     itemCount: media.length,
                     itemBuilder: (_, index) => SafeMedia(
                       media: media[index],
@@ -1963,12 +2019,27 @@ class _TemplateHeroMedia extends StatelessWidget {
                     ),
                   ),
             if (overlay != null) overlay!,
+            // Only the dots need to redraw as the controller scrolls — see
+            // _ImageGallery.build for why the rest of this Stack stays static.
             if (media.length > 1)
               Positioned(
                 bottom: 12,
                 left: 0,
                 right: 0,
-                child: _CarouselDots(count: media.length, current: safeCurrent),
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) {
+                    final live =
+                        controller.hasClients ? controller.page?.round() : null;
+                    final safeCurrent = media.isEmpty
+                        ? 0
+                        : (live ?? currentPage)
+                            .clamp(0, media.length - 1)
+                            .toInt();
+                    return _CarouselDots(
+                        count: media.length, current: safeCurrent);
+                  },
+                ),
               ),
           ],
         ),
@@ -3039,6 +3110,7 @@ class _MapSectionState extends State<_MapSection> {
   bool _loadingPois = false;
   Map<String, List<NearbyPlace>>? _poiData;
   final Set<String> _activeLayers = {};
+  final MapController _mapController = MapController();
   // The POI dot the user last tapped, with the layer it belongs to (for the
   // popup's color/label) — null when no popup is showing.
   (NearbyPlace place, _MapLayer layer)? _selectedPoi;
@@ -3188,6 +3260,7 @@ class _MapSectionState extends State<_MapSection> {
           children: [
             if (_ready)
               FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
                   initialCenter: LatLng(property.lat, property.lon),
                   initialZoom: 15,
@@ -3256,38 +3329,58 @@ class _MapSectionState extends State<_MapSection> {
                       color: AppColors.primary, size: 30),
                 ),
               ),
-            // "Open in maps" hint pill — hidden while the POI popup is
-            // showing (same bottom-right corner, would overlap).
+            // "Open in maps" hint pill + recenter button — hidden while the
+            // POI popup is showing (same bottom-right corner, would overlap).
             if (_selectedPoi == null)
               Positioned(
                 bottom: 12,
                 right: 12,
-                child: GestureDetector(
-                  onTap: () => _openInMaps(property.lat, property.lon),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.62),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const RentlyIcon(IconsaxPlusLinear.export_2,
-                            size: 13, color: Colors.white),
-                        const SizedBox(width: 5),
-                        Text(
-                          l10n.propertyDetailScreenDf4787e7,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _mapController.move(
+                          LatLng(property.lat, property.lon), 15),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.62),
+                          shape: BoxShape.circle,
                         ),
-                      ],
+                        child: RentlyIcon(IconsaxPlusLinear.gps,
+                            size: 14, color: Colors.white),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _openInMaps(property.lat, property.lon),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.62),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const RentlyIcon(IconsaxPlusLinear.export_2,
+                                size: 13, color: Colors.white),
+                            const SizedBox(width: 5),
+                            Text(
+                              l10n.propertyDetailScreenDf4787e7,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             // Selected-POI popup — colored dot + name + category, with a
@@ -3344,6 +3437,13 @@ class _MapSectionState extends State<_MapSection> {
                                 color: AppColors.slate500,
                               ),
                             ),
+                            Text(
+                              _distanceAndWalkLabel(l10n, _selectedPoi!.$1),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.slate500,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -3379,23 +3479,45 @@ class _MapSectionState extends State<_MapSection> {
                   ),
                 ),
               ),
-            // Layers toggle button — floating pill, top-start corner.
+            // Layers toggle — glass pill with icon + label, top-start corner.
             Positioned(
               top: 12,
               left: 12,
-              child: GestureDetector(
-                onTap: () => setState(() => _layersOpen = !_layersOpen),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: _layersOpen
-                        ? AppColors.primary
-                        : Colors.black.withValues(alpha: 0.62),
-                    shape: BoxShape.circle,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _layersOpen = !_layersOpen),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _layersOpen
+                            ? AppColors.primary.withValues(alpha: 0.85)
+                            : Colors.black.withValues(alpha: 0.38),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RentlyIcon(IconsaxPlusLinear.layer,
+                              size: 15, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(
+                            l10n.propertyDetailScreenAddLayers,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: RentlyIcon(IconsaxPlusLinear.layer,
-                      size: 16, color: Colors.white),
                 ),
               ),
             ),
@@ -3407,57 +3529,68 @@ class _MapSectionState extends State<_MapSection> {
                 top: 52,
                 left: 12,
                 right: 12,
-                child: GestureDetector(
-                  // Absorb taps so they don't fall through to the outer
-                  // "open in maps" GestureDetector.
-                  onTap: () {},
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.62),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_loadingPois)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6, right: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const SizedBox(
-                                  width: 10,
-                                  height: 10,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 1.6, color: Colors.white70),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  l10n.propertyDetailScreenLoadingPois,
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 10.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (final layer in _kMapLayers) ...[
-                                _MapLayerChip(
-                                  layer: layer,
-                                  active: _activeLayers.contains(layer.key),
-                                  onTap: () => _toggleLayer(layer.key),
-                                ),
-                                const SizedBox(width: 6),
-                              ],
-                            ],
-                          ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: GestureDetector(
+                      // Absorb taps so they don't fall through to the outer
+                      // "open in maps" GestureDetector.
+                      onTap: () {},
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.38),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25)),
                         ),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_loadingPois)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 6, right: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 1.6,
+                                          color: Colors.white70),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      l10n.propertyDetailScreenLoadingPois,
+                                      style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 10.5),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  for (final layer in _kMapLayers) ...[
+                                    _MapLayerChip(
+                                      layer: layer,
+                                      active: _activeLayers.contains(layer.key),
+                                      onTap: () => _toggleLayer(layer.key),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -3466,6 +3599,22 @@ class _MapSectionState extends State<_MapSection> {
         ),
       ),
     );
+  }
+
+  /// "350 מ׳ · 4 דק׳ הליכה"-style label — straight-line distance from the
+  /// property to a POI, plus an estimated walk time at ~5km/h.
+  String _distanceAndWalkLabel(AppLocalizations l10n, NearbyPlace place) {
+    final meters = const Distance().as(
+      LengthUnit.Meter,
+      LatLng(widget.property.lat, widget.property.lon),
+      LatLng(place.lat, place.lon),
+    );
+    final distanceLabel = meters < 1000
+        ? l10n.propertyDetailScreenDistanceMeters((meters / 10).round() * 10)
+        : l10n
+            .propertyDetailScreenDistanceKm((meters / 1000).toStringAsFixed(1));
+    final minutes = max(1, (meters / 83.3).round());
+    return '$distanceLabel · ${l10n.propertyDetailScreenWalkMinutes(minutes)}';
   }
 
   Future<void> _openInMaps(double lat, double lon) async {
