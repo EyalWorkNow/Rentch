@@ -120,7 +120,9 @@ class DatingProvider extends ChangeNotifier {
 
   // Batches rapid successive writes so we don't hammer Appwrite on every swipe.
   // With 10k concurrent users, unbatched writes would exhaust API rate limits.
-  final _writeDebouncer = WriteDebouncer();
+  // 10s window: each remote sync writes the full ~16KB state blob (16 WCU), so
+  // a swipe burst must collapse to one write; flushRemoteState() covers app-exit.
+  final _writeDebouncer = WriteDebouncer(delay: const Duration(seconds: 10));
 
   final CardSwiperController propertySwiperController = CardSwiperController();
   final CardSwiperController ownerSwiperController = CardSwiperController();
@@ -5051,6 +5053,7 @@ class DatingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _writeDebouncer.cancel();
     for (final session in _activeDetailSessions.values) {
       session.heartbeatTimer?.cancel();
     }
@@ -6718,9 +6721,36 @@ class DatingProvider extends ChangeNotifier {
     _matches = updatedMatches;
   }
 
+  /// Immediate remote sync of the current state, bypassing the debounce
+  /// window. Called when the app leaves the foreground so the trailing
+  /// seconds of a swipe burst are not lost if the OS kills the process.
+  Future<void> flushRemoteState() async {
+    try {
+      await _localStorageService.syncRemoteAppState(_stateSnapshot());
+    } catch (_) {/* fail-soft — local copy already saved by _persist */}
+  }
+
   Future<void> _persist() async {
+    final snapshot = _stateSnapshot();
+
+    await _localStorageService.saveAppState(snapshot, syncRemote: false);
+
+    // Debounce only the remote write. Local SharedPreferences must update
+    // immediately so state is not lost if Appwrite is slow or rate-limited.
+    unawaited(_writeDebouncer.schedule(() async {
+      if (RateLimiter.instance.allowStateWrite()) {
+        await _localStorageService.syncRemoteAppState(snapshot);
+      } else {
+        if (kDebugMode) {
+          debugPrint('DatingProvider: remote write skipped (rate limit)');
+        }
+      }
+    }));
+  }
+
+  Map<String, dynamic> _stateSnapshot() {
     // Snapshot all current state
-    final snapshot = {
+    return {
       'schema': 'rental_match_v2',
       'tenantProfile': _tenantProfile?.toJson(),
       'learner': _learner.toJson(), // per-user FTRL model (z/n/updates)
@@ -6756,20 +6786,6 @@ class DatingProvider extends ChangeNotifier {
       'personaProfile': _persona.toJson(),
       'subscription': _subscription?.toJson(),
     };
-
-    await _localStorageService.saveAppState(snapshot, syncRemote: false);
-
-    // Debounce only the remote write. Local SharedPreferences must update
-    // immediately so state is not lost if Appwrite is slow or rate-limited.
-    unawaited(_writeDebouncer.schedule(() async {
-      if (RateLimiter.instance.allowStateWrite()) {
-        await _localStorageService.syncRemoteAppState(snapshot);
-      } else {
-        if (kDebugMode) {
-          debugPrint('DatingProvider: remote write skipped (rate limit)');
-        }
-      }
-    }));
   }
 }
 

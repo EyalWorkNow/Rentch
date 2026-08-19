@@ -123,7 +123,8 @@ Future<void> _pumpDetail(WidgetTester tester, RentalProperty property) async {
 // after dispose" check that has nothing to do with what a test verifies.
 Future<void> _settle(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(seconds: 1));
+  // 11s > the 10s WriteDebouncer window (fake time — instant in practice).
+  await tester.pump(const Duration(seconds: 11));
 }
 
 RentalProperty _property({

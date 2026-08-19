@@ -43,8 +43,11 @@ class RealtimeChatService {
   // COST: adaptive fallback polling — fast while the conversation is active,
   // backing off to slow when idle, so a user stuck on the fallback (WS down)
   // doesn't hit REST every 3s forever (~1,200 req/hr → ~180).
-  static const Duration _pollFast = Duration(seconds: 3);
-  static const Duration _pollSlow = Duration(seconds: 20);
+  // The WebSocket carries real-time delivery; this poll is the reconciliation
+  // backstop. 3s/20s would cost ~7M req/mo at scale for freshness the WS
+  // already provides.
+  static const Duration _pollFast = Duration(seconds: 10);
+  static const Duration _pollSlow = Duration(seconds: 60);
   static const int _idleBackoffAfter = 3; // slow polls after N with nothing new
   int _idlePolls = 0;
   String? _lastNewestId;

@@ -1,0 +1,13 @@
+finding,description,scenario_basis,conservative_usd_mo,base_usd_mo,aggressive_usd_mo,confidence,notes
+F1,app-state debounce+diff,5k MAU; 2/10/30 persists-user-day at 16KB vs ~1 write-user-day,19,285,1400,M,"WCU $1.25/M; conservative=2 persists/day, aggressive=30 (heavy swiping); measured mechanism, modeled multiplier"
+C4,chat poll 3s->10s + WS-gated 60s,5k MAU; 1/5/10% concurrent chat users,4,20,50,M,REST $3.50/M today; drops to HTTP-API pricing after F3
+C1,gzip on main API,egress at 20/100/300 GB-mo pre-compression; 80% reduction,1.4,7,22,M,DTO ~$0.09/GB; also faster loads on cellular
+F3,REST to HTTP API,1.5M req-mo at $3.50 vs $1.00 per M,2,3.75,9,H,pure price arithmetic; aggressive=3.6M req-mo
+C2,deck pagination 150->25,RRU + egress reduction on browse,0.7,2,6,M,rides on same client release as F1
+F2,TTL + stop write-only telemetry,telemetry writes at scale,0.5,2.4,8,H,write cost dominates storage; aggressive includes events+views emitters off
+F4,media lifecycle GIR + MPU abort,media at 10/100/500 GB,0.3,1.2,6,H,68% saving on 3d-scans prefix; grows with media volume
+F5,arm64 router+authorizer,compute at scale x 20% saving,0.3,0.6,1.7,M,only if CI supports arm64 build; else drop
+C3,embeddings to side table,read amplification removed on seeded listings,0.3,1,3,L,do inside the pending re-enrich job or skip
+C5,Cache-Control+ETag on read-mostly JSON,app-side TTL cache hit 20/40/60%,0.2,0.6,2,M,latency-led; dollars incidental
+F6,log retention 90d,storage cap only; ingest unchanged,0.1,0.3,1,H,ingest stays cheap unless DEBUG logging ships
+TOTAL,,,28.8,323.85,1508.7,,net of nothing double-counted; C4/F3 interaction adjusted in base

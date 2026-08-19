@@ -16,6 +16,10 @@ class LocalStorageService {
   static const String _updatedAtField = 'updatedAt';
   static const String _remoteStateIdKey = 'rentch_remote_state_document_id_v2';
 
+  // Hash of the last successfully synced remote payload (per app run) —
+  // lets _saveRemoteState skip writes when the state hasn't actually changed.
+  int? _lastSyncedStateHash;
+
   // SEC-8: On iOS, app state is stored in the Keychain (Secure Enclave AES-256)
   // instead of NSUserDefaults (plain-text on non-jailbroken devices but
   // readable on jailbroken ones). On Android, SharedPreferences already uses
@@ -259,8 +263,13 @@ class LocalStorageService {
     if (!AppConfig.canUseRemoteState) return;
     final remoteState = _stateForRemoteSync(state);
 
+    // Skip the write when nothing changed since the last successful sync —
+    // every upsert ships the full ~16KB blob, so no-op writes are pure cost.
+    final encoded = jsonEncode(remoteState);
+    if (encoded.hashCode == _lastSyncedStateHash) return;
+
     final data = {
-      _payloadField: jsonEncode(remoteState),
+      _payloadField: encoded,
       _schemaField: remoteState[_schemaField],
       _updatedAtField: DateTime.now().toUtc().toIso8601String(),
     };
@@ -272,6 +281,7 @@ class LocalStorageService {
         rowId: await _remoteStateDocumentId(preferences),
         data: data,
       );
+      _lastSyncedStateHash = encoded.hashCode;
     } catch (error) {
       _logRemoteError('save', error);
       return;

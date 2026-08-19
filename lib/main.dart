@@ -617,6 +617,10 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _emitSessionContext();
+      // Flush the debounced remote app-state sync before the OS may suspend or
+      // kill us — otherwise the trailing 10s of swipes never reach the cloud.
+      final provider = _provider;
+      if (provider != null) unawaited(provider.flushRemoteState());
       // Flush the final per-session behavioural summary as the app leaves the
       // foreground (stop() cancels the periodic timer and emits once).
       BehaviorInsights.instance.stop();

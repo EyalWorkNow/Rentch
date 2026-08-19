@@ -1,0 +1,37 @@
+type,name,region,key_config,size_or_count,monthly_cost_usd_gross,notes
+apigw_rest,rentch-api (g7b9nx11sk),us-east-1,REST $3.50/M,97228 req/90d,0.11,main app API; not behind CloudFront
+apigw_http,rently-thumb-api (0tsrng7tp4),us-east-1,HTTP $1.00/M,included above,0.00,behind CloudFront d2q8n06j
+apigw_ws,rentch-ws (43ccfrrt44),us-east-1,WEBSOCKET,1133 msgs/90d,0.00,chat fan-out
+lambda,rentch-router,us-east-1,256MB 300s x86_64 nodejs20,16.8MB bundle,0.00,monolith ~265 routes / 7987 lines
+lambda,rentch-authorizer,us-east-1,128MB 10s x86_64,2KB,0.00,
+lambda,rentch-ws,us-east-1,128MB 10s x86_64,2KB,0.00,
+lambda,rentch-ws-authorizer,us-east-1,128MB 10s x86_64,1KB,0.00,
+lambda,rentch-broadcaster,us-east-1,128MB 20s x86_64,1KB,0.00,DDB stream consumer
+lambda,rentch-img-resize,us-east-1,1536MB 30s x86_64,16MB,0.00,thumb origin
+lambda,rentch-pano-stitch,us-east-1,3008MB 300s x86_64 python3.12,68MB,0.00,360 stitching
+lambda,rentch-splat-convert,us-east-1,3008MB 300s x86_64,10.7MB,0.00,ply/spz→ksplat
+lambda,rentch-billing-cron,us-east-1,256MB 300s x86_64,15KB,0.00,EventBridge cron
+dynamodb,rentch-properties,us-east-1,on-demand 2 GSI TTL off,~24k items (ItemCount stale 1570) 10.8MB+,0.03,listings incl 22497 loaded 2026-08-20
+dynamodb,rentch-search-log,us-east-1,on-demand 1 GSI TTL off,9842 items 3.4MB,0.02,ephemeral - TTL candidate
+dynamodb,rentch-events,us-east-1,on-demand 2 GSI TTL off,7744 items 1.7MB,0.02,ephemeral - TTL candidate
+dynamodb,rentch-app-state,us-east-1,on-demand TTL off,120 items 1.9MB,0.01,16KB avg item - hot write path
+dynamodb,rentch-users,us-east-1,on-demand 1 GSI,34 items,0.00,
+dynamodb,rentch-interactions,us-east-1,on-demand 1 GSI,185 items,0.00,
+dynamodb,rentch-property-views,us-east-1,on-demand 1 GSI TTL off,177 items,0.00,ephemeral - TTL candidate
+dynamodb,rentch-property-likes,us-east-1,on-demand 1 GSI,69 items,0.00,
+dynamodb,rentch-device-tokens,us-east-1,on-demand,153 items,0.00,
+dynamodb,rentch-messages,us-east-1,on-demand 1 GSI,11 items,0.00,
+dynamodb,rentch-matches,us-east-1,on-demand 2 GSI,5 items,0.00,
+dynamodb,rentch-notifications,us-east-1,on-demand,40 items,0.00,
+dynamodb,rentch-subscriptions,us-east-1,on-demand,20 items,0.00,billing
+dynamodb,rentch-contracts,us-east-1,on-demand,4 items,0.00,
+dynamodb,rentch-ws-connections,us-east-1,on-demand 1 GSI TTL off,0 items,0.00,conn TTL open issue
+dynamodb,rentch-invoices+reviews+saved-searches+broadcasts,us-east-1,on-demand,0 items,0.00,empty tables
+dynamodb,rentch-blocks+reports+broker-data,us-east-1,on-demand,1-1-1 items,0.00,
+s3,rentch-media-543897290879,us-east-1,no lifecycle no versioning,2.53GB / 625 obj,0.06,~4MB avg object - originals full size
+s3,rentch-deploy-543897290879,us-east-1,no lifecycle 3 stuck MPUs,69MB / 6 obj,0.00,
+cloudfront,d1fdecs29tmtug (ERTPO26XFW3ZT),global,origin=media bucket,enabled,0.00,media CDN
+cloudfront,d2q8n06j1ozb0e (E2IGKSBWR4ACXJ),global,origin=thumb HTTP API,enabled,0.00,thumb CDN
+logs,/aws/lambda/rentch-router,us-east-1,retention=never,20.3MB stored,0.00,largest log group
+logs,8 other /aws/lambda/* groups,us-east-1,retention=never,<3MB each,0.00,
+absent,EC2/EBS/NAT/EIP/RDS/ElastiCache/OpenSearch/ECR/SQS/SNS/SecretsManager,-,confirmed 0,-,0.00,no classic money pits

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/security/security_config.dart';
 
@@ -140,30 +142,35 @@ class WriteDebouncer {
 
   final Duration delay;
   Future<void> Function()? _pending;
-  DateTime? _lastScheduled;
+  Timer? _timer;
 
   // Schedule a write. If another write arrives within [delay], the earlier one
-  // is cancelled and only the latest executes.
+  // is cancelled and only the latest executes. Timer-based (not Future.delayed)
+  // so cancel() can actually stop it — widget tests fail on pending timers left
+  // after dispose, and a long delay window made that visible.
   Future<void> schedule(Future<void> Function() write) async {
-    _lastScheduled = DateTime.now();
-    final scheduled = _lastScheduled;
     _pending = write;
+    _timer?.cancel();
+    _timer = Timer(delay, () {
+      final fn = _pending;
+      _pending = null;
+      if (fn != null) unawaited(fn());
+    });
+  }
 
-    await Future<void>.delayed(delay);
-
-    // If another call came in while we were waiting, skip this one
-    if (_lastScheduled != scheduled) return;
-
-    final fn = _pending;
+  // Drop any pending write without executing it (call on dispose).
+  void cancel() {
+    _timer?.cancel();
+    _timer = null;
     _pending = null;
-    if (fn != null) await fn();
   }
 
   // Force-flush any pending write immediately (call on app suspend/logout)
   Future<void> flush() async {
+    _timer?.cancel();
+    _timer = null;
     final fn = _pending;
     _pending = null;
-    _lastScheduled = null;
     if (fn != null) await fn();
   }
 }
