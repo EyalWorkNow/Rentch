@@ -3407,13 +3407,31 @@
   "smartSearchForSale": "🏷️ À vendre",
   "smartSearchForRent": "🔑 À louer",
   "smartSearchRoomsSuffix": "🛏️ {range} pièces",
-  "@smartSearchRoomsSuffix": {"placeholders": {"range": {"type": "String"}}},
+  "@smartSearchRoomsSuffix": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchNearTrain": "🚉 Près du train",
   "smartSearchBestValue": "🏷️ Meilleur rapport qualité-prix",
   "smartSearchRangeUpTo": "jusqu'à {value}",
-  "@smartSearchRangeUpTo": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeUpTo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchRangeFrom": "à partir de {value}",
-  "@smartSearchRangeFrom": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeFrom": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "gamificationHintAddPhoto": "Ajoutez une photo de profil (+20 %)",
   "gamificationHintWriteBio": "Écrivez quelques mots sur vous (+20 %)",
   "gamificationHintSetBudget": "Définissez un budget (+15 %)",
@@ -3421,5 +3439,26 @@
   "gamificationHintAddRequirements": "Ajoutez vos critères (+10 %)",
   "gamificationHintAddName": "Ajoutez votre nom (+10 %)",
   "gamificationHintAlmostDone": "Votre profil est presque complet !",
-  "panoramaCaptureScreenStillProcessing": "Toujours en traitement - nous vous préviendrons quand ce sera prêt"
+  "panoramaCaptureScreenStillProcessing": "Toujours en traitement - nous vous préviendrons quand ce sera prêt",
+  "lassoDrawButton": "Dessinez une zone sur la carte",
+  "lassoDrawPrompt": "Dessinez avec le doigt autour de la zone souhaitée",
+  "lassoShowResults": "Afficher {count} logements dans cette zone",
+  "@lassoShowResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoEmptyArea": "Aucun logement dans la zone dessinée — essayez plus grand",
+  "lassoInAreaCount": "{count} logements dans votre zone",
+  "@lassoInAreaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoShowAllTooltip": "Afficher tous les logements sur la carte",
+  "lassoDrawing": "Dessin en cours… levez le doigt pour terminer"
 }

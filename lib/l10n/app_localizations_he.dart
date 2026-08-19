@@ -11661,4 +11661,29 @@ class AppLocalizationsHe extends AppLocalizations {
   @override
   String get panoramaCaptureScreenStillProcessing =>
       'עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן';
+
+  @override
+  String get lassoDrawButton => 'צייר אזור על המפה';
+
+  @override
+  String get lassoDrawPrompt => 'ציירו באצבע סביב האזור שמעניין אתכם';
+
+  @override
+  String lassoShowResults(int count) {
+    return 'הצג $count דירות באזור';
+  }
+
+  @override
+  String get lassoEmptyArea => 'אין דירות באזור שסימנתם — נסו אזור גדול יותר';
+
+  @override
+  String lassoInAreaCount(int count) {
+    return '$count דירות באזור שסימנתם';
+  }
+
+  @override
+  String get lassoShowAllTooltip => 'הצג את כל הדירות במפה';
+
+  @override
+  String get lassoDrawing => 'מציירים… הרימו את האצבע לסיום';
 }

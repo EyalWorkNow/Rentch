@@ -12023,4 +12023,31 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get panoramaCaptureScreenStillProcessing =>
       'Aún procesando - te avisaremos cuando esté listo';
+
+  @override
+  String get lassoDrawButton => 'Dibuja un área en el mapa';
+
+  @override
+  String get lassoDrawPrompt =>
+      'Dibuja con el dedo alrededor de la zona que te interesa';
+
+  @override
+  String lassoShowResults(int count) {
+    return 'Mostrar $count pisos en esta zona';
+  }
+
+  @override
+  String get lassoEmptyArea =>
+      'No hay pisos en la zona dibujada — prueba una más grande';
+
+  @override
+  String lassoInAreaCount(int count) {
+    return '$count pisos en la zona que dibujaste';
+  }
+
+  @override
+  String get lassoShowAllTooltip => 'Mostrar todos los pisos en el mapa';
+
+  @override
+  String get lassoDrawing => 'Dibujando… levanta el dedo para terminar';
 }

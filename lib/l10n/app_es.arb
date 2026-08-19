@@ -3407,13 +3407,31 @@
   "smartSearchForSale": "🏷️ En venta",
   "smartSearchForRent": "🔑 En alquiler",
   "smartSearchRoomsSuffix": "🛏️ {range} habitaciones",
-  "@smartSearchRoomsSuffix": {"placeholders": {"range": {"type": "String"}}},
+  "@smartSearchRoomsSuffix": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchNearTrain": "🚉 Cerca del tren",
   "smartSearchBestValue": "🏷️ Mejor relación calidad-precio",
   "smartSearchRangeUpTo": "hasta {value}",
-  "@smartSearchRangeUpTo": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeUpTo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchRangeFrom": "desde {value}",
-  "@smartSearchRangeFrom": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeFrom": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "gamificationHintAddPhoto": "Añade una foto de perfil (+20%)",
   "gamificationHintWriteBio": "Escribe algo sobre ti (+20%)",
   "gamificationHintSetBudget": "Establece un presupuesto (+15%)",
@@ -3421,5 +3439,26 @@
   "gamificationHintAddRequirements": "Añade tus requisitos (+10%)",
   "gamificationHintAddName": "Añade tu nombre (+10%)",
   "gamificationHintAlmostDone": "¡Tu perfil está casi completo!",
-  "panoramaCaptureScreenStillProcessing": "Aún procesando - te avisaremos cuando esté listo"
+  "panoramaCaptureScreenStillProcessing": "Aún procesando - te avisaremos cuando esté listo",
+  "lassoDrawButton": "Dibuja un área en el mapa",
+  "lassoDrawPrompt": "Dibuja con el dedo alrededor de la zona que te interesa",
+  "lassoShowResults": "Mostrar {count} pisos en esta zona",
+  "@lassoShowResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoEmptyArea": "No hay pisos en la zona dibujada — prueba una más grande",
+  "lassoInAreaCount": "{count} pisos en la zona que dibujaste",
+  "@lassoInAreaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoShowAllTooltip": "Mostrar todos los pisos en el mapa",
+  "lassoDrawing": "Dibujando… levanta el dedo para terminar"
 }

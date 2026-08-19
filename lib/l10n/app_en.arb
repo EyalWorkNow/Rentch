@@ -3407,13 +3407,31 @@
   "smartSearchForSale": "🏷️ For sale",
   "smartSearchForRent": "🔑 For rent",
   "smartSearchRoomsSuffix": "🛏️ {range} rooms",
-  "@smartSearchRoomsSuffix": {"placeholders": {"range": {"type": "String"}}},
+  "@smartSearchRoomsSuffix": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchNearTrain": "🚉 Near the train",
   "smartSearchBestValue": "🏷️ Best value",
   "smartSearchRangeUpTo": "up to {value}",
-  "@smartSearchRangeUpTo": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeUpTo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchRangeFrom": "from {value}",
-  "@smartSearchRangeFrom": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeFrom": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "gamificationHintAddPhoto": "Add a profile photo (+20%)",
   "gamificationHintWriteBio": "Write a bit about yourself (+20%)",
   "gamificationHintSetBudget": "Set a budget (+15%)",
@@ -3421,5 +3439,26 @@
   "gamificationHintAddRequirements": "Add your requirements (+10%)",
   "gamificationHintAddName": "Add your name (+10%)",
   "gamificationHintAlmostDone": "Your profile is almost complete!",
-  "panoramaCaptureScreenStillProcessing": "Still processing - we'll let you know when it's ready"
+  "panoramaCaptureScreenStillProcessing": "Still processing - we'll let you know when it's ready",
+  "lassoDrawButton": "Draw an area on the map",
+  "lassoDrawPrompt": "Draw with your finger around the area you want",
+  "lassoShowResults": "Show {count} apartments in this area",
+  "@lassoShowResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoEmptyArea": "No apartments in the drawn area — try a larger one",
+  "lassoInAreaCount": "{count} apartments in your drawn area",
+  "@lassoInAreaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoShowAllTooltip": "Show all apartments on the map",
+  "lassoDrawing": "Drawing… lift your finger to finish"
 }

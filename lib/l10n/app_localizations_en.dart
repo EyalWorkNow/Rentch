@@ -11883,4 +11883,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get panoramaCaptureScreenStillProcessing =>
       'Still processing - we\'ll let you know when it\'s ready';
+
+  @override
+  String get lassoDrawButton => 'Draw an area on the map';
+
+  @override
+  String get lassoDrawPrompt =>
+      'Draw with your finger around the area you want';
+
+  @override
+  String lassoShowResults(int count) {
+    return 'Show $count apartments in this area';
+  }
+
+  @override
+  String get lassoEmptyArea =>
+      'No apartments in the drawn area — try a larger one';
+
+  @override
+  String lassoInAreaCount(int count) {
+    return '$count apartments in your drawn area';
+  }
+
+  @override
+  String get lassoShowAllTooltip => 'Show all apartments on the map';
+
+  @override
+  String get lassoDrawing => 'Drawing… lift your finger to finish';
 }

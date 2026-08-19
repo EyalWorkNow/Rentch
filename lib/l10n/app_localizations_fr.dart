@@ -12058,4 +12058,31 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get panoramaCaptureScreenStillProcessing =>
       'Toujours en traitement - nous vous préviendrons quand ce sera prêt';
+
+  @override
+  String get lassoDrawButton => 'Dessinez une zone sur la carte';
+
+  @override
+  String get lassoDrawPrompt =>
+      'Dessinez avec le doigt autour de la zone souhaitée';
+
+  @override
+  String lassoShowResults(int count) {
+    return 'Afficher $count logements dans cette zone';
+  }
+
+  @override
+  String get lassoEmptyArea =>
+      'Aucun logement dans la zone dessinée — essayez plus grand';
+
+  @override
+  String lassoInAreaCount(int count) {
+    return '$count logements dans votre zone';
+  }
+
+  @override
+  String get lassoShowAllTooltip => 'Afficher tous les logements sur la carte';
+
+  @override
+  String get lassoDrawing => 'Dessin en cours… levez le doigt pour terminer';
 }

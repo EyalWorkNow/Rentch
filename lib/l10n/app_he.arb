@@ -3455,13 +3455,31 @@
   "smartSearchForSale": "🏷️ למכירה",
   "smartSearchForRent": "🔑 להשכרה",
   "smartSearchRoomsSuffix": "🛏️ {range} חד׳",
-  "@smartSearchRoomsSuffix": {"placeholders": {"range": {"type": "String"}}},
+  "@smartSearchRoomsSuffix": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchNearTrain": "🚉 ליד הרכבת",
   "smartSearchBestValue": "🏷️ הכי משתלם",
   "smartSearchRangeUpTo": "עד {value}",
-  "@smartSearchRangeUpTo": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeUpTo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchRangeFrom": "מ-{value}",
-  "@smartSearchRangeFrom": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeFrom": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "gamificationHintAddPhoto": "הוסף תמונת פרופיל (+20%)",
   "gamificationHintWriteBio": "כתוב קצת עליך (+20%)",
   "gamificationHintSetBudget": "הגדר תקציב (+15%)",
@@ -3469,5 +3487,26 @@
   "gamificationHintAddRequirements": "הוסף דרישות (+10%)",
   "gamificationHintAddName": "הוסף שם (+10%)",
   "gamificationHintAlmostDone": "הפרופיל כמעט מושלם!",
-  "panoramaCaptureScreenStillProcessing": "עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן"
+  "panoramaCaptureScreenStillProcessing": "עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן",
+  "lassoDrawButton": "צייר אזור על המפה",
+  "lassoDrawPrompt": "ציירו באצבע סביב האזור שמעניין אתכם",
+  "lassoShowResults": "הצג {count} דירות באזור",
+  "@lassoShowResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoEmptyArea": "אין דירות באזור שסימנתם — נסו אזור גדול יותר",
+  "lassoInAreaCount": "{count} דירות באזור שסימנתם",
+  "@lassoInAreaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoShowAllTooltip": "הצג את כל הדירות במפה",
+  "lassoDrawing": "מציירים… הרימו את האצבע לסיום"
 }

@@ -11784,4 +11784,30 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get panoramaCaptureScreenStillProcessing =>
       'لا تزال المعالجة جارية - سنعلمك عندما تكون جاهزة';
+
+  @override
+  String get lassoDrawButton => 'ارسم منطقة على الخريطة';
+
+  @override
+  String get lassoDrawPrompt => 'ارسموا بإصبعكم حول المنطقة التي تهمكم';
+
+  @override
+  String lassoShowResults(int count) {
+    return 'عرض $count شقق في هذه المنطقة';
+  }
+
+  @override
+  String get lassoEmptyArea =>
+      'لا توجد شقق في المنطقة المحددة — جرّبوا منطقة أكبر';
+
+  @override
+  String lassoInAreaCount(int count) {
+    return '$count شقق في المنطقة التي حددتموها';
+  }
+
+  @override
+  String get lassoShowAllTooltip => 'عرض جميع الشقق على الخريطة';
+
+  @override
+  String get lassoDrawing => 'جارٍ الرسم… ارفعوا إصبعكم للإنهاء';
 }

@@ -20626,6 +20626,48 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'עדיין מעבדים - נעדכן אותך כשזה יהיה מוכן'**
   String get panoramaCaptureScreenStillProcessing;
+
+  /// No description provided for @lassoDrawButton.
+  ///
+  /// In he, this message translates to:
+  /// **'צייר אזור על המפה'**
+  String get lassoDrawButton;
+
+  /// No description provided for @lassoDrawPrompt.
+  ///
+  /// In he, this message translates to:
+  /// **'ציירו באצבע סביב האזור שמעניין אתכם'**
+  String get lassoDrawPrompt;
+
+  /// No description provided for @lassoShowResults.
+  ///
+  /// In he, this message translates to:
+  /// **'הצג {count} דירות באזור'**
+  String lassoShowResults(int count);
+
+  /// No description provided for @lassoEmptyArea.
+  ///
+  /// In he, this message translates to:
+  /// **'אין דירות באזור שסימנתם — נסו אזור גדול יותר'**
+  String get lassoEmptyArea;
+
+  /// No description provided for @lassoInAreaCount.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} דירות באזור שסימנתם'**
+  String lassoInAreaCount(int count);
+
+  /// No description provided for @lassoShowAllTooltip.
+  ///
+  /// In he, this message translates to:
+  /// **'הצג את כל הדירות במפה'**
+  String get lassoShowAllTooltip;
+
+  /// No description provided for @lassoDrawing.
+  ///
+  /// In he, this message translates to:
+  /// **'מציירים… הרימו את האצבע לסיום'**
+  String get lassoDrawing;
 }
 
 class _AppLocalizationsDelegate

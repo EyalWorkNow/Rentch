@@ -3407,13 +3407,31 @@
   "smartSearchForSale": "🏷️ للبيع",
   "smartSearchForRent": "🔑 للإيجار",
   "smartSearchRoomsSuffix": "🛏️ {range} غرف",
-  "@smartSearchRoomsSuffix": {"placeholders": {"range": {"type": "String"}}},
+  "@smartSearchRoomsSuffix": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchNearTrain": "🚉 قريب من القطار",
   "smartSearchBestValue": "🏷️ الأفضل قيمة",
   "smartSearchRangeUpTo": "حتى {value}",
-  "@smartSearchRangeUpTo": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeUpTo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "smartSearchRangeFrom": "من {value}",
-  "@smartSearchRangeFrom": {"placeholders": {"value": {"type": "String"}}},
+  "@smartSearchRangeFrom": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "gamificationHintAddPhoto": "أضف صورة شخصية (+20%)",
   "gamificationHintWriteBio": "اكتب نبذة عنك (+20%)",
   "gamificationHintSetBudget": "حدد الميزانية (+15%)",
@@ -3421,5 +3439,26 @@
   "gamificationHintAddRequirements": "أضف متطلباتك (+10%)",
   "gamificationHintAddName": "أضف اسمك (+10%)",
   "gamificationHintAlmostDone": "ملفك الشخصي أوشك على الاكتمال!",
-  "panoramaCaptureScreenStillProcessing": "لا تزال المعالجة جارية - سنعلمك عندما تكون جاهزة"
+  "panoramaCaptureScreenStillProcessing": "لا تزال المعالجة جارية - سنعلمك عندما تكون جاهزة",
+  "lassoDrawButton": "ارسم منطقة على الخريطة",
+  "lassoDrawPrompt": "ارسموا بإصبعكم حول المنطقة التي تهمكم",
+  "lassoShowResults": "عرض {count} شقق في هذه المنطقة",
+  "@lassoShowResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoEmptyArea": "لا توجد شقق في المنطقة المحددة — جرّبوا منطقة أكبر",
+  "lassoInAreaCount": "{count} شقق في المنطقة التي حددتموها",
+  "@lassoInAreaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lassoShowAllTooltip": "عرض جميع الشقق على الخريطة",
+  "lassoDrawing": "جارٍ الرسم… ارفعوا إصبعكم للإنهاء"
 }

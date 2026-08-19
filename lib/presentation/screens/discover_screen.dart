@@ -4168,6 +4168,23 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
     // Default select the first property marker to show the bottom card initially
     _selectedProperty = widget.previewMarkers.firstOrNull;
     _currentPolygon.addAll(widget.initialPolygon);
+    // Open focused on what matters — the drawn area if one exists, otherwise
+    // the listings themselves. The old fixed nation-wide zoom opened on a
+    // single unreadable clump of overlapping pins.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final points = _currentPolygon.length >= 3
+          ? List<LatLng>.from(_currentPolygon)
+          : _markers.map((p) => p.point).toList();
+      if (points.length < 2) return;
+      _mapController.fitCamera(
+        CameraFit.coordinates(
+          coordinates: points,
+          padding: const EdgeInsets.fromLTRB(48, 140, 48, 200),
+          maxZoom: 13,
+        ),
+      );
+    });
   }
 
   @override
@@ -4233,12 +4250,10 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
 
   void _startLasso(PointerDownEvent event) {
     _activePointers++;
+    // A second finger (pinch-zoom) must never wipe an area the user already
+    // drew — just stop the current stroke and let the zoom happen.
     if (!_drawMode || _activePointers > 1) {
-      if (_activePointers > 1) {
-        setState(() {
-          _currentPolygon.clear();
-        });
-      }
+      if (_activePointers > 1) setState(() => _lastDrawOffset = null);
       return;
     }
     final point =
@@ -4265,7 +4280,16 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
   void _finishLasso(PointerUpEvent event) {
     _activePointers = math.max(0, _activePointers - 1);
     if (!_drawMode) return;
-    setState(() => _lastDrawOffset = null);
+    setState(() {
+      _lastDrawOffset = null;
+      // Lifting the finger with a real shape drawn = done. Exit draw mode so
+      // the map pans normally again — a non-technical user should never be
+      // stuck in a mode where dragging the map "doesn't work".
+      if (_currentPolygon.length >= 3) {
+        _drawMode = false;
+        HapticFeedback.lightImpact();
+      }
+    });
   }
 
   void _cancelLasso(PointerCancelEvent event) {
@@ -4273,12 +4297,20 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
     setState(() => _lastDrawOffset = null);
   }
 
-  void _locateUser() {
-    if (_markers.isNotEmpty) {
-      _animatedMapMove(_markers.first.point, 13.5);
-    } else {
+  // Fit the camera around every visible pin ("show me everything") — honest,
+  // unlike the old GPS-looking button that teleported to an arbitrary listing.
+  void _showAllProperties() {
+    if (_markers.isEmpty) {
       _animatedMapMove(widget.initialArea.center, 12.5);
+      return;
     }
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: _markers.map((p) => p.point).toList(),
+        padding: const EdgeInsets.fromLTRB(48, 140, 48, 200),
+        maxZoom: 14,
+      ),
+    );
   }
 
   @override
@@ -4291,9 +4323,25 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
         .watch<DatingProvider>()
         .previewFilteredProperties(widget.filters, limit: 70);
     final polygon = _activePolygon;
-    final canSave = polygon.length >= 3;
     final hasProperties = _markers.isNotEmpty;
     final hasPolygon = polygon.length >= 3;
+    // Honest count: how many of the visible pins actually fall inside the
+    // drawn shape (the old chip showed the whole map's count regardless).
+    final drawnArea =
+        hasPolygon ? SearchArea.custom(polygon: polygon) : null;
+    // Count against the FULL filtered catalogue, not the 70 pins shown — the
+    // pin cap is a rendering optimisation and must not skew the number the
+    // user acts on. Skipped mid-stroke (_lastDrawOffset != null) to keep
+    // drawing at full frame rate.
+    final countSource = (drawnArea != null && _lastDrawOffset == null)
+        ? context
+            .read<DatingProvider>()
+            .previewFilteredProperties(widget.filters, limit: 5000)
+        : _markers;
+    final inAreaCount = drawnArea == null
+        ? 0
+        : countSource.where((p) => drawnArea.contains(p.point)).length;
+    final canSave = hasPolygon && inAreaCount > 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -4440,125 +4488,23 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                     },
                   ),
                 ),
-                // Filter Dropdown Button replacing Search Bar
+                // Filter button — opens the filter sheet directly. (Was a fake
+                // dropdown where every menu item opened the same sheet anyway —
+                // one pointless extra tap for the user.)
                 Expanded(
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      cardColor: Colors.white,
-                    ),
-                    child: PopupMenuButton<String>(
-                      tooltip: AppLocalizations.of(context)!
-                          .discoverScreenE67a269a,
-                      onSelected: (value) {
-                        final provider =
-                            Provider.of<DatingProvider>(context, listen: false);
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          useSafeArea: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => _FiltersSheet(provider: provider),
-                        );
-                      },
-                      offset: const Offset(0, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: const BorderSide(color: AppColors.border),
-                      ),
-                      itemBuilder: (BuildContext context) => [
-                        PopupMenuItem<String>(
-                          value: 'price',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                  AppLocalizations.of(context)!
-                                      .discoverScreen3bb32ddd,
-                                  style: const TextStyle(
-                                      color: AppColors.navy,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13.5)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.monetization_on_outlined,
-                                  color: AppColors.navy, size: 18),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'rooms',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                  AppLocalizations.of(context)!
-                                      .discoverScreenB50b3974,
-                                  style: const TextStyle(
-                                      color: AppColors.navy,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13.5)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.meeting_room_outlined,
-                                  color: AppColors.navy, size: 18),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'type',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                  AppLocalizations.of(context)!
-                                      .discoverScreen7d93908e,
-                                  style: const TextStyle(
-                                      color: AppColors.navy,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13.5)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.home_work_outlined,
-                                  color: AppColors.navy, size: 18),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'features',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                  AppLocalizations.of(context)!
-                                      .discoverScreenE08c750c,
-                                  style: const TextStyle(
-                                      color: AppColors.navy,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13.5)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.star_border_rounded,
-                                  color: AppColors.navy, size: 18),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem<String>(
-                          value: 'all',
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                  AppLocalizations.of(context)!
-                                      .discoverScreenE479e555,
-                                  style: const TextStyle(
-                                      color: AppColors.navy,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13.5)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.tune_rounded,
-                                  color: AppColors.navy, size: 18),
-                            ],
-                          ),
-                        ),
-                      ],
-                      child: Container(
+                  child: GestureDetector(
+                    onTap: () {
+                      final provider =
+                          Provider.of<DatingProvider>(context, listen: false);
+                      showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => _FiltersSheet(provider: provider),
+                      );
+                    },
+                    child: Container(
                         height: 52,
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -4607,9 +4553,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 8),
-                // Locate User Button
+                // "Show everything" button — fits the camera around all pins.
                 Container(
                   width: 48,
                   height: 48,
@@ -4626,111 +4571,101 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                     ],
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.gps_fixed_rounded,
+                    tooltip:
+                        AppLocalizations.of(context)!.lassoShowAllTooltip,
+                    icon: const Icon(Icons.zoom_out_map_rounded,
                         color: AppColors.navy),
-                    onPressed: _locateUser,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Lasso toggle Button
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _drawMode ? AppColors.primary : Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _drawMode
-                          ? Icons.gesture_rounded
-                          : Icons.gesture_outlined,
-                      color: _drawMode ? Colors.white : AppColors.navy,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _drawMode = !_drawMode;
-                      });
-                    },
+                    onPressed: _showAllProperties,
                   ),
                 ),
               ],
             ),
           ),
 
-          // Bottom Area: Floating Card and Save buttons
-          // 1. Bottom Headers: Styled as premium tags/chips with liquid glass
-          if (hasProperties)
+          // While drawing: a clear instruction pill so the "map stopped
+          // moving" state is never a mystery.
+          if (_drawMode)
+            Positioned(
+              top: 84 + MediaQuery.of(context).padding.top,
+              left: 24,
+              right: 24,
+              child: IgnorePointer(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.navy.withValues(alpha: 0.88),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.draw_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          AppLocalizations.of(context)!.lassoDrawPrompt,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Honest in-area count chip — only shown once a shape exists, and
+          // counts what is actually inside it (the old chip showed the whole
+          // map's count and doubled as a hidden save button).
+          if (hasPolygon)
             Positioned(
               left: 16,
               right: 16,
               bottom: 368 + MediaQuery.of(context).padding.bottom,
-              child: GestureDetector(
-                onTap: canSave
-                    ? () =>
-                        Navigator.of(context).pop(List<LatLng>.from(polygon))
-                    : null,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.38),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Text(
-                            AppLocalizations.of(context)!
-                                .discoverScreenE2349334,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
+              child: IgnorePointer(
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                          sigmaX: PlatformFx.blurSigma(12),
+                          sigmaY: PlatformFx.blurSigma(12)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.38),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: Text(
+                          inAreaCount > 0
+                              ? AppLocalizations.of(context)!
+                                  .lassoInAreaCount(inAreaCount)
+                              : AppLocalizations.of(context)!.lassoEmptyArea,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                     ),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.26),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Text(
-                            AppLocalizations.of(context)!
-                                .discoverScreenC2dc6194(_markers.length),
-                            style: const TextStyle(
-                              color: Colors.white, // Solid white text
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -4825,94 +4760,126 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
               ),
             ),
 
-          // 3. Action buttons (Clear & Save) positioned at the bottom
+          // 3. Bottom action row — ONE big labeled button drives the whole
+          // flow (draw → done → show results), so nothing relies on decoding
+          // a mystery icon. "Clear" appears only when there is something to
+          // clear.
           Positioned(
             left: 16,
             right: 16,
             bottom: 4 + MediaQuery.of(context).padding.bottom,
             child: Row(
               children: [
-                // Clear Lasso Button (Liquid Glass)
-                Expanded(
-                  flex: 1,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.24),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.12)),
-                        ),
-                        child: TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _currentPolygon.clear();
-                              _lastDrawOffset = null;
-                              _selectedProperty =
-                                  _markers.firstOrNull;
-                            });
-                          },
-                          icon: const Icon(Icons.refresh_rounded,
-                              color: Colors.white, size: 18),
-                          label: Text(
-                            AppLocalizations.of(context)!
-                                .discoverScreenE8b3a3d5,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
+                if (hasPolygon || _drawMode) ...[
+                  Expanded(
+                    flex: 1,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                            sigmaX: PlatformFx.blurSigma(18),
+                            sigmaY: PlatformFx.blurSigma(18)),
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.24),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12)),
+                          ),
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _currentPolygon.clear();
+                                _lastDrawOffset = null;
+                                _drawMode = false;
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded,
+                                color: Colors.white, size: 18),
+                            label: Text(
+                              AppLocalizations.of(context)!
+                                  .discoverScreenE8b3a3d5,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Save Lasso Button (Vibrant sky blue/cyan when canSave is true)
+                  const SizedBox(width: 12),
+                ],
+                // Primary: start drawing → (drawing…) → show N results.
                 Expanded(
                   flex: 2,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
+                      filter: ImageFilter.blur(
+                          sigmaX: PlatformFx.blurSigma(18),
+                          sigmaY: PlatformFx.blurSigma(18)),
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: canSave
-                              ? AppColors.sky
-                                  .withValues(alpha: 0.85) // Sky Blue / Cyan
-                              : Colors.black.withValues(alpha: 0.18),
+                          color: hasPolygon
+                              ? (canSave
+                                  ? AppColors.sky.withValues(alpha: 0.85)
+                                  : Colors.black.withValues(alpha: 0.18))
+                              : (_drawMode
+                                  ? Colors.black.withValues(alpha: 0.18)
+                                  : AppColors.primary.withValues(alpha: 0.9)),
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
                             color: canSave
                                 ? AppColors.sky.withValues(alpha: 0.4)
-                                : Colors.white.withValues(alpha: 0.08),
+                                : Colors.white.withValues(alpha: 0.12),
                           ),
                         ),
                         child: TextButton.icon(
-                          onPressed: canSave
-                              ? () => Navigator.of(context)
-                                  .pop(List<LatLng>.from(polygon))
-                              : null,
+                          onPressed: () {
+                            if (hasPolygon) {
+                              if (canSave) {
+                                Navigator.of(context)
+                                    .pop(List<LatLng>.from(polygon));
+                              }
+                              return;
+                            }
+                            if (!_drawMode) {
+                              HapticFeedback.lightImpact();
+                              setState(() => _drawMode = true);
+                            }
+                          },
                           icon: Icon(
-                            Icons.check_circle_outline_rounded,
-                            color: canSave
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                            hasPolygon
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.draw_rounded,
+                            color: (hasPolygon && !canSave) || _drawMode
+                                ? Colors.white.withValues(alpha: 0.55)
+                                : Colors.white,
                             size: 18,
                           ),
                           label: Text(
-                            AppLocalizations.of(context)!
-                                .discoverScreen55e539c8,
+                            hasPolygon
+                                ? (canSave
+                                    ? AppLocalizations.of(context)!
+                                        .lassoShowResults(inAreaCount)
+                                    : AppLocalizations.of(context)!
+                                        .lassoEmptyArea)
+                                : (_drawMode
+                                    ? AppLocalizations.of(context)!
+                                        .lassoDrawing
+                                    : AppLocalizations.of(context)!
+                                        .lassoDrawButton),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: canSave
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.4),
+                              color: (hasPolygon && !canSave) || _drawMode
+                                  ? Colors.white.withValues(alpha: 0.75)
+                                  : Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
                             ),
