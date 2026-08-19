@@ -15,6 +15,7 @@ import 'package:dating_app/data/providers/chat_provider.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/swipe_to_confirm.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -207,6 +208,10 @@ class _MessageScreenState extends State<MessageScreen> {
 
   ChatProvider? _chatProvider;
   bool _chatInitialized = false;
+
+  /// My Firebase uid — the reliable "which side is mine" key (server stamps
+  /// senderId from the token on every message row, app and website alike).
+  String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool _actionsOpen = false;
 
   // ── Media (image upload + voice note recording) ───────────────────────────
@@ -240,7 +245,7 @@ class _MessageScreenState extends State<MessageScreen> {
     _chatProvider = ChatProvider(
       matchId: widget.matchId,
       senderName: senderName,
-      seedMessages: match.messages,
+      senderId: _myUid,
     );
     _chatProvider!.addListener(_onChatUpdate);
     _chatProvider!.initialize();
@@ -963,7 +968,8 @@ class _MessageScreenState extends State<MessageScreen> {
                     itemBuilder: (context, i) {
                       final msg =
                           match.messages[match.messages.length - 1 - i];
-                      final isTenant = msg.sender == tenantName;
+                      final isTenant =
+                          msg.isMine(myUid: _myUid, myName: tenantName);
                       return Align(
                         alignment: isTenant
                             ? Alignment.centerRight
@@ -1265,7 +1271,7 @@ class _MessageScreenState extends State<MessageScreen> {
           itemBuilder: (context, index) {
             final msg = messages[index];
             final prev = index == 0 ? null : messages[index - 1];
-            final isTenant = msg.sender == tenantName;
+            final isTenant = msg.isMine(myUid: _myUid, myName: tenantName);
             final showDate =
                 prev == null || !_isSameDay(prev.createdAt, msg.createdAt);
             final showAvatar =

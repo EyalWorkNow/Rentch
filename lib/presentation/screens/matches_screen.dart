@@ -3,6 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/match_labels_repository.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -1013,7 +1014,9 @@ class _MatchCardState extends State<_MatchCard> {
     final awaitingReply = isLandlord &&
         lastMessage != null &&
         tenantName.isNotEmpty &&
-        lastMessage.sender == tenantName;
+        lastMessage.isMine(
+            myUid: FirebaseAuth.instance.currentUser?.uid ?? '',
+            myName: tenantName);
 
     return GestureDetector(
       onLongPress: widget.onLongPress,

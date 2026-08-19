@@ -220,7 +220,12 @@ class RealtimeChatService {
               'createdAt': now.toIso8601String(),
             },
           ));
-      return ChatMessage(id: rowId, sender: senderName, text: text, createdAt: now);
+      return ChatMessage(
+          id: rowId,
+          sender: senderName,
+          senderId: senderId,
+          text: text,
+          createdAt: now);
     } catch (e) {
       if (kDebugMode) debugPrint('RealtimeChatService.sendMessage error: $e');
       return null;
@@ -299,11 +304,19 @@ class RealtimeChatService {
     try {
       final id = (data[r'$id'] ?? data['id'] ?? '').toString();
       final sender = (data['senderName'] ?? '').toString();
+      // Stamped server-side from the auth token — reliable even when the
+      // website sends with an empty senderName.
+      final senderId = (data['senderId'] ?? '').toString();
       final text = (data['text'] ?? '').toString();
       final raw = data['createdAt'] as String?;
       final createdAt = raw != null ? DateTime.tryParse(raw) : null;
       if (id.isEmpty || text.isEmpty || createdAt == null) return null;
-      return ChatMessage(id: id, sender: sender, text: text, createdAt: createdAt);
+      return ChatMessage(
+          id: id,
+          sender: sender,
+          senderId: senderId,
+          text: text,
+          createdAt: createdAt);
     } catch (_) {
       return null;
     }

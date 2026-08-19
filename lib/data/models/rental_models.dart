@@ -2517,11 +2517,17 @@ class ChatMessage {
     required this.sender,
     required this.text,
     required this.createdAt,
+    this.senderId = '',
     this.failed = false,
   });
 
   final String id;
   final String sender;
+
+  /// Firebase uid of the sender, stamped server-side from the auth token on
+  /// every backend row (app AND website writes). '' for old local rows —
+  /// alignment logic falls back to comparing [sender] names then.
+  final String senderId;
   final String text;
   final DateTime createdAt;
 
@@ -2529,9 +2535,18 @@ class ChatMessage {
   /// "not sent" marker instead of pretending it was delivered.
   final bool failed;
 
+  /// Which side of the chat this bubble belongs to. Prefers the server-stamped
+  /// [senderId] (works for website-sent messages whose senderName is empty);
+  /// falls back to the legacy name comparison for old local rows without one.
+  bool isMine({required String myUid, required String myName}) =>
+      senderId.isNotEmpty && myUid.isNotEmpty
+          ? senderId == myUid
+          : sender == myName;
+
   ChatMessage copyWith({bool? failed, String? text}) => ChatMessage(
         id: id,
         sender: sender,
+        senderId: senderId,
         text: text ?? this.text,
         createdAt: createdAt,
         failed: failed ?? this.failed,
@@ -2541,6 +2556,7 @@ class ChatMessage {
     return ChatMessage(
       id: json['id'] as String,
       sender: json['sender'] as String,
+      senderId: json['senderId']?.toString() ?? '',
       text: json['text'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
@@ -2550,6 +2566,7 @@ class ChatMessage {
     return {
       'id': id,
       'sender': sender,
+      if (senderId.isNotEmpty) 'senderId': senderId,
       'text': text,
       'createdAt': createdAt.toIso8601String(),
     };

@@ -7,10 +7,10 @@ import 'package:flutter/foundation.dart';
 // Per-conversation chat manager.
 //
 // Lifecycle:
-//   1. Seed with local messages from DatingProvider (shown instantly, offline-safe).
-//   2. Fetch remote messages from Appwrite → merge + de-duplicate.
-//   3. Subscribe to Appwrite Realtime for incoming messages.
-//   4. Reconnect is handled by RealtimeChatService with exponential backoff + jitter.
+//   1. Fetch remote messages from Appwrite — the backend thread is the single
+//      source of truth (no local demo seeding, so app and website always agree).
+//   2. Subscribe to Appwrite Realtime for incoming messages.
+//   3. Reconnect is handled by RealtimeChatService with exponential backoff + jitter.
 //
 // Scalability: The previous implementation polled every 15 s as a fallback.
 //   At 1M concurrent users that produces ~66K req/s from polling alone.
@@ -21,7 +21,6 @@ import 'package:flutter/foundation.dart';
 //   final chat = ChatProvider(
 //     matchId: match.id,
 //     senderName: tenantName,
-//     seedMessages: match.messages,
 //   );
 //   await chat.initialize();
 //   // … show chat.messages, call chat.sendMessage(text)
@@ -32,8 +31,7 @@ class ChatProvider extends ChangeNotifier {
     required this.matchId,
     required this.senderName,
     this.senderId = '',
-    List<ChatMessage> seedMessages = const [],
-  })  : _messages = List<ChatMessage>.from(seedMessages),
+  })  : _messages = <ChatMessage>[],
         _service = RealtimeChatService();
 
   final String matchId;
@@ -70,12 +68,9 @@ class ChatProvider extends ChangeNotifier {
     final remote = await _service.fetchMessages(matchId, limit: 100);
     if (_disposed) return;
 
-    // Remote is the source of truth. If Appwrite has messages, use them
-    // exclusively — don't mix with local demo seed which may be stale.
-    // If Appwrite is empty, keep the local seed so the screen isn't blank.
-    if (remote.isNotEmpty) {
-      _messages = remote;
-    }
+    // Remote is the single source of truth — an empty backend thread renders
+    // empty, matching the website (no on-device-only seed messages).
+    _messages = remote;
     _isLoading = false;
     _safeNotify();
 
@@ -109,6 +104,7 @@ class ChatProvider extends ChangeNotifier {
       ChatMessage(
         id: id,
         sender: senderName,
+        senderId: senderId,
         text: trimmed,
         createdAt: DateTime.now(),
       ),
@@ -154,6 +150,7 @@ class ChatProvider extends ChangeNotifier {
       ChatMessage(
         id: tempId,
         sender: senderName,
+        senderId: senderId,
         text: encodedLocal,
         createdAt: DateTime.now(),
       ),
