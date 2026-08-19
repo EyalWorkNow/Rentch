@@ -6,6 +6,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
+import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/profile_completion_sheet.dart';
 import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
@@ -73,11 +74,27 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     // Tenant profile-completion nudge — pops once per launch when < 100%.
-    // (The old first-launch subscription paywall was removed — landlords no
-    // longer have a subscription; monetization is boost-only + broker upgrade.)
     if (mounted) {
       await ProfileCompletionSheet.maybeShow(context);
     }
+    // Landlord subscription offer — every entry, until they actually
+    // subscribe. refreshSubscription() is awaited here (not just the
+    // fire-and-forget call elsewhere) so this reads the real current
+    // entitlement rather than a possibly-stale/default cached value.
+    if (mounted) {
+      await _maybeShowSubscriptionOffer();
+    }
+  }
+
+  Future<void> _maybeShowSubscriptionOffer() async {
+    final provider = context.read<DatingProvider>();
+    if (!provider.isLandlord) return;
+    await provider.refreshSubscription();
+    if (!mounted || provider.isSubscribed) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'PaywallScreen'),
+      builder: (_) => const PaywallScreen(),
+    ));
   }
 
   void _showMatchOverlay(BuildContext context, RentalProperty property) {

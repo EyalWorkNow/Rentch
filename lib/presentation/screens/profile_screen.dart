@@ -7,6 +7,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
+import 'package:dating_app/presentation/features/billing/subscription_screen.dart';
 import 'package:dating_app/presentation/widgets/language_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -1550,10 +1551,12 @@ String _fmt(int value) {
 // LANDLORD PROFILE — full redesign
 // ===========================================================================
 
-// ponytail: PRO upsell is a dead promise — the "שדרג עכשיו" CTA only shows a
-// "coming soon" snackbar with no real purchase/upgrade flow. Until monetization
-// is built, hide the card behind this flag. Flip to true to re-enable.
-const bool _kProUpsellEnabled = false;
+// Re-enabled: this used to gate a dead "coming soon" promise, but the real
+// purchase flow (PaywallScreen -> checkout_launcher -> Grow/webview) has
+// since been built and wired to this exact button (see onPressed below) —
+// the flag was just never flipped back, which is why the subscription
+// purchase option was invisible in the shipped app.
+const bool _kProUpsellEnabled = true;
 
 class _LandlordProfileScreen extends StatelessWidget {
   const _LandlordProfileScreen({
@@ -1852,6 +1855,17 @@ class _LandlordProfileScreen extends StatelessWidget {
                     ownerName: profile.name,
                     isSelf: true,
                   ),
+                ),
+              ),
+            ),
+            const _SettingsDivider(),
+            _ProfileMenuItem(
+              icon: IconsaxPlusLinear.crown_1,
+              label: 'המנוי שלי',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  settings: const RouteSettings(name: 'SubscriptionScreen'),
+                  builder: (_) => const SubscriptionScreen(),
                 ),
               ),
             ),
