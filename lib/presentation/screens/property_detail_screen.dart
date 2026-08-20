@@ -676,8 +676,8 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
         lon: widget.property.lon,
         city: widget.property.city,
         profile: NearbyProfile.fromText(personaText),
-        carousel: true, // detail page → tag carousel, top 5 + "צפה בכולם"
-        maxChips: 5,
+        carousel: true, // detail page → 3×2 tag grid + "צפה בכולם"
+        maxChips: 6,
         showAllKinds: true, // expose EVERY nearby layer with data (persona-first)
         preferredKinds: provider.filters.preferredNearby, // seeker's picks first
         showHeader: false, // the section header + toggle sit above the card
@@ -3504,10 +3504,28 @@ class _MapSectionState extends State<_MapSection> {
                           MaterialPageRoute<void>(
                             fullscreenDialog: true,
                             builder: (_) => Scaffold(
+                              extendBodyBehindAppBar: true,
                               appBar: AppBar(
-                                title: Text(
-                                    AppLocalizations.of(context)!
+                                elevation: 0,
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.60),
+                                flexibleSpace: ClipRect(
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                        sigmaX: 14, sigmaY: 14),
+                                    child: const SizedBox.expand(),
+                                  ),
+                                ),
+                                title: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    RentlyIcon(IconsaxPlusLinear.location,
+                                        size: 20, color: AppColors.primary),
+                                    const SizedBox(width: 8),
+                                    Text(AppLocalizations.of(context)!
                                         .propertyDetailScreen26d0e7de),
+                                  ],
+                                ),
                               ),
                               body: _MapSection(
                                 property: widget.property,
@@ -3792,7 +3810,7 @@ class _MapSectionState extends State<_MapSection> {
     if (widget.fullscreen) return body;
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: SizedBox(height: 280, child: body),
+      child: SizedBox(height: 364, child: body),
     );
   }
 

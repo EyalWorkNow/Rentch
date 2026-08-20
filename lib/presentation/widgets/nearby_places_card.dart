@@ -264,25 +264,21 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   color: AppColors.navy)),
           const SizedBox(height: 10),
         ],
-        // Collapsed → a horizontal, swipeable CAROUSEL of the top tags. Expanded
-        // ("צפה בכולם") → a full wrap so every tag is visible at once.
-        if (showAll)
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            ...chips,
-            if (viewAll != null) viewAll,
-          ])
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(children: [
-              for (var i = 0; i < chips.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                chips[i],
-              ],
-              if (viewAll != null) ...[const SizedBox(width: 8), viewAll],
-            ]),
-          ),
+        // Tags as a fixed 3-column GRID — 2 rows collapsed, everything when
+        // expanded (no sideways scrolling; "צפה בכולם" reveals the rest).
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.6,
+          children: chips,
+        ),
+        if (viewAll != null) ...[
+          const SizedBox(height: 8),
+          Center(child: viewAll),
+        ],
         const SizedBox(height: 8),
         // Selected tag's places as an ADAPTIVE wrap — each card sizes to its own
         // content so the FULL name shows (even a long one), and rows fill
