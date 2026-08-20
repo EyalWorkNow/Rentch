@@ -502,15 +502,15 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       }),
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         decoration: BoxDecoration(
           color: on ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: on ? AppColors.primary : AppColors.borderLight),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 16, color: on ? Colors.white : AppColors.primary),
-          const SizedBox(width: 6),
+          Icon(icon, size: 14, color: on ? Colors.white : AppColors.primary),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
                 title
@@ -519,14 +519,14 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     color: on ? Colors.white : AppColors.navy)),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Text('$n${n >= 120 ? '+' : ''}',
               style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 10,
                   fontWeight: FontWeight.w800,
                   color: on ? Colors.white70 : AppColors.textSecondary)),
         ]),
