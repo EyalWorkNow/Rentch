@@ -255,6 +255,7 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.rentch.app',
         ),
+        const SimpleAttributionWidget(source: Text('OpenStreetMap')),
         PolygonLayer(
           polygons: [
             for (final r in _ranked)

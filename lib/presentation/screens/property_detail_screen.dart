@@ -3097,8 +3097,16 @@ const List<_MapLayer> _kMapLayers = [
 ];
 
 class _MapSection extends StatefulWidget {
-  _MapSection({required this.property});
+  _MapSection({
+    required this.property,
+    this.fullscreen = false,
+    this.initialLayers,
+  });
   final RentalProperty property;
+  // Fullscreen variant: fills its parent, no expand button, ready immediately.
+  final bool fullscreen;
+  // Layers to start with (carried over when expanding to fullscreen).
+  final Set<String>? initialLayers;
 
   @override
   State<_MapSection> createState() => _MapSectionState();
@@ -3118,6 +3126,15 @@ class _MapSectionState extends State<_MapSection> {
   @override
   void initState() {
     super.initState();
+    final carried = widget.initialLayers;
+    if (carried != null) _activeLayers.addAll(carried);
+    if (widget.fullscreen) {
+      // Fullscreen is user-initiated — no need to defer, and the carried-over
+      // layers need their POI data loaded in this fresh state object.
+      _ready = true;
+      if (_activeLayers.isNotEmpty) unawaited(_ensurePoisLoaded());
+      return;
+    }
     // Defer the FlutterMap (widget init + OpenStreetMap tile fetch) off the
     // page-open critical path — building it eagerly on every listing open was a
     // main cause of the "delay entering an apartment page". The map is below the
@@ -3144,13 +3161,20 @@ class _MapSectionState extends State<_MapSection> {
     setState(() {
       if (_activeLayers.contains(key)) {
         _activeLayers.remove(key);
+        // Don't leave a popup describing a dot that just disappeared.
+        if (_selectedPoi != null && _selectedPoi!.$2.key == key) {
+          _selectedPoi = null;
+        }
       } else {
         _activeLayers.add(key);
       }
     });
-    if (_poiData != null || _loadingPois || !_activeLayers.contains(key)) {
-      return;
-    }
+    if (!_activeLayers.contains(key)) return;
+    await _ensurePoisLoaded();
+  }
+
+  Future<void> _ensurePoisLoaded() async {
+    if (_poiData != null || _loadingPois) return;
     setState(() => _loadingPois = true);
     // Idempotent loaders — no-op if already loaded (e.g. NearbyPlacesCard
     // further down this same page already triggered them). Same 5 calls
@@ -3251,11 +3275,7 @@ class _MapSectionState extends State<_MapSection> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final property = widget.property;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: SizedBox(
-        height: 280,
-        child: Stack(
+    final body = Stack(
           fit: StackFit.expand,
           children: [
             if (_ready)
@@ -3292,6 +3312,9 @@ class _MapSectionState extends State<_MapSection> {
                     urlTemplate:
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.rentch.app',
+                  ),
+                  const SimpleAttributionWidget(
+                    source: Text('OpenStreetMap'),
                   ),
                   MarkerLayer(markers: _poiMarkers()),
                   MarkerLayer(
@@ -3338,6 +3361,38 @@ class _MapSectionState extends State<_MapSection> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (!widget.fullscreen) ...[
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => Scaffold(
+                              appBar: AppBar(
+                                title: Text(
+                                    AppLocalizations.of(context)!
+                                        .propertyDetailScreen26d0e7de),
+                              ),
+                              body: _MapSection(
+                                property: widget.property,
+                                fullscreen: true,
+                                initialLayers: {..._activeLayers},
+                              ),
+                            ),
+                          ),
+                        ),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.62),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const RentlyIcon(IconsaxPlusLinear.maximize_4,
+                              size: 14, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     GestureDetector(
                       onTap: () => _mapController.move(
                           LatLng(property.lat, property.lon), 15),
@@ -3596,8 +3651,11 @@ class _MapSectionState extends State<_MapSection> {
                 ),
               ),
           ],
-        ),
-      ),
+        );
+    if (widget.fullscreen) return body;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(height: 280, child: body),
     );
   }
 

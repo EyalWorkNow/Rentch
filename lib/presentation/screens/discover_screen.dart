@@ -4364,6 +4364,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.rentch.app',
               ),
+              const SimpleAttributionWidget(source: Text('OpenStreetMap')),
               PolygonLayer(
                 polygons: [
                   Polygon(
