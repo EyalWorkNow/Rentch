@@ -5647,7 +5647,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get erikChatScreenInputHint => 'Cuéntame con tus propias palabras...';
 
   @override
-  String get nearbyPlacesCard29364e0f => 'Lugares cercanos';
+  String get nearbyPlacesCard29364e0f => 'Lugares cerca del piso';
 
   @override
   String get nearbyPlacesCard7e6e0fb1 => 'Anterior';
@@ -12050,4 +12050,31 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get lassoDrawing => 'Dibujando… levanta el dedo para terminar';
+
+  @override
+  String get nearbyPlacesCardRail => 'Estaciones de tren';
+
+  @override
+  String get nearbyPlacesCardAirQuality => 'Monitoreo de calidad del aire';
+
+  @override
+  String get discoverScreenNearbyRail => 'Estaciones de tren';
+
+  @override
+  String get discoverScreenNearbyAir => 'Calidad del aire';
+
+  @override
+  String get discoverScreenNearbyWorship => 'Lugares de culto';
+
+  @override
+  String get discoverScreenNearbyVets => 'Veterinarios';
+
+  @override
+  String get discoverScreenNearbyBike => 'Bicis compartidas';
+
+  @override
+  String get nearbyToggleMap => 'Mapa';
+
+  @override
+  String get nearbyToggleList => 'Lista';
 }

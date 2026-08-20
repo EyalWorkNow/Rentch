@@ -578,16 +578,28 @@ class IsraelGeoIndex {
   static final Map<String, List<_Poi>> _poiLayers = {};
   static final Map<String, Map<int, List<int>>> _poiGrids = {};
 
-  static Future<void> _loadPoi(String key, String file) async {
+  static final Map<String, Future<void>> _poiInflight = {};
+
+  static Future<void> _loadPoi(String key, String file) {
+    // Memoize the FUTURE, not an empty placeholder: pre-marking with const []
+    // made a second caller (map section vs nearby card racing on the same
+    // page) see "loaded" mid-flight and cache empty layers forever.
+    return _poiInflight[key] ??= _loadPoiInner(key, file);
+  }
+
+  static Future<void> _loadPoiInner(String key, String file) async {
     if (_poiLayers.containsKey(key)) return;
-    _poiLayers[key] = const <_Poi>[]; // mark loading (idempotent)
     try {
       final raw = await rootBundle.loadString('assets/data/govdata/$file');
       final list = [
         for (final e in (jsonDecode(raw) as List))
           if (e is Map)
             _Poi((e['n'] ?? '').toString(), (e['lat'] as num).toDouble(),
-                (e['lon'] as num).toDouble(), (e['t'] ?? '').toString()),
+                (e['lon'] as num).toDouble(), (e['t'] ?? '').toString())
+          // Compact triple format some gov files use: [lat, lon, name].
+          else if (e is List && e.length >= 3 && e[0] is num && e[1] is num)
+            _Poi(e[2].toString(), (e[0] as num).toDouble(),
+                (e[1] as num).toDouble(), ''),
       ];
       _poiLayers[key] = list;
       _poiGrids[key] =
@@ -615,6 +627,8 @@ class IsraelGeoIndex {
         _loadPoi('bike_share', 'bike_share.json'),
         _loadPoi('coworking', 'coworking.json'),
         _loadPoi('parking', 'parking.json'),
+        _loadPoi('rail', 'rail_stations.json'),
+        _loadPoi('air_quality', 'air_quality_stations.json'),
       ]);
 
   /// Generic within-radius query over a loaded [_poiLayers] key. [kind] tags the
@@ -734,6 +748,16 @@ class IsraelGeoIndex {
   static List<NearbyPlace> parkingWithin(double lat, double lon,
           {double km = 1.5, int cap = 12}) =>
       _poiWithin('parking', lat, lon, km: km, kind: 'parking', cap: cap);
+
+  static List<NearbyPlace> railStationsWithin(double lat, double lon,
+          {double km = 5, int cap = 12}) =>
+      _poiWithin('rail', lat, lon,
+          km: km, kind: 'rail', cap: cap, genericName: 'תחנת רכבת');
+
+  static List<NearbyPlace> airQualityStationsWithin(double lat, double lon,
+          {double km = 5, int cap = 12}) =>
+      _poiWithin('air_quality', lat, lon,
+          km: km, kind: 'airQuality', cap: cap, genericName: 'תחנת ניטור');
 
   // Nightlife venues (OSM bars/pubs/clubs weighted 1.0, cafés 0.4). A LIVELY area
   // isn't the nearest bar — it's the DENSITY of them around you.

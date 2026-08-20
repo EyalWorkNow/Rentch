@@ -669,15 +669,22 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
     final tp = provider.tenantProfile;
     final personaText =
         '${tp?.bio ?? ''} ${(tp?.importantDetails ?? const <String>[]).join(' ')}';
-    children.add(NearbyPlacesCard(
-      lat: widget.property.lat,
-      lon: widget.property.lon,
-      city: widget.property.city,
-      profile: NearbyProfile.fromText(personaText),
-      carousel: true, // detail page → tag carousel, top 5 + "צפה בכולם"
-      maxChips: 5,
-      showAllKinds: true, // expose EVERY nearby layer with data (persona-first)
-      preferredKinds: provider.filters.preferredNearby, // seeker's picks first
+    children.add(_NearbySection(
+      property: widget.property,
+      listView: NearbyPlacesCard(
+        lat: widget.property.lat,
+        lon: widget.property.lon,
+        city: widget.property.city,
+        profile: NearbyProfile.fromText(personaText),
+        carousel: true, // detail page → tag carousel, top 5 + "צפה בכולם"
+        maxChips: 5,
+        showAllKinds: true, // expose EVERY nearby layer with data (persona-first)
+        preferredKinds: provider.filters.preferredNearby, // seeker's picks first
+      ),
+      preferredLayerKeys: provider.filters.preferredNearby
+          .map((k) => k.name)
+          .take(6)
+          .toSet(),
     ));
     children.add(_AskRentlyEntry(
       property: widget.property,
@@ -3073,7 +3080,7 @@ const List<_MapLayer> _kMapLayers = [
       IconsaxPlusLinear.hospital),
   _MapLayer('pharmacies', 'בתי מרקחת', Color(0xFF14B8A6), 'pharmacies',
       IconsaxPlusLinear.health),
-  _MapLayer('shops', 'קניות', Color(0xFFF5A524), 'supermarkets',
+  _MapLayer('supermarkets', 'קניות', Color(0xFFF5A524), 'supermarkets',
       IconsaxPlusLinear.shopping_cart),
   _MapLayer(
       'parks', 'פארקים', Color(0xFF27AE60), 'parks', IconsaxPlusLinear.tree),
@@ -3107,7 +3114,115 @@ const List<_MapLayer> _kMapLayers = [
       IconsaxPlusLinear.briefcase),
   _MapLayer(
       'parking', 'חניה', Color(0xFF1F2937), 'parking', IconsaxPlusLinear.car),
+  _MapLayer('rail', 'תחנות רכבת', Color(0xFF0EA5E9), 'rail',
+      IconsaxPlusLinear.routing),
+  _MapLayer('airQuality', 'איכות אוויר', Color(0xFF14B8A6), 'airQuality',
+      IconsaxPlusLinear.wind_2),
 ];
+
+/// "מקומות בקרבת הדירה" — one section, two views behind a segmented toggle:
+/// רשימה (the existing NearbyPlacesCard) or מפה (the same _MapSection used at
+/// the bottom of the page, whose chip strip IS the tag picker — same design).
+class _NearbySection extends StatefulWidget {
+  const _NearbySection({
+    required this.property,
+    required this.listView,
+    required this.preferredLayerKeys,
+  });
+  final RentalProperty property;
+  final Widget listView;
+  final Set<String> preferredLayerKeys;
+
+  @override
+  State<_NearbySection> createState() => _NearbySectionState();
+}
+
+class _NearbySectionState extends State<_NearbySection> {
+  bool _mapMode = false;
+
+  Widget _segment(
+      {required bool selected,
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon,
+              size: 15, color: selected ? Colors.white : AppColors.slate500),
+          const SizedBox(width: 5),
+          Text(label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white : AppColors.slate500,
+              )),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(l10n.nearbyPlacesCard29364e0f,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink)),
+            ),
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight2,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                _segment(
+                  selected: !_mapMode,
+                  icon: IconsaxPlusLinear.textalign_right,
+                  label: l10n.nearbyToggleList,
+                  onTap: () => setState(() => _mapMode = false),
+                ),
+                _segment(
+                  selected: _mapMode,
+                  icon: IconsaxPlusLinear.map_1,
+                  label: l10n.nearbyToggleMap,
+                  onTap: () => setState(() => _mapMode = true),
+                ),
+              ]),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Map mode reuses the page's map section 1:1 — including its layer-chip
+        // strip, which serves as the tag picker (same design, same behavior).
+        if (_mapMode)
+          _MapSection(
+            property: widget.property,
+            initialLayers: widget.preferredLayerKeys.isEmpty
+                ? null
+                : widget.preferredLayerKeys,
+          )
+        else
+          widget.listView,
+      ],
+    );
+  }
+}
 
 class _MapSection extends StatefulWidget {
   _MapSection({
@@ -3209,7 +3324,7 @@ class _MapSectionState extends State<_MapSection> {
       'schools': IsraelGeoIndex.schoolsWithin(lat, lon, km: 1.0, cap: 40),
       'kindergartens':
           IsraelGeoIndex.kindergartensWithin(lat, lon, km: 1.0, cap: 40),
-      'clinics': IsraelGeoIndex.clinicsWithin(lat, lon, km: 1.0, cap: 40),
+      'clinics': IsraelGeoIndex.clinicsWithin(lat, lon, km: 3.0, cap: 40),
       'pharmacies': IsraelGeoIndex.pharmaciesWithin(lat, lon, km: 1.0, cap: 40),
       'supermarkets':
           IsraelGeoIndex.supermarketsWithin(lat, lon, km: 1.0, cap: 40),
@@ -3222,7 +3337,7 @@ class _MapSectionState extends State<_MapSection> {
           IsraelGeoIndex.nightlifeVenuesWithin(lat, lon, km: 1.0, cap: 40),
       'synagogues': IsraelGeoIndex.synagoguesWithin(lat, lon, km: 1.0, cap: 40),
       'culture': IsraelGeoIndex.cultureWithin(lat, lon, km: 1.0, cap: 40),
-      'hospitals': IsraelGeoIndex.hospitalsWithin(lat, lon, km: 1.0, cap: 40),
+      'hospitals': IsraelGeoIndex.hospitalsWithin(lat, lon, km: 5.0, cap: 40),
       'transit': IsraelGeoIndex.transitStopsWithin(lat, lon, km: 1.0, cap: 40),
       'worship': IsraelGeoIndex.worshipWithin(lat, lon, km: 1.0, cap: 40),
       'pools': IsraelGeoIndex.poolsWithin(lat, lon, km: 1.0, cap: 40),
@@ -3231,6 +3346,11 @@ class _MapSectionState extends State<_MapSection> {
       'bikeShare': IsraelGeoIndex.bikeShareWithin(lat, lon, km: 1.0, cap: 40),
       'coworking': IsraelGeoIndex.coworkingWithin(lat, lon, km: 1.0, cap: 40),
       'parking': IsraelGeoIndex.parkingWithin(lat, lon, km: 1.0, cap: 40),
+      // Far-relevance categories get a wider radius — 1km showed zero dots
+      // for layers whose list card uses 5km.
+      'rail': IsraelGeoIndex.railStationsWithin(lat, lon, km: 5.0, cap: 40),
+      'airQuality':
+          IsraelGeoIndex.airQualityStationsWithin(lat, lon, km: 5.0, cap: 40),
     };
     if (kDebugMode) {
       debugPrint('_MapSection: loaded bundled POIs → '
@@ -3268,13 +3388,13 @@ class _MapSectionState extends State<_MapSection> {
               decoration: BoxDecoration(
                 color: layer.color,
                 shape: BoxShape.circle,
-                border:
-                    Border.all(color: Colors.white, width: isSelected ? 3 : 2),
+                // Spec: 3px white stroke + light drop shadow on all POI dots.
+                border: Border.all(color: Colors.white, width: 3),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1)),
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2)),
                 ],
               ),
               child: Icon(layer.icon,

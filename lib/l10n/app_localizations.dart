@@ -9801,7 +9801,7 @@ abstract class AppLocalizations {
   /// No description provided for @nearbyPlacesCard29364e0f.
   ///
   /// In he, this message translates to:
-  /// **'מקומות בקרבה'**
+  /// **'מקומות בקרבת הדירה'**
   String get nearbyPlacesCard29364e0f;
 
   /// No description provided for @nearbyPlacesCard7e6e0fb1.
@@ -20668,6 +20668,60 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'מציירים… הרימו את האצבע לסיום'**
   String get lassoDrawing;
+
+  /// No description provided for @nearbyPlacesCardRail.
+  ///
+  /// In he, this message translates to:
+  /// **'תחנות רכבת'**
+  String get nearbyPlacesCardRail;
+
+  /// No description provided for @nearbyPlacesCardAirQuality.
+  ///
+  /// In he, this message translates to:
+  /// **'ניטור איכות אוויר'**
+  String get nearbyPlacesCardAirQuality;
+
+  /// No description provided for @discoverScreenNearbyRail.
+  ///
+  /// In he, this message translates to:
+  /// **'תחנות רכבת'**
+  String get discoverScreenNearbyRail;
+
+  /// No description provided for @discoverScreenNearbyAir.
+  ///
+  /// In he, this message translates to:
+  /// **'איכות אוויר'**
+  String get discoverScreenNearbyAir;
+
+  /// No description provided for @discoverScreenNearbyWorship.
+  ///
+  /// In he, this message translates to:
+  /// **'מקומות תפילה'**
+  String get discoverScreenNearbyWorship;
+
+  /// No description provided for @discoverScreenNearbyVets.
+  ///
+  /// In he, this message translates to:
+  /// **'וטרינרים'**
+  String get discoverScreenNearbyVets;
+
+  /// No description provided for @discoverScreenNearbyBike.
+  ///
+  /// In he, this message translates to:
+  /// **'אופניים שיתופיים'**
+  String get discoverScreenNearbyBike;
+
+  /// No description provided for @nearbyToggleMap.
+  ///
+  /// In he, this message translates to:
+  /// **'מפה'**
+  String get nearbyToggleMap;
+
+  /// No description provided for @nearbyToggleList.
+  ///
+  /// In he, this message translates to:
+  /// **'רשימה'**
+  String get nearbyToggleList;
 }
 
 class _AppLocalizationsDelegate

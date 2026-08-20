@@ -1615,7 +1615,7 @@
   "erikChatScreenPublishNow": "Publicar ahora",
   "erikChatScreenEdit": "Editar",
   "erikChatScreenInputHint": "Cuéntame con tus propias palabras...",
-  "nearbyPlacesCard29364e0f": "Lugares cercanos",
+  "nearbyPlacesCard29364e0f": "Lugares cerca del piso",
   "nearbyPlacesCard7e6e0fb1": "Anterior",
   "nearbyPlacesCard4a3e7c17": "Página {page} de {total}",
   "nearbyPlacesCard5f9edf6e": "Siguiente",
@@ -3460,5 +3460,14 @@
     }
   },
   "lassoShowAllTooltip": "Mostrar todos los pisos en el mapa",
-  "lassoDrawing": "Dibujando… levanta el dedo para terminar"
+  "lassoDrawing": "Dibujando… levanta el dedo para terminar",
+  "nearbyPlacesCardRail": "Estaciones de tren",
+  "nearbyPlacesCardAirQuality": "Monitoreo de calidad del aire",
+  "discoverScreenNearbyRail": "Estaciones de tren",
+  "discoverScreenNearbyAir": "Calidad del aire",
+  "discoverScreenNearbyWorship": "Lugares de culto",
+  "discoverScreenNearbyVets": "Veterinarios",
+  "discoverScreenNearbyBike": "Bicis compartidas",
+  "nearbyToggleMap": "Mapa",
+  "nearbyToggleList": "Lista"
 }

@@ -1615,7 +1615,7 @@
   "erikChatScreenPublishNow": "Publish now",
   "erikChatScreenEdit": "Edit",
   "erikChatScreenInputHint": "Tell me in your own words...",
-  "nearbyPlacesCard29364e0f": "Nearby places",
+  "nearbyPlacesCard29364e0f": "Places near the apartment",
   "nearbyPlacesCard7e6e0fb1": "Previous",
   "nearbyPlacesCard4a3e7c17": "Page {page} of {total}",
   "nearbyPlacesCard5f9edf6e": "Next",
@@ -3460,5 +3460,14 @@
     }
   },
   "lassoShowAllTooltip": "Show all apartments on the map",
-  "lassoDrawing": "Drawing… lift your finger to finish"
+  "lassoDrawing": "Drawing… lift your finger to finish",
+  "nearbyPlacesCardRail": "Train stations",
+  "nearbyPlacesCardAirQuality": "Air-quality monitoring",
+  "discoverScreenNearbyRail": "Train stations",
+  "discoverScreenNearbyAir": "Air quality",
+  "discoverScreenNearbyWorship": "Places of worship",
+  "discoverScreenNearbyVets": "Vets",
+  "discoverScreenNearbyBike": "Bike share",
+  "nearbyToggleMap": "Map",
+  "nearbyToggleList": "List"
 }

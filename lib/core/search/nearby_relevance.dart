@@ -36,6 +36,8 @@ enum NearbyKind {
   bikeShare, // תחנות אופניים
   coworking, // חללי עבודה משותפים
   parking, // חניונים
+  rail, // תחנות רכבת כבדה
+  airQuality, // תחנות ניטור איכות אוויר
 }
 
 /// Maps a nearby category to the ranking DIMENSION it should boost when the
@@ -65,6 +67,7 @@ String? nearbyKindToDimension(NearbyKind k) {
       return 'religious_area';
     case NearbyKind.transit:
     case NearbyKind.bikeShare:
+    case NearbyKind.rail:
       return 'transit';
     case NearbyKind.nightlife:
     case NearbyKind.dining:
@@ -73,6 +76,8 @@ String? nearbyKindToDimension(NearbyKind k) {
       return 'university';
     case NearbyKind.coworking:
       return 'employment';
+    case NearbyKind.airQuality:
+      return 'quiet'; // clean-air proximity ≈ environmental-quality preference
     case NearbyKind.vets:
     case NearbyKind.parking:
       return null; // display-only (no ranking dimension yet)
@@ -480,9 +485,17 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   // ── mobility (transit / bike-share / parking) ─────────────────────────────
   if (p.transitWanted) {
     add(NearbyKind.transit, 88);
+    add(NearbyKind.rail, 84); // heavy-rail stations — the commuter's anchor
   } else if (youngL || p.couple || p.budget) {
     add(NearbyKind.transit, 62);
+    add(NearbyKind.rail, 58);
   }
+  // Clean-air signal matters most to families with kids and health-focused
+  // seekers — surface the monitoring layer for them.
+  if (p.youngChild || p.schoolChild || p.health) {
+    add(NearbyKind.airQuality, 45);
+  }
+
   if (p.transitWanted) {
     add(NearbyKind.bikeShare, 68);
   } else if (youngL || p.couple || p.active) {
@@ -540,6 +553,7 @@ List<NearbySection> orderedNearbySections(NearbyProfile p) {
     NearbyKind.playgrounds,
     NearbyKind.hospitals,
     NearbyKind.transit,
+    NearbyKind.rail,
     NearbyKind.synagogues,
     NearbyKind.worship,
     NearbyKind.culture,
@@ -552,6 +566,7 @@ List<NearbySection> orderedNearbySections(NearbyProfile p) {
     NearbyKind.parking,
     NearbyKind.dogParks,
     NearbyKind.vets,
+    NearbyKind.airQuality,
   ];
   // HARD suppressions carry over to the full-reference list too: an explicitly
   // secular seeker is never shown synagogues/mosques/churches even in the

@@ -6819,6 +6819,14 @@ List<(NearbyKind, String, IconData)> _nearbyPrefOptions(
     (NearbyKind.coworking, l10n.discoverScreen49d8274a,
         IconsaxPlusLinear.briefcase),
     (NearbyKind.parking, l10n.discoverScreenA6b678a2, IconsaxPlusLinear.car),
+    (NearbyKind.rail, l10n.discoverScreenNearbyRail, IconsaxPlusLinear.routing),
+    (NearbyKind.airQuality, l10n.discoverScreenNearbyAir,
+        IconsaxPlusLinear.wind_2),
+    (NearbyKind.worship, l10n.discoverScreenNearbyWorship,
+        IconsaxPlusLinear.courthouse),
+    (NearbyKind.vets, l10n.discoverScreenNearbyVets, IconsaxPlusLinear.pet),
+    (NearbyKind.bikeShare, l10n.discoverScreenNearbyBike,
+        IconsaxPlusLinear.driving),
   ];
 }
 

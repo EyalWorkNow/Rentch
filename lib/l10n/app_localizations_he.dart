@@ -5480,7 +5480,7 @@ class AppLocalizationsHe extends AppLocalizations {
   String get erikChatScreenInputHint => 'ספר לי במילים שלך...';
 
   @override
-  String get nearbyPlacesCard29364e0f => 'מקומות בקרבה';
+  String get nearbyPlacesCard29364e0f => 'מקומות בקרבת הדירה';
 
   @override
   String get nearbyPlacesCard7e6e0fb1 => 'הקודם';
@@ -11686,4 +11686,31 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get lassoDrawing => 'מציירים… הרימו את האצבע לסיום';
+
+  @override
+  String get nearbyPlacesCardRail => 'תחנות רכבת';
+
+  @override
+  String get nearbyPlacesCardAirQuality => 'ניטור איכות אוויר';
+
+  @override
+  String get discoverScreenNearbyRail => 'תחנות רכבת';
+
+  @override
+  String get discoverScreenNearbyAir => 'איכות אוויר';
+
+  @override
+  String get discoverScreenNearbyWorship => 'מקומות תפילה';
+
+  @override
+  String get discoverScreenNearbyVets => 'וטרינרים';
+
+  @override
+  String get discoverScreenNearbyBike => 'אופניים שיתופיים';
+
+  @override
+  String get nearbyToggleMap => 'מפה';
+
+  @override
+  String get nearbyToggleList => 'רשימה';
 }

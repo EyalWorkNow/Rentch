@@ -1615,7 +1615,7 @@
   "erikChatScreenPublishNow": "Publier maintenant",
   "erikChatScreenEdit": "Modifier",
   "erikChatScreenInputHint": "Racontez-moi avec vos propres mots...",
-  "nearbyPlacesCard29364e0f": "Lieux à proximité",
+  "nearbyPlacesCard29364e0f": "Lieux près du logement",
   "nearbyPlacesCard7e6e0fb1": "Précédent",
   "nearbyPlacesCard4a3e7c17": "Page {page} sur {total}",
   "nearbyPlacesCard5f9edf6e": "Suivant",
@@ -3460,5 +3460,14 @@
     }
   },
   "lassoShowAllTooltip": "Afficher tous les logements sur la carte",
-  "lassoDrawing": "Dessin en cours… levez le doigt pour terminer"
+  "lassoDrawing": "Dessin en cours… levez le doigt pour terminer",
+  "nearbyPlacesCardRail": "Gares ferroviaires",
+  "nearbyPlacesCardAirQuality": "Surveillance de la qualité de l'air",
+  "discoverScreenNearbyRail": "Gares",
+  "discoverScreenNearbyAir": "Qualité de l'air",
+  "discoverScreenNearbyWorship": "Lieux de culte",
+  "discoverScreenNearbyVets": "Vétérinaires",
+  "discoverScreenNearbyBike": "Vélos partagés",
+  "nearbyToggleMap": "Carte",
+  "nearbyToggleList": "Liste"
 }

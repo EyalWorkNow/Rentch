@@ -200,6 +200,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         return IsraelGeoIndex.coworkingWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.parking:
         return IsraelGeoIndex.parkingWithin(la, lo, km: 2, cap: 120);
+      case NearbyKind.rail:
+        return IsraelGeoIndex.railStationsWithin(la, lo, km: 5, cap: 120);
+      case NearbyKind.airQuality:
+        return IsraelGeoIndex.airQualityStationsWithin(la, lo, km: 5, cap: 120);
     }
   }
 
@@ -408,7 +412,14 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
+            // Spec-match with the map dots: 3px white stroke + light shadow.
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2)),
+            ],
           ),
           child: IntrinsicWidth(
             child: Column(
@@ -508,7 +519,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     color: on ? Colors.white : AppColors.navy)),
           ),
           const SizedBox(width: 6),
-          Text('$n${n >= 12 ? '+' : ''}',
+          Text('$n${n >= 120 ? '+' : ''}',
               style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w800,
@@ -570,7 +581,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${places.length}${places.length >= 12 ? '+' : ''}'
+                    '${places.length}${places.length >= 120 ? '+' : ''}'
                         '${AppLocalizations.of(context)!.nearbyPlacesCardC3e59a4e(radiusKm)}',
                     style: TextStyle(
                         fontSize: 11.5,
@@ -648,6 +659,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         return (IconsaxPlusLinear.briefcase, l10n.nearbyPlacesCard5d4c2d06, 3);
       case NearbyKind.parking:
         return (IconsaxPlusLinear.car, l10n.nearbyPlacesCard0a96eae3, 2);
+      case NearbyKind.rail:
+        return (IconsaxPlusLinear.routing, l10n.nearbyPlacesCardRail, 5);
+      case NearbyKind.airQuality:
+        return (IconsaxPlusLinear.wind_2, l10n.nearbyPlacesCardAirQuality, 5);
     }
   }
 

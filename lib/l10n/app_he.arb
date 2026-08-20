@@ -1663,7 +1663,7 @@
   "erikChatScreenPublishNow": "פרסם עכשיו",
   "erikChatScreenEdit": "עריכה",
   "erikChatScreenInputHint": "ספר לי במילים שלך...",
-  "nearbyPlacesCard29364e0f": "מקומות בקרבה",
+  "nearbyPlacesCard29364e0f": "מקומות בקרבת הדירה",
   "nearbyPlacesCard7e6e0fb1": "הקודם",
   "nearbyPlacesCard4a3e7c17": "עמוד {page} מתוך {total}",
   "nearbyPlacesCard5f9edf6e": "הבא",
@@ -3508,5 +3508,14 @@
     }
   },
   "lassoShowAllTooltip": "הצג את כל הדירות במפה",
-  "lassoDrawing": "מציירים… הרימו את האצבע לסיום"
+  "lassoDrawing": "מציירים… הרימו את האצבע לסיום",
+  "nearbyPlacesCardRail": "תחנות רכבת",
+  "nearbyPlacesCardAirQuality": "ניטור איכות אוויר",
+  "discoverScreenNearbyRail": "תחנות רכבת",
+  "discoverScreenNearbyAir": "איכות אוויר",
+  "discoverScreenNearbyWorship": "מקומות תפילה",
+  "discoverScreenNearbyVets": "וטרינרים",
+  "discoverScreenNearbyBike": "אופניים שיתופיים",
+  "nearbyToggleMap": "מפה",
+  "nearbyToggleList": "רשימה"
 }

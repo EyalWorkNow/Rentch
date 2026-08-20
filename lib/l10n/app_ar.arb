@@ -1615,7 +1615,7 @@
   "erikChatScreenPublishNow": "انشر الآن",
   "erikChatScreenEdit": "تعديل",
   "erikChatScreenInputHint": "أخبرني بكلماتك الخاصة...",
-  "nearbyPlacesCard29364e0f": "أماكن قريبة",
+  "nearbyPlacesCard29364e0f": "أماكن بالقرب من الشقة",
   "nearbyPlacesCard7e6e0fb1": "السابق",
   "nearbyPlacesCard4a3e7c17": "صفحة {page} من {total}",
   "nearbyPlacesCard5f9edf6e": "التالي",
@@ -3460,5 +3460,14 @@
     }
   },
   "lassoShowAllTooltip": "عرض جميع الشقق على الخريطة",
-  "lassoDrawing": "جارٍ الرسم… ارفعوا إصبعكم للإنهاء"
+  "lassoDrawing": "جارٍ الرسم… ارفعوا إصبعكم للإنهاء",
+  "nearbyPlacesCardRail": "محطات القطار",
+  "nearbyPlacesCardAirQuality": "رصد جودة الهواء",
+  "discoverScreenNearbyRail": "محطات القطار",
+  "discoverScreenNearbyAir": "جودة الهواء",
+  "discoverScreenNearbyWorship": "دور العبادة",
+  "discoverScreenNearbyVets": "أطباء بيطريون",
+  "discoverScreenNearbyBike": "دراجات مشتركة",
+  "nearbyToggleMap": "خريطة",
+  "nearbyToggleList": "قائمة"
 }

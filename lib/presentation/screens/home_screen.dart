@@ -17,6 +17,7 @@ import 'package:dating_app/presentation/screens/landlord_properties_screen.dart'
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/widgets/ai_sparkle_animated_icon.dart';
 
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
@@ -207,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ProfileScreen()
             ];
 
-      final l10n = AppLocalizations.of(context)!;
+      final l10n = AppLocalizations.of(context);
       final items = isLandlord ? _landlordItems(l10n) : _tenantItems(l10n);
       final safeIndex = currentTabIndex.clamp(0, screens.length - 1);
       // The merged "לקוחות" tab (landlord, index 1) reflects BOTH pending
@@ -318,6 +319,86 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ? baseCircle * 0.9
                                   : baseCircle;
 
+                              final circleWidget = AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutCubic,
+                                width: circleSize,
+                                height: circleSize,
+                                margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.ink,
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                            color: isEtti
+                                                ? const Color(0xFF818CF8)
+                                                    .withValues(alpha: 0.55)
+                                                : AppColors.primary
+                                                    .withValues(alpha: 0.45),
+                                            blurRadius: isEtti ? 14 : 10,
+                                            spreadRadius: isEtti ? 2.5 : 2,
+                                          )
+                                        ]
+                                      : [],
+                                ),
+                                child: Center(
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      AnimatedScale(
+                                        scale: isSelected ? 1.12 : 1.0,
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.elasticOut,
+                                        child: isEtti
+                                            ? AiSparkleAnimatedIcon(
+                                                size: isCompact
+                                                    ? (isNotDiscover ? 32.0 : 28.0)
+                                                    : (isNotDiscover ? 36.0 : 32.0),
+                                                isSelected: isSelected,
+                                              )
+                                            : RentlyIcon(
+                                                isSelected ? item.activeIcon : item.icon,
+                                                color: Colors.white,
+                                                size: isCompact
+                                                    ? (isNotDiscover ? 26.0 : 24.0)
+                                                    : (isNotDiscover ? 31.0 : 28.0),
+                                              ),
+                                      ),
+                                      if (showBadge)
+                                        Positioned(
+                                          top: -4,
+                                          right: -4,
+                                          child: ScaleBopBadge(
+                                            value: unseenCount,
+                                            child: Container(
+                                              constraints: const BoxConstraints(
+                                                  minWidth: 16, minHeight: 16),
+                                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                                              decoration: const BoxDecoration(
+                                                color: AppColors.coral,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  unseenCount > 9 ? '9+' : '$unseenCount',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+
                               return ScaleBounce(
                                 key: Key('nav_tab_$index'),
                                 onTap: () => _onTabTap(index, provider),
@@ -326,104 +407,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   alignment: Alignment.center,
                                   clipBehavior: Clip.none,
                                   children: [
-                                    AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 250),
-                                      curve: Curves.easeOutCubic,
-                                      width: circleSize,
-                                      height: circleSize,
-                                      margin: const EdgeInsets.symmetric(
-                                          horizontal: 1.0),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isSelected
-                                            ? AppColors.primary
-                                            : AppColors.ink,
-                                        // תכלת stroke marks ONLY the אתי CTA circle.
-                                        border: isEtti
-                                            ? Border.all(
-                                                color: AppColors.primaryLight,
-                                                width: 1.8)
-                                            : null,
-                                        boxShadow: isSelected
-                                            ? [
-                                                BoxShadow(
-                                                  color: AppColors.primary
-                                                      .withValues(alpha: 0.45),
-                                                  blurRadius: 10,
-                                                  spreadRadius: 2,
-                                                )
-                                              ]
-                                            : [],
-                                      ),
-                                      child: Center(
-                                        child: Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            // אתי's circle: her PHOTO during the 3s
-                                            // entry peek AND whenever her tab is active
-                                            // (permanent on her page); an AI icon
-                                            // otherwise. The photo RISES in with a
-                                            // springy micro-animation.
-                                            AnimatedScale(
-                                              scale: isSelected ? 1.12 : 1.0,
-                                              duration: const Duration(
-                                                  milliseconds: 300),
-                                              curve: Curves.elasticOut,
-                                              child: RentlyIcon(
-                                                isSelected
-                                                    ? item.activeIcon
-                                                    : item.icon,
-                                                color: Colors.white,
-                                                size: isCompact
-                                                    ? (isNotDiscover
-                                                        ? 26.0
-                                                        : 24.0)
-                                                    : (isNotDiscover
-                                                        ? 31.0
-                                                        : 28.0),
-                                              ),
-                                            ),
-                                            if (showBadge)
-                                              Positioned(
-                                                top: -4,
-                                                right: -4,
-                                                child: ScaleBopBadge(
-                                                  value: unseenCount,
-                                                  child: Container(
-                                                    constraints:
-                                                        const BoxConstraints(
-                                                            minWidth: 16,
-                                                            minHeight: 16),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 4),
-                                                    decoration:
-                                                        const BoxDecoration(
-                                                      color: AppColors.coral,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Center(
-                                                      child: Text(
-                                                        unseenCount > 9
-                                                            ? '9+'
-                                                            : '$unseenCount',
-                                                        style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 9,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    // Profile-completion ring hugging the circle.
+                                    if (isEtti)
+                                      AiNavCircleDecoration(
+                                        isSelected: isSelected,
+                                        size: circleSize,
+                                        child: circleWidget,
+                                      )
+                                    else
+                                      circleWidget,
                                     if (showCompletionRing)
                                       IgnorePointer(
                                         child: SizedBox(
@@ -462,8 +453,8 @@ class _HomeScreenState extends State<HomeScreen> {
 List<_NavItem> _tenantItems(AppLocalizations l10n) => [
       _NavItem(
         label: l10n.homeScreenFfcf1893,
-        icon: IconsaxPlusLinear.search_normal,
-        activeIcon: IconsaxPlusLinear.search_normal,
+        icon: IconsaxPlusLinear.home_2,
+        activeIcon: IconsaxPlusBold.home_2,
       ),
       _NavItem(
         label: l10n.homeScreen61f6102d,
