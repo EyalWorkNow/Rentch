@@ -26,6 +26,7 @@ class NearbyPlacesCard extends StatefulWidget {
     this.maxChips = 5,
     this.showAllKinds = false,
     this.preferredKinds = const <NearbyKind>{},
+    this.showHeader = true,
   });
 
   final double lat;
@@ -53,6 +54,10 @@ class NearbyPlacesCard extends StatefulWidget {
 
   /// Carousel: how many tags to show before the "צפה בכולם (+N)" button.
   final int maxChips;
+
+  /// Hide the card's own title when a host section already renders one
+  /// (the property page's מקומות בקרבת הדירה header + toggle).
+  final bool showHeader;
 
   @override
   State<NearbyPlacesCard> createState() => _NearbyPlacesCardState();
@@ -251,10 +256,14 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.nearbyPlacesCard29364e0f,
-            style: const TextStyle(
-                fontSize: 15.5, fontWeight: FontWeight.w900, color: AppColors.navy)),
-        const SizedBox(height: 10),
+        if (widget.showHeader) ...[
+          Text(l10n.nearbyPlacesCard29364e0f,
+              style: const TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.navy)),
+          const SizedBox(height: 10),
+        ],
         // Collapsed → a horizontal, swipeable CAROUSEL of the top tags. Expanded
         // ("צפה בכולם") → a full wrap so every tag is visible at once.
         if (showAll)

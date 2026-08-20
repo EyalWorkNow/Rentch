@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Ultra-Premium Animated 4-point AI Sparkle Stars icon (Google Gemini / Apple Intelligence style).
-/// Features 3 crisp solid white 4-point sparkle stars with a subtle dark background stroke,
-/// an orbital multi-color glowing drop shadow, and dynamic shimmer motion.
+/// Ultra-Modern Rounded 4-point AI Sparkle Stars icon (Google Gemini / Apple Intelligence style).
+/// Features rounded tips, no border stroke, animated shifting multicolor gradient fill inside
+/// the stars, and a dynamic glowing aura.
 class AiSparkleAnimatedIcon extends StatefulWidget {
   const AiSparkleAnimatedIcon({
     super.key,
@@ -75,21 +75,21 @@ class _AiSparklePainter extends CustomPainter {
     final double w = size.width;
     final double h = size.height;
 
-    // Rich vibrant neon color spectrum cycling endlessly
+    // Shifting neon color spectrum cycling endlessly inside the star
     final colors = const [
-      Color(0xFF6366F1), // Electric Indigo
-      Color(0xFFA855F7), // Neon Purple
-      Color(0xFFEC4899), // Hot Magenta
+      Color(0xFF818CF8), // Electric Indigo
+      Color(0xFFC084FC), // Neon Purple
+      Color(0xFFF472B6), // Hot Pink
       Color(0xFF38BDF8), // Electric Cyan
-      Color(0xFF10B981), // Emerald
-      Color(0xFFF59E0B), // Amber Gold
-      Color(0xFF6366F1), // Loop back
+      Color(0xFF34D399), // Emerald
+      Color(0xFFFBBF24), // Amber Gold
+      Color(0xFF818CF8), // Loop back
     ];
 
-    final rect = Rect.fromLTWH(-w * 0.3, -h * 0.3, w * 1.6, h * 1.6);
+    final rect = Rect.fromLTWH(0, 0, w, h);
 
-    // Rotating sweep gradient for the glowing drop shadow
-    final glowGradient = SweepGradient(
+    // Rotating sweep gradient applied directly INSIDE the star fill & glow
+    final starGradient = SweepGradient(
       center: Alignment.center,
       startAngle: 0,
       endAngle: math.pi * 2,
@@ -98,52 +98,44 @@ class _AiSparklePainter extends CustomPainter {
     );
 
     // Orbital 3D drop-shadow motion offset
-    final double shadowDx = math.cos(progress * 2 * math.pi * 1.5) * 3.2;
-    final double shadowDy = math.sin(progress * 2 * math.pi * 1.5) * 3.2;
+    final double shadowDx = math.cos(progress * 2 * math.pi * 1.5) * 2.5;
+    final double shadowDy = math.sin(progress * 2 * math.pi * 1.5) * 2.5;
     final Offset shadowOffset = Offset(shadowDx, shadowDy);
 
     // 1. Soft wide outer drop shadow glow
     final outerGlowPaint = Paint()
-      ..shader = glowGradient.createShader(rect)
+      ..shader = starGradient.createShader(rect)
       ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.35);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.32);
 
     // 2. Crisp focused inner drop shadow glow
     final innerGlowPaint = Paint()
-      ..shader = glowGradient.createShader(rect)
+      ..shader = starGradient.createShader(rect)
       ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.18);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.16);
 
-    // 3. Dark background stroke paint (creates crisp border around white stars)
-    final bgStrokePaint = Paint()
-      ..color = const Color(0xFF0B0F19)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeJoin = StrokeJoin.round
-      ..isAntiAlias = true;
-
-    // 4. Pure solid white star fill paint
-    final whiteFillPaint = Paint()
-      ..color = Colors.white
+    // 3. Shifting multi-color gradient fill INSIDE the star (NO STROKE!)
+    final starFillPaint = Paint()
+      ..shader = starGradient.createShader(rect)
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    // Main 4-point Sparkle Star (Top-Left, prominent size)
+    // Main 4-point Sparkle Star (Top-Left, prominent size, rounded corners)
     final bigCenter = Offset(w * 0.38, h * 0.38);
     final bigRadius = w * 0.42;
-    final bigStarPath = _draw4PointSparkle(bigCenter, bigRadius);
+    final bigStarPath = _draw4PointSparkleRounded(bigCenter, bigRadius);
 
-    // Medium 4-point Sparkle Star (Bottom-Right, breathing micro-pulse)
+    // Medium 4-point Sparkle Star (Bottom-Right, breathing micro-pulse, rounded corners)
     final mediumPulse = 1.0 + 0.15 * math.sin((progress + 0.25) * math.pi * 4);
     final mediumCenter = Offset(w * 0.74, h * 0.72);
     final mediumRadius = w * 0.21 * mediumPulse;
-    final mediumStarPath = _draw4PointSparkle(mediumCenter, mediumRadius);
+    final mediumStarPath = _draw4PointSparkleRounded(mediumCenter, mediumRadius);
 
-    // Tiny 3rd Sparkle Star (Top-Right, async twinkle)
+    // Tiny 3rd Sparkle Star (Top-Right, async twinkle, rounded corners)
     final tinyTwinkle = (0.5 + 0.5 * math.sin((progress + 0.6) * math.pi * 6)).clamp(0.4, 1.1);
     final tinyCenter = Offset(w * 0.76, h * 0.26);
     final tinyRadius = w * 0.11 * tinyTwinkle;
-    final tinyStarPath = _draw4PointSparkle(tinyCenter, tinyRadius);
+    final tinyStarPath = _draw4PointSparkleRounded(tinyCenter, tinyRadius);
 
     final combinedPath = Path()
       ..addPath(bigStarPath, Offset.zero)
@@ -162,30 +154,64 @@ class _AiSparklePainter extends CustomPainter {
     canvas.drawPath(combinedPath, innerGlowPaint);
     canvas.restore();
 
-    // Draw dark background stroke around the stars
-    canvas.drawPath(combinedPath, bgStrokePaint);
-
-    // Draw solid white stars on top
-    canvas.drawPath(combinedPath, whiteFillPaint);
+    // Draw multi-color animated gradient star fill (NO STROKE!)
+    canvas.drawPath(combinedPath, starFillPaint);
   }
 
-  Path _draw4PointSparkle(Offset center, double radius) {
+  /// Draws a 4-pointed sparkle star with smoothly rounded tips
+  Path _draw4PointSparkleRounded(Offset center, double radius) {
     final Path path = Path();
     final double cx = center.dx;
     final double cy = center.dy;
 
-    final top = Offset(cx, cy - radius);
-    final right = Offset(cx + radius, cy);
-    final bottom = Offset(cx, cy + radius);
-    final left = Offset(cx - radius, cy);
+    // Corner rounding factor (~12% of radius for soft modern tips)
+    final double cr = radius * 0.14;
 
-    path.moveTo(top.dx, top.dy);
-    path.quadraticBezierTo(cx, cy, right.dx, right.dy);
-    path.quadraticBezierTo(cx, cy, bottom.dx, bottom.dy);
-    path.quadraticBezierTo(cx, cy, left.dx, left.dy);
-    path.quadraticBezierTo(cx, cy, top.dx, top.dy);
+    // Tip points & approach points
+    // Top tip
+    final topApproachLeft = Offset(cx - cr, cy - radius + cr);
+    final topTip = Offset(cx, cy - radius);
+    final topApproachRight = Offset(cx + cr, cy - radius + cr);
+
+    // Right tip
+    final rightApproachTop = Offset(cx + radius - cr, cy - cr);
+    final rightTip = Offset(cx + radius, cy);
+    final rightApproachBottom = Offset(cx + radius - cr, cy + cr);
+
+    // Bottom tip
+    final bottomApproachRight = Offset(cx + cr, cy + radius - cr);
+    final bottomTip = Offset(cx, cy + radius);
+    final bottomApproachLeft = Offset(cx - cr, cy + radius - cr);
+
+    // Left tip
+    final leftApproachBottom = Offset(cx - radius + cr, cy + cr);
+    final leftTip = Offset(cx - radius, cy);
+    final leftApproachTop = Offset(cx - radius + cr, cy - cr);
+
+    // Build path with rounded tip arcs and concave side curves
+    path.moveTo(topApproachRight.dx, topApproachRight.dy);
+
+    // Curve to Right tip approach
+    path.quadraticBezierTo(cx, cy, rightApproachTop.dx, rightApproachTop.dy);
+    // Rounded Right tip
+    path.quadraticBezierTo(rightTip.dx, rightTip.dy, rightApproachBottom.dx, rightApproachBottom.dy);
+
+    // Curve to Bottom tip approach
+    path.quadraticBezierTo(cx, cy, bottomApproachRight.dx, bottomApproachRight.dy);
+    // Rounded Bottom tip
+    path.quadraticBezierTo(bottomTip.dx, bottomTip.dy, bottomApproachLeft.dx, bottomApproachLeft.dy);
+
+    // Curve to Left tip approach
+    path.quadraticBezierTo(cx, cy, leftApproachBottom.dx, leftApproachBottom.dy);
+    // Rounded Left tip
+    path.quadraticBezierTo(leftTip.dx, leftTip.dy, leftApproachTop.dx, leftApproachTop.dy);
+
+    // Curve to Top tip approach
+    path.quadraticBezierTo(cx, cy, topApproachLeft.dx, topApproachLeft.dy);
+    // Rounded Top tip
+    path.quadraticBezierTo(topTip.dx, topTip.dy, topApproachRight.dx, topApproachRight.dy);
+
     path.close();
-
     return path;
   }
 

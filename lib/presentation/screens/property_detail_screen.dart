@@ -680,6 +680,7 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
         maxChips: 5,
         showAllKinds: true, // expose EVERY nearby layer with data (persona-first)
         preferredKinds: provider.filters.preferredNearby, // seeker's picks first
+        showHeader: false, // the section header + toggle sit above the card
       ),
       preferredLayerKeys: provider.filters.preferredNearby
           .map((k) => k.name)
