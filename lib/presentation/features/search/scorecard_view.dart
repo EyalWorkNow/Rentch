@@ -91,11 +91,15 @@ class _ScorecardViewState extends State<ScorecardView> {
         child: Row(children: [
           Icon(IconsaxPlusBold.chart_2, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text(AppLocalizations.of(context)!.scorecardViewBd0267a3,
-              style: TextStyle(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14)),
+          Flexible(
+            child: Text(AppLocalizations.of(context)!.scorecardViewBd0267a3,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14)),
+          ),
           const SizedBox(width: 8),
           _fitPill(c),
           const Spacer(),
@@ -249,11 +253,15 @@ class _ScorecardViewState extends State<ScorecardView> {
                 Icon(IconsaxPlusLinear.document_text,
                     size: 15, color: AppColors.primary),
                 const SizedBox(width: 7),
-                Text(AppLocalizations.of(context)!.scorecardView5d1b29db,
-                    style: TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12.5)),
+                Flexible(
+                  child: Text(AppLocalizations.of(context)!.scorecardView5d1b29db,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5)),
+                ),
                 const SizedBox(width: 6),
                 Container(
                   padding:
@@ -379,12 +387,15 @@ class _ScorecardViewState extends State<ScorecardView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Text(d.label,
-              style: TextStyle(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12)),
-          const Spacer(),
+          Expanded(
+            child: Text(d.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12)),
+          ),
           Text('${(frac * 100).round()}%',
               style: TextStyle(
                   color: AppColors.textSecondary,
