@@ -1570,7 +1570,20 @@ class _ParitySections extends StatelessWidget {
     // ── Map / location ────────────────────────────────────────────────────
     children.add(
         _header(l10n.propertyDetailScreen26d0e7de, IconsaxPlusLinear.location));
-    children.add(_MapSection(property: property));
+    // All 21 layers stay visible and toggleable; the seeker's own "מקומות
+    // בסביבה" picks start ON so an אתי-recommended listing opens with the
+    // layers that matter to THEM already lit (capped so the map stays legible).
+    final preferredLayerKeys = context
+        .read<DatingProvider>()
+        .filters
+        .preferredNearby
+        .map((k) => k.name)
+        .take(6)
+        .toSet();
+    children.add(_MapSection(
+      property: property,
+      initialLayers: preferredLayerKeys.isEmpty ? null : preferredLayerKeys,
+    ));
 
     return children;
   }
@@ -3141,7 +3154,10 @@ class _MapSectionState extends State<_MapSection> {
     // fold, so it fills in a moment after the page has slid in.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 350), () {
-        if (mounted) setState(() => _ready = true);
+        if (!mounted) return;
+        setState(() => _ready = true);
+        // Preferred layers start ON — their POI dots need data to show.
+        if (_activeLayers.isNotEmpty) unawaited(_ensurePoisLoaded());
       });
     });
   }

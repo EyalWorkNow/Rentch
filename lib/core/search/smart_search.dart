@@ -987,7 +987,19 @@ class SmartSearch {
     TenantProfile? profile,
   }) {
     // Hard rent/sale gate first so neither ranking path can mix the two.
-    final pool = applyTransactionFilter(props, q);
+    var pool = applyTransactionFilter(props, q);
+    // HARD budget gate — "עד 4500" means up to 4500; soft scoring alone let
+    // well-over-budget listings outrank in-budget ones. Only when the budget
+    // leaves nothing do we fall back to ≤15% over (surfaced as labeled
+    // near-budget fallbacks downstream, never as silent matches).
+    final cap = q.maxPrice;
+    if (cap != null) {
+      final within =
+          pool.where((p) => !(p.price > 0 && p.price > cap)).toList();
+      pool = within.isNotEmpty
+          ? within
+          : pool.where((p) => !(p.price > 0 && p.price > cap * 1.15)).toList();
+    }
     // Use advanced multi-dimensional matching if query has enough signal;
     // fall back to simpler scoring if vague.
     if (q.hasEssentials && pool.isNotEmpty) {
