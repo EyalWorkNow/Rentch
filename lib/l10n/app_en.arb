@@ -3511,6 +3511,8 @@
   "dossierEntryHint": "Build a credibility card that speaks for you with landlords",
   "leadDossierBadge": "Renter dossier · {count} documents",
   "leadDossierDataFirst": "Data before name",
+  "leadNameHidden": "Candidate · data before name",
+  "leadNameRevealHint": "Name and photo are revealed once you approve the lead",
   "leadDossierReference": "Includes landlord reference",
   "nearbyJobsCardEmpty": "No matching openings found in the area — try a different role or wording",
   "nearbyJobsCardResults": "{count} openings found in the area"

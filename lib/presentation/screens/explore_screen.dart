@@ -660,10 +660,23 @@ class _LeadCardState extends State<_LeadCard> {
   }
 
   void _openDetail() {
+    // Gradual identity reveal: a data-first candidate stays anonymous on the
+    // detail page too — the identity is masked AT THE SOURCE (name + photos),
+    // so every widget inside TenantDetailScreen renders the anonymous form
+    // without knowing about the feature. The name/photo are revealed only
+    // through the landlord's real interaction — accepting the lead, which
+    // creates the match where the full identity shows (matches list + chat).
+    final l10n = AppLocalizations.of(context)!;
+    final masked = widget.dossierDataFirst
+        ? widget.tenant.copyWith(
+            name: widget.displayOccupation(context) ?? l10n.leadNameHidden,
+            photoUrls: const <String>[],
+          )
+        : widget.tenant;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TenantDetailScreen(
-          tenant: widget.tenant,
+          tenant: masked,
           property: widget.property,
           reviews: widget.reviews,
         ),
@@ -1010,6 +1023,29 @@ class _LeadCardState extends State<_LeadCard> {
                             ),
                           ),
                         ),
+                        // Data-first: tell the landlord the identity isn't
+                        // missing — it reveals after they approve the lead.
+                        if (dataFirst)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                            child: Row(children: [
+                              const Icon(IconsaxPlusLinear.eye_slash,
+                                  size: 13, color: Colors.white70),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  l10n.leadNameRevealHint,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ]),
+                          ),
                         const SizedBox(height: 8),
                         // "התעניין/ה ב: <property address>".
                         Padding(

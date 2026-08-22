@@ -3569,6 +3569,8 @@
   "leadDossierBadge": "תיק שוכר · {count} מסמכים",
   "@leadDossierBadge": {"placeholders": {"count": {"type": "int"}}},
   "leadDossierDataFirst": "נתונים לפני שם",
+  "leadNameHidden": "מועמד/ת · נתונים לפני שם",
+  "leadNameRevealHint": "השם והתמונה ייחשפו לאחר אישור המועמדות",
   "leadDossierReference": "כולל המלצת משכיר",
   "nearbyJobsCardEmpty": "לא נמצאו משרות מתאימות באיזור — נסו תפקיד או ניסוח אחר",
   "nearbyJobsCardResults": "{count} משרות נמצאו באיזור",

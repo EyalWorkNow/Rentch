@@ -11977,6 +11977,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get leadDossierDataFirst => 'البيانات قبل الاسم';
 
   @override
+  String get leadNameHidden => 'مرشّح · البيانات قبل الاسم';
+
+  @override
+  String get leadNameRevealHint => 'يُكشف الاسم والصورة بعد موافقتك على الطلب';
+
+  @override
   String get leadDossierReference => 'يتضمن توصية مؤجّر';
 
   @override

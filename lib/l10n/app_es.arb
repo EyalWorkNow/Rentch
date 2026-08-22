@@ -3511,6 +3511,8 @@
   "dossierEntryHint": "Crea una tarjeta de credibilidad que hable por ti ante los caseros",
   "leadDossierBadge": "Expediente · {count} documentos",
   "leadDossierDataFirst": "Datos antes que nombre",
+  "leadNameHidden": "Candidato · datos antes que nombre",
+  "leadNameRevealHint": "El nombre y la foto se revelan al aprobar la candidatura",
   "leadDossierReference": "Incluye referencia del casero",
   "nearbyJobsCardEmpty": "No se encontraron vacantes en la zona — prueba otro puesto u otra redacción",
   "nearbyJobsCardResults": "{count} vacantes encontradas en la zona"

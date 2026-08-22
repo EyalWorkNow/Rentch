@@ -12219,6 +12219,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get leadDossierDataFirst => 'Datos antes que nombre';
 
   @override
+  String get leadNameHidden => 'Candidato · datos antes que nombre';
+
+  @override
+  String get leadNameRevealHint =>
+      'El nombre y la foto se revelan al aprobar la candidatura';
+
+  @override
   String get leadDossierReference => 'Incluye referencia del casero';
 
   @override

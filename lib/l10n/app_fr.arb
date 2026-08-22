@@ -3511,6 +3511,8 @@
   "dossierEntryHint": "Créez une carte de crédibilité qui parle pour vous auprès des bailleurs",
   "leadDossierBadge": "Dossier · {count} documents",
   "leadDossierDataFirst": "Les données avant le nom",
+  "leadNameHidden": "Candidat · les données avant le nom",
+  "leadNameRevealHint": "Le nom et la photo sont révélés une fois la candidature approuvée",
   "leadDossierReference": "Comprend une référence du bailleur",
   "nearbyJobsCardEmpty": "Aucun poste trouvé dans le secteur — essayez un autre métier ou une autre formulation",
   "nearbyJobsCardResults": "{count} postes trouvés dans le secteur"

@@ -20969,6 +20969,18 @@ abstract class AppLocalizations {
   /// **'נתונים לפני שם'**
   String get leadDossierDataFirst;
 
+  /// No description provided for @leadNameHidden.
+  ///
+  /// In he, this message translates to:
+  /// **'מועמד/ת · נתונים לפני שם'**
+  String get leadNameHidden;
+
+  /// No description provided for @leadNameRevealHint.
+  ///
+  /// In he, this message translates to:
+  /// **'השם והתמונה ייחשפו לאחר אישור המועמדות'**
+  String get leadNameRevealHint;
+
   /// No description provided for @leadDossierReference.
   ///
   /// In he, this message translates to:

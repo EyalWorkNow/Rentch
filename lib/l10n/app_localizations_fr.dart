@@ -12254,6 +12254,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get leadDossierDataFirst => 'Les données avant le nom';
 
   @override
+  String get leadNameHidden => 'Candidat · les données avant le nom';
+
+  @override
+  String get leadNameRevealHint =>
+      'Le nom et la photo sont révélés une fois la candidature approuvée';
+
+  @override
   String get leadDossierReference => 'Comprend une référence du bailleur';
 
   @override

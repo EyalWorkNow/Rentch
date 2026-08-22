@@ -3511,6 +3511,8 @@
   "dossierEntryHint": "ابنِ بطاقة مصداقية تتحدث عنك أمام أصحاب الشقق",
   "leadDossierBadge": "ملف المستأجر · {count} مستندات",
   "leadDossierDataFirst": "البيانات قبل الاسم",
+  "leadNameHidden": "مرشّح · البيانات قبل الاسم",
+  "leadNameRevealHint": "يُكشف الاسم والصورة بعد موافقتك على الطلب",
   "leadDossierReference": "يتضمن توصية مؤجّر",
   "nearbyJobsCardEmpty": "لم يتم العثور على وظائف مناسبة في المنطقة — جرّب وظيفة أو صياغة أخرى",
   "nearbyJobsCardResults": "تم العثور على {count} وظيفة في المنطقة"

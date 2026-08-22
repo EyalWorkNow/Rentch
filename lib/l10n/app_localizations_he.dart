@@ -11853,6 +11853,12 @@ class AppLocalizationsHe extends AppLocalizations {
   String get leadDossierDataFirst => 'נתונים לפני שם';
 
   @override
+  String get leadNameHidden => 'מועמד/ת · נתונים לפני שם';
+
+  @override
+  String get leadNameRevealHint => 'השם והתמונה ייחשפו לאחר אישור המועמדות';
+
+  @override
   String get leadDossierReference => 'כולל המלצת משכיר';
 
   @override
