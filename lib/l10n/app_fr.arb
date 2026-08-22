@@ -3469,5 +3469,14 @@
   "discoverScreenNearbyVets": "Vétérinaires",
   "discoverScreenNearbyBike": "Vélos partagés",
   "nearbyToggleMap": "Carte",
-  "nearbyToggleList": "Liste"
+  "nearbyToggleList": "Liste",
+  "nearbyJobsCardTitle": "Emplois dans le quartier",
+  "nearbyJobsCardHint": "Cherchez des postes près de {city} — saisissez un métier ou un domaine",
+  "nearbyJobsCardDensityHigh": "Forte densité d'emplois",
+  "nearbyJobsCardDensityMedium": "Densité d'emplois moyenne",
+  "nearbyJobsCardDensityLow": "Faible densité d'emplois",
+  "nearbyJobsCardSearchHint": "Métier ou domaine, ex. : développeur, enseignant…",
+  "nearbyJobsCardNoKey": "La recherche d'emploi n'est pas encore connectée — une clé TheirStack (THEIRSTACK_API_KEY) est requise",
+  "nearbyJobsCardEmpty": "Aucun poste trouvé dans le secteur — essayez un autre métier ou une autre formulation",
+  "nearbyJobsCardResults": "{count} postes trouvés dans le secteur"
 }

@@ -3517,5 +3517,28 @@
   "discoverScreenNearbyVets": "וטרינרים",
   "discoverScreenNearbyBike": "אופניים שיתופיים",
   "nearbyToggleMap": "מפה",
-  "nearbyToggleList": "רשימה"
+  "nearbyToggleList": "רשימה",
+  "nearbyJobsCardTitle": "עבודה באיזור",
+  "nearbyJobsCardHint": "חיפוש משרות בקרבת {city} — הקלידו תפקיד או תחום",
+  "@nearbyJobsCardHint": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "nearbyJobsCardDensityHigh": "צפיפות תעסוקה גבוהה",
+  "nearbyJobsCardDensityMedium": "צפיפות תעסוקה בינונית",
+  "nearbyJobsCardDensityLow": "צפיפות תעסוקה נמוכה",
+  "nearbyJobsCardSearchHint": "תפקיד או תחום, למשל: מפתח תוכנה, מורה…",
+  "nearbyJobsCardNoKey": "חיפוש המשרות עדיין לא מחובר — נדרש מפתח TheirStack בהגדרות הבנייה (THEIRSTACK_API_KEY)",
+  "nearbyJobsCardEmpty": "לא נמצאו משרות מתאימות באיזור — נסו תפקיד או ניסוח אחר",
+  "nearbyJobsCardResults": "{count} משרות נמצאו באיזור",
+  "@nearbyJobsCardResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

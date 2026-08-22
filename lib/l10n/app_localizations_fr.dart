@@ -12113,4 +12113,38 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get nearbyToggleList => 'Liste';
+
+  @override
+  String get nearbyJobsCardTitle => 'Emplois dans le quartier';
+
+  @override
+  String nearbyJobsCardHint(String city) {
+    return 'Cherchez des postes près de $city — saisissez un métier ou un domaine';
+  }
+
+  @override
+  String get nearbyJobsCardDensityHigh => 'Forte densité d\'emplois';
+
+  @override
+  String get nearbyJobsCardDensityMedium => 'Densité d\'emplois moyenne';
+
+  @override
+  String get nearbyJobsCardDensityLow => 'Faible densité d\'emplois';
+
+  @override
+  String get nearbyJobsCardSearchHint =>
+      'Métier ou domaine, ex. : développeur, enseignant…';
+
+  @override
+  String get nearbyJobsCardNoKey =>
+      'La recherche d\'emploi n\'est pas encore connectée — une clé TheirStack (THEIRSTACK_API_KEY) est requise';
+
+  @override
+  String get nearbyJobsCardEmpty =>
+      'Aucun poste trouvé dans le secteur — essayez un autre métier ou une autre formulation';
+
+  @override
+  String nearbyJobsCardResults(int count) {
+    return '$count postes trouvés dans le secteur';
+  }
 }

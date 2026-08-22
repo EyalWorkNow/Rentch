@@ -11837,4 +11837,38 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get nearbyToggleList => 'قائمة';
+
+  @override
+  String get nearbyJobsCardTitle => 'وظائف في المنطقة';
+
+  @override
+  String nearbyJobsCardHint(String city) {
+    return 'ابحث عن وظائف بالقرب من $city — اكتب وظيفة أو مجالاً';
+  }
+
+  @override
+  String get nearbyJobsCardDensityHigh => 'كثافة وظائف عالية';
+
+  @override
+  String get nearbyJobsCardDensityMedium => 'كثافة وظائف متوسطة';
+
+  @override
+  String get nearbyJobsCardDensityLow => 'كثافة وظائف منخفضة';
+
+  @override
+  String get nearbyJobsCardSearchHint =>
+      'وظيفة أو مجال، مثلاً: مطوّر برمجيات، معلّم…';
+
+  @override
+  String get nearbyJobsCardNoKey =>
+      'البحث عن الوظائف غير متصل بعد — مطلوب مفتاح TheirStack (THEIRSTACK_API_KEY)';
+
+  @override
+  String get nearbyJobsCardEmpty =>
+      'لم يتم العثور على وظائف مناسبة في المنطقة — جرّب وظيفة أو صياغة أخرى';
+
+  @override
+  String nearbyJobsCardResults(int count) {
+    return 'تم العثور على $count وظيفة في المنطقة';
+  }
 }

@@ -182,6 +182,28 @@ class AppConfig {
     defaultValue: 'scaniverse',
   );
 
+  // ── Jobs search (TheirStack) ─────────────────────────────────────────────────
+  // Live job-postings index aggregated from thousands of boards and career
+  // sites (theirstack.com). NOTE: billed 1 credit per job returned — keep
+  // per-search limits small and cache results. Empty key → the "עבודה באיזור"
+  // card shows its not-configured notice.
+  static const String theirStackApiKey = String.fromEnvironment(
+    'THEIRSTACK_API_KEY',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2ZXIiOjEsImp0aSI6IjU5NDZlMTkzLWQyNTgtNDEwZS05MWY4LTRlNzRkZjY3ZmI3YiIsImNyZWF0ZWRfYnkiOjIwMDM3MCwicGVybWlzc2lvbnMiOltdLCJhdWQiOiJhcGkiLCJpYXQiOjE3ODc0MzE0MDksInN1YiI6IjE5NjI0MCIsIm5hbWUiOiJSZW50bHkiLCJlbWFpbCI6ImV5YWxhdGl5YXdvcmtAZ21haWwuY29tIn0.jpUR7h_xIoxkhSfMkSjoXqPwIP6xGfSKv5FQEdT7BtQ',
+  );
+
+  // Supplementary FREE jobs source (tried first — see JobsService). The key is
+  // valid but Jooble's Israeli index (il.jooble.org) is flaky, so it's merged
+  // fail-soft with TheirStack rather than relied on.
+  static const String joobleApiKey = String.fromEnvironment(
+    'JOOBLE_API_KEY',
+    defaultValue: '503edf2f-6872-42b2-a35f-8fecc5b52078',
+  );
+
+  static bool get hasJobsSearchConfig =>
+      theirStackApiKey.trim().isNotEmpty || joobleApiKey.trim().isNotEmpty;
+
   static const String spatialApiKey = String.fromEnvironment(
     'SPATIAL_API_KEY',
     defaultValue: '',

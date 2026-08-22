@@ -12077,4 +12077,38 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nearbyToggleList => 'Lista';
+
+  @override
+  String get nearbyJobsCardTitle => 'Empleos en la zona';
+
+  @override
+  String nearbyJobsCardHint(String city) {
+    return 'Busca vacantes cerca de $city — escribe un puesto o sector';
+  }
+
+  @override
+  String get nearbyJobsCardDensityHigh => 'Alta densidad de empleo';
+
+  @override
+  String get nearbyJobsCardDensityMedium => 'Densidad media de empleo';
+
+  @override
+  String get nearbyJobsCardDensityLow => 'Baja densidad de empleo';
+
+  @override
+  String get nearbyJobsCardSearchHint =>
+      'Puesto o sector, p. ej.: desarrollador, docente…';
+
+  @override
+  String get nearbyJobsCardNoKey =>
+      'La búsqueda de empleo aún no está conectada — se requiere una clave de TheirStack (THEIRSTACK_API_KEY)';
+
+  @override
+  String get nearbyJobsCardEmpty =>
+      'No se encontraron vacantes en la zona — prueba otro puesto u otra redacción';
+
+  @override
+  String nearbyJobsCardResults(int count) {
+    return '$count vacantes encontradas en la zona';
+  }
 }

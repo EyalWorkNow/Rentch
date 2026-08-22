@@ -11713,4 +11713,38 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get nearbyToggleList => 'רשימה';
+
+  @override
+  String get nearbyJobsCardTitle => 'עבודה באיזור';
+
+  @override
+  String nearbyJobsCardHint(String city) {
+    return 'חיפוש משרות בקרבת $city — הקלידו תפקיד או תחום';
+  }
+
+  @override
+  String get nearbyJobsCardDensityHigh => 'צפיפות תעסוקה גבוהה';
+
+  @override
+  String get nearbyJobsCardDensityMedium => 'צפיפות תעסוקה בינונית';
+
+  @override
+  String get nearbyJobsCardDensityLow => 'צפיפות תעסוקה נמוכה';
+
+  @override
+  String get nearbyJobsCardSearchHint =>
+      'תפקיד או תחום, למשל: מפתח תוכנה, מורה…';
+
+  @override
+  String get nearbyJobsCardNoKey =>
+      'חיפוש המשרות עדיין לא מחובר — נדרש מפתח TheirStack בהגדרות הבנייה (THEIRSTACK_API_KEY)';
+
+  @override
+  String get nearbyJobsCardEmpty =>
+      'לא נמצאו משרות מתאימות באיזור — נסו תפקיד או ניסוח אחר';
+
+  @override
+  String nearbyJobsCardResults(int count) {
+    return '$count משרות נמצאו באיזור';
+  }
 }

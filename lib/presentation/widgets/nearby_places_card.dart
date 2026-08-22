@@ -85,6 +85,12 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _load();
+  }
+
   Future<void> _load() async {
     // Idempotent loaders — no-op if already loaded at startup.
     await Future.wait([
@@ -159,56 +165,106 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     _load();
   }
 
+  // Outside city centers many layers are empty at their default radius, which
+  // used to hide them entirely (a suburb property showed ~12 of 23 layers).
+  // Retry empty layers at 3× the radius (capped at 10 km) — the section badge
+  // and each item show the REAL distance, so nothing is misrepresented.
+  List<NearbyPlace> _withFallback(
+      List<NearbyPlace> Function(double km) q, double km) {
+    final first = q(km);
+    if (first.isNotEmpty) return first;
+    final wide = (km * 3).clamp(km, 10.0);
+    return q(wide);
+  }
+
   List<NearbyPlace> _dataFor(NearbySection s) {
     final la = widget.lat, lo = widget.lon;
     switch (s.kind) {
       case NearbyKind.schools:
-        return IsraelGeoIndex.schoolsWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.schoolsWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.kindergartens:
-        return IsraelGeoIndex.kindergartensWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.kindergartensWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.clinics:
-        return IsraelGeoIndex.clinicsWithin(la, lo,
-            km: 5, hmo: s.hmo.isEmpty ? null : s.hmo, cap: 120); // clinics matter farther
+        return _withFallback(
+            (km) => IsraelGeoIndex.clinicsWithin(la, lo,
+                km: km, hmo: s.hmo.isEmpty ? null : s.hmo, cap: 120),
+            5); // clinics matter farther
       case NearbyKind.supermarkets:
-        return IsraelGeoIndex.supermarketsWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.supermarketsWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.parks:
-        return IsraelGeoIndex.parksWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.parksWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.pharmacies:
-        return IsraelGeoIndex.pharmaciesWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.pharmaciesWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.playgrounds:
-        return IsraelGeoIndex.playgroundsWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.playgroundsWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.dining:
-        return IsraelGeoIndex.diningWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.diningWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.gyms:
-        return IsraelGeoIndex.gymsWithin(la, lo, km: 3, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.gymsWithin(la, lo, km: km, cap: 120), 3);
       case NearbyKind.nightlife:
-        return IsraelGeoIndex.nightlifeVenuesWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) =>
+                IsraelGeoIndex.nightlifeVenuesWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.synagogues:
-        return IsraelGeoIndex.synagoguesWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.synagoguesWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.culture:
-        return IsraelGeoIndex.cultureWithin(la, lo, km: 3, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.cultureWithin(la, lo, km: km, cap: 120), 3);
       case NearbyKind.hospitals:
-        return IsraelGeoIndex.hospitalsWithin(la, lo, km: 5, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.hospitalsWithin(la, lo, km: km, cap: 120),
+            5);
       case NearbyKind.transit:
-        return IsraelGeoIndex.transitStopsWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.transitStopsWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.worship:
-        return IsraelGeoIndex.worshipWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.worshipWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.pools:
-        return IsraelGeoIndex.poolsWithin(la, lo, km: 3, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.poolsWithin(la, lo, km: km, cap: 120), 3);
       case NearbyKind.dogParks:
-        return IsraelGeoIndex.dogParksWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.dogParksWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.vets:
-        return IsraelGeoIndex.vetsWithin(la, lo, km: 3, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.vetsWithin(la, lo, km: km, cap: 120), 3);
       case NearbyKind.bikeShare:
-        return IsraelGeoIndex.bikeShareWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.bikeShareWithin(la, lo, km: km, cap: 120),
+            2);
       case NearbyKind.coworking:
-        return IsraelGeoIndex.coworkingWithin(la, lo, km: 3, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.coworkingWithin(la, lo, km: km, cap: 120),
+            3);
       case NearbyKind.parking:
-        return IsraelGeoIndex.parkingWithin(la, lo, km: 2, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.parkingWithin(la, lo, km: km, cap: 120), 2);
       case NearbyKind.rail:
-        return IsraelGeoIndex.railStationsWithin(la, lo, km: 5, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.railStationsWithin(la, lo, km: km, cap: 120),
+            5);
       case NearbyKind.airQuality:
-        return IsraelGeoIndex.airQualityStationsWithin(la, lo, km: 5, cap: 120);
+        return _withFallback(
+            (km) => IsraelGeoIndex.airQualityStationsWithin(la, lo,
+                km: km, cap: 120),
+            5);
     }
   }
 
@@ -250,7 +306,6 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final limit = widget.maxChips;
     final showAll = _showAllChips || total <= limit;
     final count = showAll ? total : limit;
-    final chips = [for (var i = 0; i < count; i++) _chip(i, i == sel)];
     final viewAll = total > limit ? _viewAllButton(!showAll, total - limit) : null;
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -264,38 +319,50 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   color: AppColors.navy)),
           const SizedBox(height: 10),
         ],
-        // Tags as a fixed 3-column GRID — 2 rows collapsed, everything when
-        // expanded (no sideways scrolling; "צפה בכולם" reveals the rest).
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 2.6,
-          children: chips,
+        // Category tags in a 3-column equal-width Grid — forming a perfect rectangle.
+        Column(
+          children: [
+            for (var r = 0; r < (count / 3).ceil(); r++) ...[
+              if (r > 0) const SizedBox(height: 8),
+              Row(
+                children: [
+                  for (var c = 0; c < 3; c++) ...[
+                    if (c > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: (r * 3 + c) < count
+                          ? _chip(r * 3 + c, (r * 3 + c) == sel)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
         ),
         if (viewAll != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Center(child: viewAll),
         ],
-        const SizedBox(height: 8),
-        // Selected tag's places as an ADAPTIVE wrap — each card sizes to its own
-        // content so the FULL name shows (even a long one), and rows fill
-        // asymmetrically to the width instead of a rigid symmetric grid.
+        const SizedBox(height: 12),
+        // Selected tag's places as a FIXED 3×3 grid — 9 places per page, each
+        // cell carries the category icon + name + distance, with prev/next
+        // paging below.
         if (_sections.isNotEmpty) ...[
-          LayoutBuilder(
-            builder: (context, c) => Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final pl in _sections[sel].$2.skip(_currentPage * 10).take(10))
-                  _placeCard(pl, c.maxWidth),
-              ],
-            ),
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.0,
+            children: [
+              for (final pl
+                  in _sections[sel].$2.skip(_currentPage * 9).take(9))
+                _gridPlaceCard(pl, _meta(_sections[sel].$1.kind).$1),
+            ],
           ),
-          // Pagination controls (only if total items > 10)
-          if (_sections[sel].$2.length > 10) ...[
+          // Pagination controls (only if total items > 9)
+          if (_sections[sel].$2.length > 9) ...[
             const SizedBox(height: 14),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -327,7 +394,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                 Text(
                   l10n.nearbyPlacesCard4a3e7c17(
                     _currentPage + 1,
-                    (_sections[sel].$2.length / 10).ceil(),
+                    (_sections[sel].$2.length / 9).ceil(),
                   ),
                   style: const TextStyle(
                     fontSize: 12.5,
@@ -337,7 +404,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                 ),
                 // Next page button (RTL left-side button)
                 TextButton(
-                  onPressed: _currentPage < ((_sections[sel].$2.length / 10).ceil() - 1)
+                  onPressed: _currentPage < ((_sections[sel].$2.length / 9).ceil() - 1)
                       ? () => setState(() => _currentPage++)
                       : null,
                   style: TextButton.styleFrom(
@@ -399,65 +466,68 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     );
   }
 
-  /// One place card for the adaptive wrap: hugs its content (full name · type ·
-  /// distance), min ~104px so tiny names still read, max ~66% of the row so a long
-  /// name gets a wide card while short ones still pack several per row.
-  Widget _placeCard(NearbyPlace p, double availWidth) {
-    final sub = _sub(p);
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: 104,
-        maxWidth: (availWidth * 0.66).clamp(140.0, 320.0),
-      ),
-      child: InkWell(
-        onTap: () => _confirmOpenGoogle(p.name),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            // Spec-match with the map dots: 3px white stroke + light shadow.
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: IntrinsicWidth(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  /// One cell of the 3×3 place grid: category icon in a tinted circle, the
+  /// place name (up to 2 lines), and the distance — tap opens a Google search.
+  Widget _gridPlaceCard(NearbyPlace p, IconData icon) {
+    return InkWell(
+      onTap: () => _confirmOpenGoogle(p.name),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: AppColors.cloud,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Icon(icon, size: 13, color: AppColors.primary),
+            ),
+            const SizedBox(height: 5),
+            Expanded(
+              child: Text(
+                p.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(p.name,
-                    softWrap: true,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.2,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary)),
-                if (sub.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(sub,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
+                Icon(Icons.location_on_rounded, size: 11, color: AppColors.primary),
+                const SizedBox(width: 2),
+                Text(
+                  _distLabel(p.km),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
                   ),
-                const SizedBox(height: 6),
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.place_rounded, size: 12, color: AppColors.primary),
-                  const SizedBox(width: 2),
-                  Text(_distLabel(p.km),
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary)),
-                ]),
+                ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -468,24 +538,36 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       onTap: () => setState(() => _showAllChips = !_showAllChips),
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.primary),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Flexible(
-            child: Text(collapsed
-                    ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
-                    : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+          Text(
+            collapsed
+                ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
+                : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(width: 4),
-          Icon(collapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-              size: 18, color: AppColors.primary),
+          Icon(
+            collapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+            size: 18,
+            color: AppColors.primary,
+          ),
         ]),
       ),
     );
@@ -495,43 +577,74 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final l10n = AppLocalizations.of(context)!;
     final (icon, title, _) = _meta(_sections[index].$1.kind);
     final n = _sections[index].$2.length;
+    final cleanTitle = title
+        .replaceAll(l10n.nearbyPlacesCardChipSuffixMasc, '')
+        .replaceAll(l10n.nearbyPlacesCardChipSuffixFem, '')
+        .replaceAll(' ורק"ל', '');
+
     return InkWell(
       onTap: () => setState(() {
         _selected = index;
         _currentPage = 0;
       }),
       borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
-          color: on ? AppColors.primary : AppColors.surface,
+          color: on ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: on ? AppColors.primary : AppColors.borderLight),
+          border: Border.all(
+            color: on ? AppColors.primary : AppColors.borderLight,
+            width: on ? 1.5 : 1.0,
+          ),
+          boxShadow: on
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.22),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: on ? Colors.white : AppColors.primary),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-                title
-                    .replaceAll(l10n.nearbyPlacesCardChipSuffixMasc, '')
-                    .replaceAll(l10n.nearbyPlacesCardChipSuffixFem, ''),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 12, color: on ? Colors.white : AppColors.primary),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                cleanTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: on ? Colors.white : AppColors.navy)),
-          ),
-          const SizedBox(width: 4),
-          Text('$n${n >= 120 ? '+' : ''}',
-              style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: on ? Colors.white : AppColors.navy,
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: on
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : AppColors.cloud,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$n',
+                style: TextStyle(
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w800,
-                  color: on ? Colors.white70 : AppColors.textSecondary)),
-        ]),
-      ),
-    );
+                  color: on ? Colors.white : AppColors.navy,
+                ),
+              ),
+            ),
+          ],
+        ),
   }
 
   Widget _section(int index, NearbyKind kind, List<NearbyPlace> places) {
@@ -582,16 +695,19 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Text(
+                    // Range badge reflects the FARTHEST item actually shown
+                    // (fallback radius may exceed the kind's default radius).
                     '${places.length}${places.length >= 120 ? '+' : ''}'
-                        '${AppLocalizations.of(context)!.nearbyPlacesCardC3e59a4e(radiusKm)}',
+                        '${AppLocalizations.of(context)!.nearbyPlacesCardC3e59a4e(places.isEmpty ? radiusKm : places.last.km.ceil())}',
                     style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primaryDark),
+                        color: AppColors.primary),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -623,51 +739,51 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final l10n = AppLocalizations.of(context)!;
     switch (kind) {
       case NearbyKind.schools:
-        return (IconsaxPlusLinear.teacher, l10n.nearbyPlacesCardCef7ef5e, 2);
+        return (Icons.school_rounded, l10n.nearbyPlacesCardCef7ef5e, 2);
       case NearbyKind.kindergartens:
-        return (IconsaxPlusLinear.emoji_happy, l10n.nearbyPlacesCardD7b78a1f, 2);
+        return (Icons.child_friendly_rounded, l10n.nearbyPlacesCardD7b78a1f, 2);
       case NearbyKind.clinics:
-        return (IconsaxPlusLinear.hospital, l10n.nearbyPlacesCard385087d3, 5);
+        return (Icons.local_hospital_rounded, l10n.nearbyPlacesCard385087d3, 5);
       case NearbyKind.supermarkets:
-        return (IconsaxPlusLinear.shopping_cart, l10n.nearbyPlacesCard19a008ff, 2);
+        return (Icons.shopping_cart_rounded, l10n.nearbyPlacesCard19a008ff, 2);
       case NearbyKind.parks:
-        return (IconsaxPlusLinear.tree, l10n.nearbyPlacesCardCdc11038, 2);
+        return (Icons.park_rounded, l10n.nearbyPlacesCardCdc11038, 2);
       case NearbyKind.pharmacies:
-        return (IconsaxPlusLinear.health, l10n.nearbyPlacesCardEc7edb50, 2);
+        return (Icons.local_pharmacy_rounded, l10n.nearbyPlacesCardEc7edb50, 2);
       case NearbyKind.playgrounds:
-        return (IconsaxPlusLinear.game, l10n.nearbyPlacesCard71ec0056, 2);
+        return (Icons.child_care_rounded, l10n.nearbyPlacesCard71ec0056, 2);
       case NearbyKind.dining:
-        return (IconsaxPlusLinear.reserve, l10n.nearbyPlacesCard09b9bc6f, 2);
+        return (Icons.restaurant_rounded, l10n.nearbyPlacesCard09b9bc6f, 2);
       case NearbyKind.gyms:
-        return (IconsaxPlusLinear.weight, l10n.nearbyPlacesCard117e5860, 3);
+        return (Icons.fitness_center_rounded, l10n.nearbyPlacesCard117e5860, 3);
       case NearbyKind.nightlife:
-        return (IconsaxPlusLinear.cup, l10n.nearbyPlacesCardD4ecbfa0, 2);
+        return (Icons.local_bar_rounded, l10n.nearbyPlacesCardD4ecbfa0, 2);
       case NearbyKind.synagogues:
-        return (IconsaxPlusLinear.buildings, l10n.nearbyPlacesCard7e72c9af, 2);
+        return (Icons.synagogue_rounded, l10n.nearbyPlacesCard7e72c9af, 2);
       case NearbyKind.culture:
-        return (IconsaxPlusLinear.gallery, l10n.nearbyPlacesCard21a17e0d, 3);
+        return (Icons.museum_rounded, l10n.nearbyPlacesCard21a17e0d, 3);
       case NearbyKind.hospitals:
-        return (IconsaxPlusLinear.heart, l10n.nearbyPlacesCard46be343a, 5);
+        return (Icons.local_hospital_rounded, l10n.nearbyPlacesCard46be343a, 5);
       case NearbyKind.transit:
-        return (IconsaxPlusLinear.bus, l10n.nearbyPlacesCard07638922, 2);
+        return (Icons.directions_bus_rounded, l10n.nearbyPlacesCard07638922, 2);
       case NearbyKind.worship:
-        return (IconsaxPlusLinear.courthouse, l10n.nearbyPlacesCardBb428196, 2);
+        return (Icons.place_rounded, l10n.nearbyPlacesCardBb428196, 2);
       case NearbyKind.pools:
-        return (IconsaxPlusLinear.drop, l10n.nearbyPlacesCard34ff0c6c, 3);
+        return (Icons.pool_rounded, l10n.nearbyPlacesCard34ff0c6c, 3);
       case NearbyKind.dogParks:
-        return (IconsaxPlusLinear.pet, l10n.nearbyPlacesCard5290646f, 2);
+        return (Icons.pets_rounded, l10n.nearbyPlacesCard5290646f, 2);
       case NearbyKind.vets:
-        return (IconsaxPlusLinear.lifebuoy, l10n.nearbyPlacesCard6faa1286, 3);
+        return (Icons.medical_services_rounded, l10n.nearbyPlacesCard6faa1286, 3);
       case NearbyKind.bikeShare:
-        return (IconsaxPlusLinear.routing, l10n.nearbyPlacesCard5b5ddf14, 2);
+        return (Icons.pedal_bike_rounded, l10n.nearbyPlacesCard5b5ddf14, 2);
       case NearbyKind.coworking:
-        return (IconsaxPlusLinear.briefcase, l10n.nearbyPlacesCard5d4c2d06, 3);
+        return (Icons.work_rounded, l10n.nearbyPlacesCard5d4c2d06, 3);
       case NearbyKind.parking:
-        return (IconsaxPlusLinear.car, l10n.nearbyPlacesCard0a96eae3, 2);
+        return (Icons.local_parking_rounded, l10n.nearbyPlacesCard0a96eae3, 2);
       case NearbyKind.rail:
-        return (IconsaxPlusLinear.routing, l10n.nearbyPlacesCardRail, 5);
+        return (Icons.train_rounded, l10n.nearbyPlacesCardRail, 5);
       case NearbyKind.airQuality:
-        return (IconsaxPlusLinear.wind_2, l10n.nearbyPlacesCardAirQuality, 5);
+        return (Icons.air_rounded, l10n.nearbyPlacesCardAirQuality, 5);
     }
   }
 

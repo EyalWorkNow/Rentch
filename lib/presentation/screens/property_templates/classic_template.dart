@@ -417,12 +417,8 @@ class _ClassicTemplate extends StatelessWidget {
         const SizedBox(height: 24),
       ],
 
-      // Location Map Section
-      _SectionCardShell(
-        title: l10n.classicTemplate26d0e7de,
-        icon: IconsaxPlusLinear.location,
-        child: _MapSection(property: p),
-      ),
+      // Bottom map removed — the nearby section's רשימה/מפה toggle (inside
+      // _ListingEnrichmentBlock above) already offers the same _MapSection.
     ];
   }
 }

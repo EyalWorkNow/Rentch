@@ -24,6 +24,7 @@ import 'package:dating_app/presentation/widgets/price_badge.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart'
     show IsraelGeoIndex, NearbyPlace;
+import 'package:dating_app/presentation/widgets/nearby_jobs_card.dart';
 import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:dating_app/presentation/widgets/neighborhood_score_card.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
@@ -686,6 +687,14 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
           .map((k) => k.name)
           .take(6)
           .toSet(),
+    ));
+    // Job search anchored to THIS listing's city — the seeker's occupation
+    // (from their search profile) pre-selects the field chip.
+    children.add(NearbyJobsCard(
+      city: widget.property.city,
+      lat: widget.property.lat,
+      lon: widget.property.lon,
+      occupation: tp?.occupation,
     ));
     children.add(_AskRentlyEntry(
       property: widget.property,
@@ -1575,23 +1584,9 @@ class _ParitySections extends StatelessWidget {
       children.add(const SizedBox(height: 26));
     }
 
-    // ── Map / location ────────────────────────────────────────────────────
-    children.add(
-        _header(l10n.propertyDetailScreen26d0e7de, IconsaxPlusLinear.location));
-    // All 21 layers stay visible and toggleable; the seeker's own "מקומות
-    // בסביבה" picks start ON so an אתי-recommended listing opens with the
-    // layers that matter to THEM already lit (capped so the map stays legible).
-    final preferredLayerKeys = context
-        .read<DatingProvider>()
-        .filters
-        .preferredNearby
-        .map((k) => k.name)
-        .take(6)
-        .toSet();
-    children.add(_MapSection(
-      property: property,
-      initialLayers: preferredLayerKeys.isEmpty ? null : preferredLayerKeys,
-    ));
+    // Extra bottom space so the last section ("מקומות בקרבת הדירה") can scroll
+    // completely clear of the floating Share/Boost buttons and bottom action bar.
+    children.add(const SizedBox(height: 90));
 
     return children;
   }
@@ -3178,18 +3173,36 @@ class _NearbySectionState extends State<_NearbySection> {
       children: [
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Icon(IconsaxPlusLinear.location,
+                  size: 15, color: AppColors.primary),
+            ),
+            const SizedBox(width: 6),
             Expanded(
-              child: Text(l10n.nearbyPlacesCard29364e0f,
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink)),
+              child: Text(
+                l10n.nearbyPlacesCard29364e0f,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.3,
+                  color: AppColors.ink,
+                ),
+              ),
             ),
             Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: AppColors.primaryLight2,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.borderLight),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 _segment(

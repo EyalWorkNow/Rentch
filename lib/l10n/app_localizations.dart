@@ -20722,6 +20722,60 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'רשימה'**
   String get nearbyToggleList;
+
+  /// No description provided for @nearbyJobsCardTitle.
+  ///
+  /// In he, this message translates to:
+  /// **'עבודה באיזור'**
+  String get nearbyJobsCardTitle;
+
+  /// No description provided for @nearbyJobsCardHint.
+  ///
+  /// In he, this message translates to:
+  /// **'חיפוש משרות בקרבת {city} — הקלידו תפקיד או תחום'**
+  String nearbyJobsCardHint(String city);
+
+  /// No description provided for @nearbyJobsCardDensityHigh.
+  ///
+  /// In he, this message translates to:
+  /// **'צפיפות תעסוקה גבוהה'**
+  String get nearbyJobsCardDensityHigh;
+
+  /// No description provided for @nearbyJobsCardDensityMedium.
+  ///
+  /// In he, this message translates to:
+  /// **'צפיפות תעסוקה בינונית'**
+  String get nearbyJobsCardDensityMedium;
+
+  /// No description provided for @nearbyJobsCardDensityLow.
+  ///
+  /// In he, this message translates to:
+  /// **'צפיפות תעסוקה נמוכה'**
+  String get nearbyJobsCardDensityLow;
+
+  /// No description provided for @nearbyJobsCardSearchHint.
+  ///
+  /// In he, this message translates to:
+  /// **'תפקיד או תחום, למשל: מפתח תוכנה, מורה…'**
+  String get nearbyJobsCardSearchHint;
+
+  /// No description provided for @nearbyJobsCardNoKey.
+  ///
+  /// In he, this message translates to:
+  /// **'חיפוש המשרות עדיין לא מחובר — נדרש מפתח TheirStack בהגדרות הבנייה (THEIRSTACK_API_KEY)'**
+  String get nearbyJobsCardNoKey;
+
+  /// No description provided for @nearbyJobsCardEmpty.
+  ///
+  /// In he, this message translates to:
+  /// **'לא נמצאו משרות מתאימות באיזור — נסו תפקיד או ניסוח אחר'**
+  String get nearbyJobsCardEmpty;
+
+  /// No description provided for @nearbyJobsCardResults.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} משרות נמצאו באיזור'**
+  String nearbyJobsCardResults(int count);
 }
 
 class _AppLocalizationsDelegate

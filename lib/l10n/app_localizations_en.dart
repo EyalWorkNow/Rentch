@@ -11937,4 +11937,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nearbyToggleList => 'List';
+
+  @override
+  String get nearbyJobsCardTitle => 'Jobs in the area';
+
+  @override
+  String nearbyJobsCardHint(String city) {
+    return 'Search openings near $city — type a role or field';
+  }
+
+  @override
+  String get nearbyJobsCardDensityHigh => 'High job density';
+
+  @override
+  String get nearbyJobsCardDensityMedium => 'Medium job density';
+
+  @override
+  String get nearbyJobsCardDensityLow => 'Low job density';
+
+  @override
+  String get nearbyJobsCardSearchHint =>
+      'Role or field, e.g. software developer, teacher…';
+
+  @override
+  String get nearbyJobsCardNoKey =>
+      'Job search isn\'t connected yet — a TheirStack key (THEIRSTACK_API_KEY) is required in the build settings';
+
+  @override
+  String get nearbyJobsCardEmpty =>
+      'No matching openings found in the area — try a different role or wording';
+
+  @override
+  String nearbyJobsCardResults(int count) {
+    return '$count openings found in the area';
+  }
 }

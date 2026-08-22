@@ -3469,5 +3469,14 @@
   "discoverScreenNearbyVets": "Vets",
   "discoverScreenNearbyBike": "Bike share",
   "nearbyToggleMap": "Map",
-  "nearbyToggleList": "List"
+  "nearbyToggleList": "List",
+  "nearbyJobsCardTitle": "Jobs in the area",
+  "nearbyJobsCardHint": "Search openings near {city} — type a role or field",
+  "nearbyJobsCardDensityHigh": "High job density",
+  "nearbyJobsCardDensityMedium": "Medium job density",
+  "nearbyJobsCardDensityLow": "Low job density",
+  "nearbyJobsCardSearchHint": "Role or field, e.g. software developer, teacher…",
+  "nearbyJobsCardNoKey": "Job search isn't connected yet — a TheirStack key (THEIRSTACK_API_KEY) is required in the build settings",
+  "nearbyJobsCardEmpty": "No matching openings found in the area — try a different role or wording",
+  "nearbyJobsCardResults": "{count} openings found in the area"
 }

@@ -3469,5 +3469,14 @@
   "discoverScreenNearbyVets": "أطباء بيطريون",
   "discoverScreenNearbyBike": "دراجات مشتركة",
   "nearbyToggleMap": "خريطة",
-  "nearbyToggleList": "قائمة"
+  "nearbyToggleList": "قائمة",
+  "nearbyJobsCardTitle": "وظائف في المنطقة",
+  "nearbyJobsCardHint": "ابحث عن وظائف بالقرب من {city} — اكتب وظيفة أو مجالاً",
+  "nearbyJobsCardDensityHigh": "كثافة وظائف عالية",
+  "nearbyJobsCardDensityMedium": "كثافة وظائف متوسطة",
+  "nearbyJobsCardDensityLow": "كثافة وظائف منخفضة",
+  "nearbyJobsCardSearchHint": "وظيفة أو مجال، مثلاً: مطوّر برمجيات، معلّم…",
+  "nearbyJobsCardNoKey": "البحث عن الوظائف غير متصل بعد — مطلوب مفتاح TheirStack (THEIRSTACK_API_KEY)",
+  "nearbyJobsCardEmpty": "لم يتم العثور على وظائف مناسبة في المنطقة — جرّب وظيفة أو صياغة أخرى",
+  "nearbyJobsCardResults": "تم العثور على {count} وظيفة في المنطقة"
 }
