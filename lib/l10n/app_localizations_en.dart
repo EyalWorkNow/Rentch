@@ -12045,6 +12045,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dossierSaveButton => 'Save dossier';
 
   @override
+  String get dossierShareAction => 'Send renter dossier';
+
+  @override
+  String get dossierShareSubtitle =>
+      'Your attached documents will be sent to this chat';
+
+  @override
+  String get dossierShareConfirmTitle => 'Share your renter dossier?';
+
+  @override
+  String dossierShareConfirmBody(int count) {
+    return '$count documents will be sent to this chat. Share only when you trust the other side.';
+  }
+
+  @override
+  String get dossierShareEmpty =>
+      'Your dossier is empty — attach documents in the renter dossier first';
+
+  @override
   String get dossierUploadFailed => 'Document upload failed — try again';
 
   @override

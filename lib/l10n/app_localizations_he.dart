@@ -11820,6 +11820,24 @@ class AppLocalizationsHe extends AppLocalizations {
   String get dossierSaveButton => 'שמירת התיק';
 
   @override
+  String get dossierShareAction => 'שליחת תיק שוכר';
+
+  @override
+  String get dossierShareSubtitle => 'המסמכים שצירפתם יישלחו לשיחה הזו';
+
+  @override
+  String get dossierShareConfirmTitle => 'לשתף את תיק השוכר?';
+
+  @override
+  String dossierShareConfirmBody(int count) {
+    return '$count מסמכים יישלחו לצ\'אט הזה. שתפו רק כשאתם סומכים על הצד השני.';
+  }
+
+  @override
+  String get dossierShareEmpty =>
+      'התיק עדיין ריק — צרפו מסמכים בתיק השוכר קודם';
+
+  @override
   String get dossierUploadFailed => 'העלאת המסמך נכשלה — נסו שוב';
 
   @override

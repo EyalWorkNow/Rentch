@@ -11943,6 +11943,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dossierSaveButton => 'حفظ الملف';
 
   @override
+  String get dossierShareAction => 'إرسال ملف المستأجر';
+
+  @override
+  String get dossierShareSubtitle =>
+      'سيتم إرسال مستنداتك المرفقة إلى هذه المحادثة';
+
+  @override
+  String get dossierShareConfirmTitle => 'مشاركة ملف المستأجر؟';
+
+  @override
+  String dossierShareConfirmBody(int count) {
+    return 'سيتم إرسال $count مستندات إلى هذه المحادثة. شارك فقط عندما تثق بالطرف الآخر.';
+  }
+
+  @override
+  String get dossierShareEmpty =>
+      'ملفك فارغ — أرفق مستندات في ملف المستأجر أولاً';
+
+  @override
   String get dossierUploadFailed => 'فشل رفع المستند — حاول مجدداً';
 
   @override

@@ -11,6 +11,8 @@ import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/renter_dossier.dart';
+import 'package:dating_app/presentation/features/user/dossier/renter_dossier_screen.dart';
 import 'package:dating_app/data/providers/chat_provider.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
@@ -736,11 +738,79 @@ class _MessageScreenState extends State<MessageScreen> {
           Navigator.pop(context);
           _showBlockConfirm(provider, property.ownerName);
         },
+        // Sharing the dossier is the TENANT's move (their documents).
+        onSendDossier: (provider.isLandlord || provider.isBroker)
+            ? null
+            : () {
+                Navigator.pop(context);
+                _sendDossier(provider, tenantName);
+              },
       ),
     );
     if (mounted) {
       setState(() => _actionsOpen = false);
     }
+  }
+
+  // ── תיק שוכר: share the dossier documents into this chat ──────────────────
+
+  String _dossierDocLabel(AppLocalizations l10n, DossierDocType t) =>
+      switch (t) {
+        DossierDocType.paySlip => l10n.dossierDocPaySlip,
+        DossierDocType.employmentLetter => l10n.dossierDocEmployment,
+        DossierDocType.bankStatement => l10n.dossierDocBank,
+        DossierDocType.creditReport => l10n.dossierDocCredit,
+        DossierDocType.landlordReference => l10n.dossierDocLandlordRef,
+        DossierDocType.guarantorCommitment => l10n.dossierDocGuarantor,
+      };
+
+  Future<void> _sendDossier(DatingProvider provider, String senderName) async {
+    final l10n = AppLocalizations.of(context)!;
+    final dossier = provider.renterDossier;
+    if (dossier.docs.isEmpty) {
+      _snack(l10n.dossierShareEmpty, error: true);
+      await Navigator.of(context).push(MaterialPageRoute(
+        settings: const RouteSettings(name: 'RenterDossierScreen'),
+        builder: (_) => const RenterDossierScreen(),
+      ));
+      return;
+    }
+    // Documents are sensitive — explicit swipe-to-confirm before they leave
+    // the dossier (same deliberate-consent pattern as sending a contract).
+    final confirmed = await SwipeToConfirmSheet.show(
+      context,
+      title: l10n.dossierShareConfirmTitle,
+      message: l10n.dossierShareConfirmBody(dossier.docs.length),
+    );
+    if (!confirmed || !mounted) return;
+
+    Future<void> send(String text) async {
+      if (_chatProvider != null) {
+        await _chatProvider!.sendMessage(text);
+      } else {
+        await provider.sendMessage(
+          matchId: widget.matchId,
+          sender: senderName,
+          text: text,
+        );
+      }
+    }
+
+    // Intro line naming what's inside, then each doc as a regular image
+    // message (they're already on S3 — no upload step), then the previous
+    // landlord's reference as a quoted line when one exists.
+    final labels =
+        dossier.docs.map((d) => _dossierDocLabel(l10n, d.type)).join(' · ');
+    await send('📁 ${l10n.dossierTitle} — $labels');
+    for (final doc in dossier.docs) {
+      await send(ChatMediaCodec.encodeImage(doc.url));
+    }
+    if (dossier.referenceText.trim().isNotEmpty) {
+      final by = dossier.referenceName.trim();
+      await send('💬 ${l10n.dossierSectionReference}: '
+          '"${dossier.referenceText.trim()}"${by.isEmpty ? '' : ' — $by'}');
+    }
+    _scrollToBottom();
   }
 
   void _openContract(String contractId, String matchId) {
@@ -1496,6 +1566,7 @@ class _ActionsSheet extends StatelessWidget {
     required this.onOwnerSign,
     required this.onTenantSign,
     required this.onBlockUser,
+    this.onSendDossier,
   });
 
   final RentalMatch match;
@@ -1508,6 +1579,9 @@ class _ActionsSheet extends StatelessWidget {
   final VoidCallback? onOwnerSign;
   final VoidCallback? onTenantSign;
   final VoidCallback onBlockUser;
+
+  /// Tenant-only: share the renter dossier's documents into this chat.
+  final VoidCallback? onSendDossier;
 
   @override
   Widget build(BuildContext context) {
@@ -1603,6 +1677,16 @@ class _ActionsSheet extends StatelessWidget {
             onTap: onSendContract,
           ),
           const SizedBox(height: 6),
+          if (onSendDossier != null)
+            _ActionTile(
+              item: _ActionItem(
+                icon: IconsaxPlusLinear.shield_tick,
+                label: l10n.dossierShareAction,
+                subtitle: l10n.dossierShareSubtitle,
+                enabled: true,
+                onTap: onSendDossier,
+              ),
+            ),
           ...actions.map((a) => _ActionTile(item: a)),
           const SizedBox(height: 8),
           const Divider(height: 1, color: AppColors.slate100),

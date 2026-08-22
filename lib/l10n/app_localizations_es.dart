@@ -12184,6 +12184,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dossierSaveButton => 'Guardar expediente';
 
   @override
+  String get dossierShareAction => 'Enviar expediente del inquilino';
+
+  @override
+  String get dossierShareSubtitle =>
+      'Tus documentos adjuntos se enviarán a este chat';
+
+  @override
+  String get dossierShareConfirmTitle => '¿Compartir tu expediente?';
+
+  @override
+  String dossierShareConfirmBody(int count) {
+    return 'Se enviarán $count documentos a este chat. Comparte solo cuando confíes en la otra parte.';
+  }
+
+  @override
+  String get dossierShareEmpty =>
+      'Tu expediente está vacío — adjunta documentos primero';
+
+  @override
   String get dossierUploadFailed =>
       'Error al subir el documento — inténtalo de nuevo';
 

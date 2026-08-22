@@ -340,10 +340,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           ],
         ),
         if (viewAll != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Center(child: viewAll),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         // Selected tag's places as a FIXED 3×3 grid — 9 places per page, each
         // cell carries the category icon + name + distance, with prev/next
         // paging below.
@@ -354,7 +354,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 6,
             crossAxisSpacing: 6,
-            childAspectRatio: 1.02,
+            childAspectRatio: 1.35,
             children: [
               for (final pl
                   in _sections[sel].$2.skip(_currentPage * 9).take(9))
@@ -363,31 +363,37 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           ),
           // Pagination controls (only if total items > 9)
           if (_sections[sel].$2.length > 9) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Previous page button (RTL right-side button)
-                TextButton(
-                  onPressed: _currentPage > 0 
+                InkWell(
+                  onTap: _currentPage > 0 
                       ? () => setState(() => _currentPage--) 
                       : null,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 13),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(l10n.nearbyPlacesCard7e6e0fb1,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                      ),
-                    ],
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 12,
+                          color: _currentPage > 0 ? AppColors.primary : AppColors.textSecondary.withOpacity(0.3),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          l10n.nearbyPlacesCard7e6e0fb1,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                            color: _currentPage > 0 ? AppColors.primary : AppColors.textSecondary.withOpacity(0.3),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Page Indicator
@@ -397,32 +403,38 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     (_sections[sel].$2.length / 9).ceil(),
                   ),
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppColors.navy,
                   ),
                 ),
                 // Next page button (RTL left-side button)
-                TextButton(
-                  onPressed: _currentPage < ((_sections[sel].$2.length / 9).ceil() - 1)
+                InkWell(
+                  onTap: _currentPage < ((_sections[sel].$2.length / 9).ceil() - 1)
                       ? () => setState(() => _currentPage++)
                       : null,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(l10n.nearbyPlacesCard5f9edf6e,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_back_ios_rounded, size: 13),
-                    ],
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.nearbyPlacesCard5f9edf6e,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                            color: _currentPage < ((_sections[sel].$2.length / 9).ceil() - 1) ? AppColors.primary : AppColors.textSecondary.withOpacity(0.3),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_back_ios_rounded,
+                          size: 12,
+                          color: _currentPage < ((_sections[sel].$2.length / 9).ceil() - 1) ? AppColors.primary : AppColors.textSecondary.withOpacity(0.3),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

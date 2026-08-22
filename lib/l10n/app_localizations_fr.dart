@@ -12220,6 +12220,25 @@ class AppLocalizationsFr extends AppLocalizations {
   String get dossierSaveButton => 'Enregistrer le dossier';
 
   @override
+  String get dossierShareAction => 'Envoyer le dossier locataire';
+
+  @override
+  String get dossierShareSubtitle =>
+      'Vos documents joints seront envoyés dans cette conversation';
+
+  @override
+  String get dossierShareConfirmTitle => 'Partager votre dossier locataire ?';
+
+  @override
+  String dossierShareConfirmBody(int count) {
+    return '$count documents seront envoyés dans cette conversation. Ne partagez que si vous faites confiance à l\'autre partie.';
+  }
+
+  @override
+  String get dossierShareEmpty =>
+      'Votre dossier est vide — joignez d\'abord des documents';
+
+  @override
   String get dossierUploadFailed => 'Échec de l\'envoi du document — réessayez';
 
   @override

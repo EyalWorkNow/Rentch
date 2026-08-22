@@ -20915,6 +20915,36 @@ abstract class AppLocalizations {
   /// **'שמירת התיק'**
   String get dossierSaveButton;
 
+  /// No description provided for @dossierShareAction.
+  ///
+  /// In he, this message translates to:
+  /// **'שליחת תיק שוכר'**
+  String get dossierShareAction;
+
+  /// No description provided for @dossierShareSubtitle.
+  ///
+  /// In he, this message translates to:
+  /// **'המסמכים שצירפתם יישלחו לשיחה הזו'**
+  String get dossierShareSubtitle;
+
+  /// No description provided for @dossierShareConfirmTitle.
+  ///
+  /// In he, this message translates to:
+  /// **'לשתף את תיק השוכר?'**
+  String get dossierShareConfirmTitle;
+
+  /// No description provided for @dossierShareConfirmBody.
+  ///
+  /// In he, this message translates to:
+  /// **'{count} מסמכים יישלחו לצ\'אט הזה. שתפו רק כשאתם סומכים על הצד השני.'**
+  String dossierShareConfirmBody(int count);
+
+  /// No description provided for @dossierShareEmpty.
+  ///
+  /// In he, this message translates to:
+  /// **'התיק עדיין ריק — צרפו מסמכים בתיק השוכר קודם'**
+  String get dossierShareEmpty;
+
   /// No description provided for @dossierUploadFailed.
   ///
   /// In he, this message translates to:
