@@ -62,7 +62,7 @@ class AwsApiClient {
     final future = () async {
       final headers = await _headers();
       final response = await _http.get(uri, headers: headers).timeout(_timeout);
-      final data = _decode(response);
+      final data = await _decode(response);
       if (cacheTtl != null) {
         if (_getCache.length > 200) _getCache.clear(); // bounded
         _getCache[key] = (exp: DateTime.now().add(cacheTtl), data: data);
@@ -731,7 +731,7 @@ class AwsApiClient {
     return h;
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
+  Future<Map<String, dynamic>> _decode(http.Response response) async {
     if (response.statusCode == 404) return const {};
     if (response.statusCode >= 400) {
       throw AwsApiException(
@@ -741,7 +741,14 @@ class AwsApiClient {
     }
     if (response.body.isEmpty) return const {};
     try {
-      final decoded = jsonDecode(response.body);
+      // Big payloads (a 150-listing properties page) decode OFF the UI isolate
+      // — the synchronous decode landed as a frame hitch exactly when the
+      // deck was opening. Small responses stay inline (isolate round-trip
+      // costs more than the parse).
+      final body = response.body;
+      final decoded = body.length < 100 * 1024
+          ? jsonDecode(body)
+          : await compute(jsonDecode, body);
       if (decoded is Map<String, dynamic>) return decoded;
       if (decoded is Map) return Map<String, dynamic>.from(decoded);
       return {'items': decoded is List ? decoded : []};

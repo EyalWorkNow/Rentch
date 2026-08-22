@@ -153,7 +153,11 @@ class _ProfileCardState extends State<ProfileCard> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final provider = context.watch<DatingProvider>();
+    // read, not watch: every notifyListeners (~60 call sites — impressions,
+    // pagination throttle, tour refresh…) was rebuilding all 3 visible cards.
+    // The deck's own revision-keyed rebuild delivers fresh scores; the cards
+    // don't need their own provider subscription on top.
+    final provider = context.read<DatingProvider>();
     final media = p.media;
     final hasMultiple = media.length > 1;
     final safeCurrentImage = _safeImageIndex(_currentImage);

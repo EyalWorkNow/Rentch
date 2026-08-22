@@ -19,6 +19,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show compute;
+
 import 'package:flutter/services.dart' show rootBundle;
 
 /// Reads the raw string contents of a bundled asset path.
@@ -243,9 +245,18 @@ class GovData {
   static Future<String> _rootBundleReader(String path) =>
       rootBundle.loadString(path);
 
+  /// Parse JSON OFF the UI isolate when the payload is big. stat_areas.json
+  /// alone is ~6 MB — decoding it (and its ~15 sibling assets) synchronously
+  /// used to freeze frames right as the swipe deck opened. Small payloads
+  /// stay inline: an isolate round-trip costs more than the decode itself.
+  static Future<dynamic> decodeJsonOffUi(String raw) =>
+      raw.length < 200 * 1024
+          ? Future<dynamic>.value(jsonDecode(raw))
+          : compute(jsonDecode, raw);
+
   Future<void> _loadLocalities(AssetReader read) async {
     final raw = await read('$_assetDir/localities.json');
-    final list = jsonDecode(raw) as List<dynamic>;
+    final list = await decodeJsonOffUi(raw) as List<dynamic>;
     for (final item in list) {
       final rec = LocalityRecord.fromJson(item as Map<String, dynamic>);
       _localities.add(rec);
@@ -287,7 +298,7 @@ class GovData {
   }
 
   Future<void> _loadCrime(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/crime.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/crime.json'))
         as Map<String, dynamic>;
     for (final e in obj.entries) {
       final m = e.value as Map<String, dynamic>;
@@ -306,7 +317,7 @@ class GovData {
   }
 
   Future<void> _loadDemographics(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/demographics.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/demographics.json'))
         as Map<String, dynamic>;
     for (final e in obj.entries) {
       final m = e.value as Map<String, dynamic>;
@@ -326,7 +337,7 @@ class GovData {
   }
 
   Future<void> _loadSchools(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/schools_grid.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/schools_grid.json'))
         as Map<String, dynamic>;
     _schoolCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
     final cells = obj['cells'] as Map<String, dynamic>;
@@ -340,7 +351,7 @@ class GovData {
   }
 
   Future<void> _loadHealth(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/health.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/health.json'))
         as Map<String, dynamic>;
     for (final e in obj.entries) {
       final count = (e.value as num?)?.toInt() ?? 0;
@@ -355,7 +366,7 @@ class GovData {
   }
 
   Future<void> _loadAirQuality(AssetReader read) async {
-    final list = jsonDecode(await read('$_assetDir/air_quality_stations.json'))
+    final list = await decodeJsonOffUi(await read('$_assetDir/air_quality_stations.json'))
         as List<dynamic>;
     for (final item in list) {
       final t = item as List<dynamic>;
@@ -378,7 +389,7 @@ class GovData {
 
   Future<void> _loadGrid(AssetReader read) async {
     final raw = await read('$_assetDir/transit_grid.json');
-    final obj = jsonDecode(raw) as Map<String, dynamic>;
+    final obj = await decodeJsonOffUi(raw) as Map<String, dynamic>;
     _gridCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
     final cells = obj['cells'] as Map<String, dynamic>;
     for (final entry in cells.entries) {
@@ -392,7 +403,7 @@ class GovData {
 
   Future<void> _loadRail(AssetReader read) async {
     final raw = await read('$_assetDir/rail_stations.json');
-    final list = jsonDecode(raw) as List<dynamic>;
+    final list = await decodeJsonOffUi(raw) as List<dynamic>;
     for (final item in list) {
       final t = item as List<dynamic>;
       _railLatLon.add([(t[0] as num).toDouble(), (t[1] as num).toDouble()]);
@@ -402,7 +413,7 @@ class GovData {
 
   Future<void> _loadMarket(AssetReader read) async {
     final raw = await read('$_assetDir/market_seed.json');
-    final obj = jsonDecode(raw) as Map<String, dynamic>;
+    final obj = await decodeJsonOffUi(raw) as Map<String, dynamic>;
     for (final entry in obj.entries) {
       final m = entry.value as Map<String, dynamic>;
       final prior = MarketPrior(
@@ -418,7 +429,7 @@ class GovData {
   Future<void> _loadMeta(AssetReader read) async {
     try {
       final raw = await read('$_assetDir/meta.json');
-      final obj = jsonDecode(raw) as Map<String, dynamic>;
+      final obj = await decodeJsonOffUi(raw) as Map<String, dynamic>;
       version = (obj['version'] as num?)?.toInt() ?? 0;
     } catch (_) {
       version = 0;
@@ -582,7 +593,7 @@ class GovData {
   }
 
   Future<void> _loadRetail(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/poi_retail.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/poi_retail.json'))
         as Map<String, dynamic>;
     _retailCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
     final cells = obj['cells'] as Map<String, dynamic>;
@@ -620,7 +631,7 @@ class GovData {
   }
 
   Future<void> _loadNoise(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/noise_roads.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/noise_roads.json'))
         as Map<String, dynamic>;
     _noiseCell = (obj['cell'] as num?)?.toDouble() ?? 0.005;
     final cells = obj['cells'] as Map<String, dynamic>;
@@ -648,7 +659,7 @@ class GovData {
   }
 
   Future<void> _loadStatAreas(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/stat_areas.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/stat_areas.json'))
         as Map<String, dynamic>;
     _statCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
     final areas = obj['areas'] as List<dynamic>;
@@ -737,7 +748,7 @@ class GovData {
   List<int> _areaValueSorted = const []; // ascending, for percentiles
 
   Future<void> _loadAreaValue(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/stat_area_value.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/stat_area_value.json'))
         as Map<String, dynamic>;
     obj.forEach((k, v) {
       final id = int.tryParse(k);
@@ -769,7 +780,7 @@ class GovData {
   }
 
   Future<void> _loadFutureInfra(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/future_infra.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/future_infra.json'))
         as Map<String, dynamic>;
     for (final s in (obj['stations'] as List<dynamic>? ?? const [])) {
       final p = s as List<dynamic>;
@@ -805,7 +816,7 @@ class GovData {
   }
 
   Future<void> _loadEmployment(AssetReader read) async {
-    final obj = jsonDecode(await read('$_assetDir/employment.json'))
+    final obj = await decodeJsonOffUi(await read('$_assetDir/employment.json'))
         as Map<String, dynamic>;
     _jobCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
     final cells = obj['cells'] as Map<String, dynamic>;

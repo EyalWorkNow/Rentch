@@ -351,7 +351,12 @@ void main() {
         _property(
           id: 'private-slow',
           agencyListing: false,
-          entryDate: '2026-09-20',
+          // Relative date: a fixed '2026-09-20' silently crossed INTO the
+          // within-30-days window as real time advanced, flipping the test.
+          entryDate: DateTime.now()
+              .add(const Duration(days: 90))
+              .toIso8601String()
+              .substring(0, 10),
           price: 6200,
         ),
       ]),

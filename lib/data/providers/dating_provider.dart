@@ -569,7 +569,17 @@ class DatingProvider extends ChangeNotifier {
     // The unified engine relevance is filter-dependent — drop it so a match score
     // read after a filter change recomputes fresh instead of returning a stale
     // deck value (otherwise widening the budget wouldn't move the score).
+    _dropScoreCaches();
+  }
+
+  /// Drops EVERY score-related cache together. The per-card memos
+  /// (_matchScoreCache/_inlineRelevanceMemo) are revision-keyed, but a tenant
+  /// PROFILE change doesn't bump those revisions — clearing here keeps a
+  /// profile edit reflected in the very next score read.
+  void _dropScoreCaches() {
     _engineRelevance = const {};
+    _matchScoreCache.clear();
+    _inlineRelevanceMemo.clear();
   }
 
   void _removeFromFilteredCache(String propertyId) {
@@ -2972,7 +2982,7 @@ class DatingProvider extends ChangeNotifier {
     // Engine relevance folds in the profile (budget/rooms/persona), so a profile
     // change must drop the cached deck scores — else a match score read next would
     // reflect the OLD profile.
-    _engineRelevance = const {};
+    _dropScoreCaches();
     await _persist();
     // Sync to discovery table so this user appears in other users' feeds.
     unawaited(_userRepository.upsertProfile(
@@ -5167,9 +5177,16 @@ class DatingProvider extends ChangeNotifier {
     return null;
   }
 
+  // Per-card score memo — card build() asks for this on every drag frame, so
+  // the (deterministic within a revision) computation must not repeat.
+  final Map<String, int> _matchScoreCache = {};
+
   int matchScore(RentalProperty p) {
     if (_searchAreas.isEmpty) return 0;
-    return _matchScoreFor(p, _filters, DateTime.now(), selectedArea);
+    final cacheKey = '${p.id}|$_filterRevision|$_catalogRevision';
+    if (_matchScoreCache.length > 600) _matchScoreCache.clear();
+    return _matchScoreCache[cacheKey] ??=
+        _matchScoreFor(p, _filters, DateTime.now(), selectedArea);
   }
 
   /// Whether there is a genuine basis for showing a tenant→property match
@@ -5382,16 +5399,30 @@ class DatingProvider extends ChangeNotifier {
   /// The unified engine relevance for [p] under [filters]: the cached deck value
   /// when available (the common path — a sort just computed the whole deck), else
   /// an on-demand single-property score against the full-catalogue baseline.
+  // Inline single-property relevance memo. Card build() reaches this on every
+  // drag frame; before it was memoized, each cold call re-ran the market
+  // analysis + hedonic OLS fit over the WHOLE catalogue — several times per
+  // frame of swiping. Now the market context itself is content-memoized
+  // (MarketContext.analyzeCached), and this map makes the per-property result
+  // a hash lookup after the first computation per revision.
+  final Map<String, double> _inlineRelevanceMemo = {};
+
   double _engineRelevanceFor(RentalProperty p, SearchFilters filters) {
     final cached = _engineRelevance[p.id];
     if (cached != null) return cached;
+    final key = '${p.id}|$_filterRevision|$_catalogRevision';
+    final memo = _inlineRelevanceMemo[key];
+    if (memo != null) return memo;
     final rel = RecommendationEngine.relevance(
       candidates: [p],
       query: _queryFromFilters(filters),
       profile: _tenantProfile,
       marketSource: _allProperties,
     );
-    return rel[p.id] ?? 0.5;
+    final v = rel[p.id] ?? 0.5;
+    if (_inlineRelevanceMemo.length > 600) _inlineRelevanceMemo.clear();
+    _inlineRelevanceMemo[key] = v;
+    return v;
   }
 
   int _matchScoreForContext(RentalProperty p, _MatchContext context) {

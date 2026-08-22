@@ -147,7 +147,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   void _precacheGalleryNeighbors(int index) {
     final media = widget.property.media;
     if (media.isEmpty) return;
-    final width = (MediaQuery.of(context).size.width *
+    // MUST match the width SafeImage's own LayoutBuilder computes inside the
+    // gallery, or ResizeImage's width-keyed cache entry never gets hit and the
+    // "warmed" photo still decodes cold mid-swipe (= the stuck PageView). The
+    // gallery's content box is the screen minus its 5+5 padding and 8+8 frame
+    // border — 26 logical px narrower than the raw screen width.
+    const galleryInsets = 26.0;
+    final width = ((MediaQuery.of(context).size.width - galleryInsets) *
             MediaQuery.of(context).devicePixelRatio)
         .round()
         .clamp(64, 2048);
@@ -798,6 +804,69 @@ class _AskRentlyEntry extends StatelessWidget {
 
 // ─── Image Gallery ────────────────────────────────────────────────────────────
 
+/// A gallery video page whose player only initializes once its page is the
+/// CURRENT one. `allowImplicitScrolling` pre-builds neighbor pages, and a
+/// pre-built video page used to spin up a full VideoPlayerController for a
+/// page the user hadn't reached — a multi-frame stall mid photo-swipe.
+class _LazyVideoPage extends StatefulWidget {
+  const _LazyVideoPage({
+    required this.media,
+    required this.controller,
+    required this.index,
+    required this.initialPage,
+    required this.fallback,
+  });
+
+  final PropertyMedia media;
+  final PageController controller;
+  final int index;
+  final int initialPage;
+  final Widget fallback;
+
+  @override
+  State<_LazyVideoPage> createState() => _LazyVideoPageState();
+}
+
+class _LazyVideoPageState extends State<_LazyVideoPage> {
+  bool _active = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _active = widget.initialPage == widget.index;
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final page = widget.controller.hasClients
+        ? widget.controller.page?.round()
+        : widget.initialPage;
+    final nowActive = page == widget.index;
+    // One-way latch: once the player exists, keep it (re-creating on every
+    // swipe away/back would thrash AVPlayer instead of helping).
+    if (nowActive && !_active && mounted) setState(() => _active = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeMedia(
+      media: widget.media,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      fallback: widget.fallback,
+      videoMode: _active
+          ? SafeVideoDisplayMode.playback
+          : SafeVideoDisplayMode.iconOnly,
+    );
+  }
+}
+
 class _ImageGallery extends StatelessWidget {
   _ImageGallery({
     required this.property,
@@ -844,13 +913,29 @@ class _ImageGallery extends StatelessWidget {
                 // of time instead of cold, mid-swipe.
                 allowImplicitScrolling: true,
                 itemCount: media.length,
-                itemBuilder: (_, i) => SafeMedia(
-                  media: media[i],
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                  fallback: _ImageFallback(city: property.city),
-                  videoMode: SafeVideoDisplayMode.playback,
-                ),
+                itemBuilder: (_, i) {
+                  final m = media[i];
+                  // Video pages init lazily: allowImplicitScrolling pre-builds
+                  // the ADJACENT page, and eagerly constructing its
+                  // VideoPlayerController (AVPlayer + network init on the
+                  // platform thread) mid-drag stalled the photo swipe. Images
+                  // keep the eager pre-build — that's the point of it.
+                  if (!m.isImage) {
+                    return _LazyVideoPage(
+                      media: m,
+                      controller: controller,
+                      index: i,
+                      initialPage: currentPage,
+                      fallback: _ImageFallback(city: property.city),
+                    );
+                  }
+                  return SafeMedia(
+                    media: m,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    fallback: _ImageFallback(city: property.city),
+                  );
+                },
               ),
 
         // Invisible tap zones for gallery navigation. The current-page check
@@ -2135,18 +2220,16 @@ class _RoundTemplateButton extends StatelessWidget {
     return ScaleBounce(
       onTap: onTap,
       scaleDownTo: 0.88,
+      // No BackdropFilter: these buttons float over the photo PageView, so a
+      // live blur re-ran per photo-swipe frame — part of the "stuck" gallery.
+      // A stronger translucent fill keeps the frosted look for free.
       child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: PlatformFx.blurSigma(translucent ? 14 : 0),
-            sigmaY: PlatformFx.blurSigma(translucent ? 14 : 0),
-          ),
           child: Container(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
               color: translucent
-                  ? Colors.white.withValues(alpha: 0.20)
+                  ? Colors.white.withValues(alpha: 0.38)
                   : Colors.white.withValues(alpha: 0.82),
               shape: BoxShape.circle,
               border: Border.all(
@@ -2157,7 +2240,6 @@ class _RoundTemplateButton extends StatelessWidget {
             ),
             child: Icon(icon, color: color, size: 21),
           ),
-        ),
       ),
     );
   }
@@ -2374,17 +2456,15 @@ class _FloatingNavBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      // No BackdropFilter: floats over the gallery PageView — a live 18σ blur
+      // re-ran on every photo-swipe frame. A scrim fill reads the same.
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: PlatformFx.blurSigma(18),
-              sigmaY: PlatformFx.blurSigma(18)),
           child: Container(
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.12),
@@ -2393,7 +2473,6 @@ class _FloatingNavBtn extends StatelessWidget {
             ),
             child: Icon(icon, color: Colors.white, size: 20),
           ),
-        ),
       ),
     );
   }
@@ -3919,15 +3998,17 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isProcessing = property.virtualTour?.isProcessing == true;
+    // NO BackdropFilter here: this bar is pinned over the CustomScrollView, so
+    // a live blur re-runs a full-width gaussian save-layer on EVERY scroll
+    // frame (iOS kept the full sigma) — the main cause of the detail page's
+    // scroll jank. A near-opaque fill reads the same at a fraction of the cost
+    // (same trade the deck's frosted pill made — see discover_screen).
     return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-            sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
-        child: Container(
+      child: Container(
           padding: EdgeInsets.fromLTRB(
               20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.85),
+            color: Colors.white.withValues(alpha: 0.97),
             border: const Border(
               top: BorderSide(
                 color: AppColors.slate200,
@@ -4012,7 +4093,6 @@ class _BottomBar extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }

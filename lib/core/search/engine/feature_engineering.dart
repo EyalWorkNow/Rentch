@@ -22,7 +22,6 @@
 //   - No external deps beyond dart:math and the rental models.
 // ════════════════════════════════════════════════════════════════════════════
 
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart' show rootBundle;
@@ -297,7 +296,7 @@ class IsraelGeoIndex {
     try {
       final raw =
           await rootBundle.loadString('assets/data/govdata/parks.json');
-      final list = (jsonDecode(raw) as List).cast<dynamic>();
+      final list = (await GovData.decodeJsonOffUi(raw) as List).cast<dynamic>();
       _parks = [
         for (final p in list)
           if (p is Map)
@@ -328,7 +327,7 @@ class IsraelGeoIndex {
     try {
       final raw =
           await rootBundle.loadString('assets/data/govdata/schools.json');
-      final list = (jsonDecode(raw) as List);
+      final list = (await GovData.decodeJsonOffUi(raw) as List);
       _schools = [
         for (final s in list)
           if (s is Map)
@@ -458,7 +457,7 @@ class IsraelGeoIndex {
       final raw =
           await rootBundle.loadString('assets/data/govdata/clinics.json');
       _clinics = [
-        for (final c in (jsonDecode(raw) as List))
+        for (final c in (await GovData.decodeJsonOffUi(raw) as List))
           if (c is Map)
             _Clinic((c['n'] ?? '').toString(), (c['h'] ?? '').toString(),
                 (c['lat'] as num).toDouble(), (c['lon'] as num).toDouble()),
@@ -510,7 +509,7 @@ class IsraelGeoIndex {
       final raw =
           await rootBundle.loadString('assets/data/govdata/supermarkets.json');
       _supermarkets = [
-        for (final s in (jsonDecode(raw) as List))
+        for (final s in (await GovData.decodeJsonOffUi(raw) as List))
           if (s is Map)
             _GeoPlace((s['n'] ?? '').toString(), (s['lat'] as num).toDouble(),
                 (s['lon'] as num).toDouble()),
@@ -592,7 +591,7 @@ class IsraelGeoIndex {
     try {
       final raw = await rootBundle.loadString('assets/data/govdata/$file');
       final list = [
-        for (final e in (jsonDecode(raw) as List))
+        for (final e in (await GovData.decodeJsonOffUi(raw) as List))
           if (e is Map)
             _Poi((e['n'] ?? '').toString(), (e['lat'] as num).toDouble(),
                 (e['lon'] as num).toDouble(), (e['t'] ?? '').toString())
@@ -771,7 +770,7 @@ class IsraelGeoIndex {
     try {
       final raw =
           await rootBundle.loadString('assets/data/govdata/nightlife.json');
-      final list = (jsonDecode(raw) as List);
+      final list = (await GovData.decodeJsonOffUi(raw) as List);
       _nightlife = [
         for (final v in list)
           if (v is List && v.length >= 3)
@@ -1302,6 +1301,30 @@ class MarketContext {
     // smoothed IDF normalized to ~[0,1]
     final idf = math.log((1 + size) / (1 + freq * size)) / math.log(1 + size);
     return idf.clamp(0.05, 1.0);
+  }
+
+  // Content-keyed memo for [analyzeCached]. relevance() used to call analyze()
+  // fresh on EVERY invocation, which returned a new object each time — and the
+  // per-property feature-vector memo (_PfvMemo) is generation-keyed on the
+  // MarketContext's identity, so a fresh context wiped it every call and every
+  // deck re-sort re-engineered all ~150 candidates from scratch on the UI
+  // isolate. A stable context per catalogue snapshot keeps that memo hot.
+  static String? _memoKey;
+  static MarketContext? _memo;
+
+  /// [analyze], memoized on a cheap content signature of [properties]
+  /// (length + sampled ids). Same snapshot → the SAME context object back.
+  static MarketContext analyzeCached(List<RentalProperty> properties) {
+    final n = properties.length;
+    final key = n == 0
+        ? '0'
+        : '$n|${properties.first.id}|${properties[n >> 1].id}|${properties.last.id}';
+    final memo = _memo;
+    if (memo != null && key == _memoKey) return memo;
+    final ctx = analyze(properties);
+    _memoKey = key;
+    _memo = ctx;
+    return ctx;
   }
 
   /// Analyze a candidate set into a reusable context.

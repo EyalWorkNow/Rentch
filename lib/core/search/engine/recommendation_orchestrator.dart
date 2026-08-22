@@ -1696,7 +1696,7 @@ class RecommendationEngine {
         if ((p.transactionType == PropertyTransactionType.sale) == isSale) p,
     ];
     final market =
-        MarketContext.analyze(seg.length >= 8 ? seg : candidates);
+        MarketContext.analyzeCached(seg.length >= 8 ? seg : candidates);
     final model = PreferenceModelBuilder.build(
         query: query, profile: profile, market: market);
     final ranked = RankingEngine.rank(

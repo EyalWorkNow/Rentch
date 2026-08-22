@@ -317,20 +317,20 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   fontSize: 15.5,
                   fontWeight: FontWeight.w900,
                   color: AppColors.navy)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
         ],
-        // Category tags in a 3-column equal-width Grid — forming a perfect rectangle.
+        // Category tags in a 2-column equal-width Grid — spacious, bold, and highly readable.
         Column(
           children: [
-            for (var r = 0; r < (count / 3).ceil(); r++) ...[
-              if (r > 0) const SizedBox(height: 8),
+            for (var r = 0; r < (count / 2).ceil(); r++) ...[
+              if (r > 0) const SizedBox(height: 6),
               Row(
                 children: [
-                  for (var c = 0; c < 3; c++) ...[
-                    if (c > 0) const SizedBox(width: 6),
+                  for (var c = 0; c < 2; c++) ...[
+                    if (c > 0) const SizedBox(width: 8),
                     Expanded(
-                      child: (r * 3 + c) < count
-                          ? _chip(r * 3 + c, (r * 3 + c) == sel)
+                      child: (r * 2 + c) < count
+                          ? _chip(r * 2 + c, (r * 2 + c) == sel)
                           : const SizedBox.shrink(),
                     ),
                   ],
@@ -340,10 +340,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           ],
         ),
         if (viewAll != null) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Center(child: viewAll),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         // Selected tag's places as a FIXED 3×3 grid — 9 places per page, each
         // cell carries the category icon + name + distance, with prev/next
         // paging below.
@@ -352,9 +352,9 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
             crossAxisCount: 3,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.0,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 1.02,
             children: [
               for (final pl
                   in _sections[sel].$2.skip(_currentPage * 9).take(9))
@@ -363,7 +363,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           ),
           // Pagination controls (only if total items > 9)
           if (_sections[sel].$2.length > 9) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -538,7 +538,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       onTap: () => setState(() => _showAllChips = !_showAllChips),
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(999),
@@ -557,7 +557,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                 ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
                 : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w800,
               color: AppColors.primary,
             ),
@@ -590,7 +590,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
           color: on ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(999),
@@ -611,33 +611,33 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 12, color: on ? Colors.white : AppColors.primary),
-            const SizedBox(width: 3),
+            Icon(icon, size: 15, color: on ? Colors.white : AppColors.primary),
+            const SizedBox(width: 5),
             Flexible(
               child: Text(
                 cleanTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
                   color: on ? Colors.white : AppColors.navy,
                 ),
               ),
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: on
-                    ? Colors.white.withValues(alpha: 0.22)
+                    ? Colors.white.withValues(alpha: 0.25)
                     : AppColors.cloud,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '$n',
                 style: TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   color: on ? Colors.white : AppColors.navy,
                 ),
@@ -645,6 +645,8 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
             ),
           ],
         ),
+      ),
+    );
   }
 
   Widget _section(int index, NearbyKind kind, List<NearbyPlace> places) {
