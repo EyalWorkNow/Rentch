@@ -117,6 +117,7 @@ class _NearbyJobsCardState extends State<NearbyJobsCard> {
   List<JobPosting> _jobs = const [];
   bool _loading = false;
   bool _searched = false; // a search completed → empty state is meaningful
+  bool _showAllJobs = false; // toggle expanding more jobs beyond initial 4
 
   static const _occupationSeed = {
     'hightech': 'מפתח תוכנה',
@@ -396,6 +397,8 @@ class _NearbyJobsCardState extends State<NearbyJobsCard> {
                 const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
       );
     }
+    final visibleCount = _showAllJobs ? _jobs.length : 4;
+    final hiddenCount = _jobs.length - 4;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -406,10 +409,57 @@ class _NearbyJobsCardState extends State<NearbyJobsCard> {
                 fontWeight: FontWeight.w800,
                 color: AppColors.primary)),
         const SizedBox(height: 2),
-        for (var i = 0; i < _jobs.length && i < 8; i++) ...[
+        for (var i = 0; i < _jobs.length && i < visibleCount; i++) ...[
           if (i > 0)
             const Divider(height: 1, thickness: 1, color: AppColors.borderLight),
           _jobRow(_jobs[i]),
+        ],
+        if (_jobs.length > 4) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: InkWell(
+              onTap: () => setState(() => _showAllJobs = !_showAllJobs),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      !_showAllJobs
+                          ? 'צפה בעוד משרות (+$hiddenCount)'
+                          : 'הצג פחות',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      !_showAllJobs
+                          ? Icons.keyboard_arrow_down_rounded
+                          : Icons.keyboard_arrow_up_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ],
     );
@@ -419,7 +469,6 @@ class _NearbyJobsCardState extends State<NearbyJobsCard> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     if (widget.city.trim().isEmpty) return const SizedBox.shrink();
-    final badge = _densityBadge(l10n);
     return Directionality(
       textDirection: Directionality.of(context),
       child: Container(
@@ -447,7 +496,6 @@ class _NearbyJobsCardState extends State<NearbyJobsCard> {
                           fontWeight: FontWeight.w900,
                           color: AppColors.navy)),
                 ),
-                if (badge != null) badge,
               ],
             ),
             const SizedBox(height: 4),

@@ -40,6 +40,9 @@ class PropertyLike {
     this.hostsGuests,
     this.playsInstrument,
     this.urgency,
+    this.dossierDocTypes,
+    this.dossierDataFirst,
+    this.dossierReference,
   });
 
   final String propertyId;
@@ -99,6 +102,14 @@ class PropertyLike {
   /// now/soon/browsing) → lets the landlord see intent: actively looking vs just
   /// browsing. Null for old likes / when the tenant didn't set it.
   final String? urgency;
+
+  /// תיק שוכר — the document kinds the tenant attached (DossierDocType.name
+  /// keys), whether they carry a previous-landlord reference, and whether they
+  /// asked for data-first presentation (attributes before name/photo). The
+  /// files themselves never travel in the like — only WHAT is substantiated.
+  final List<String>? dossierDocTypes;
+  final bool? dossierDataFirst;
+  final bool? dossierReference;
 
   bool get hasIntro =>
       introMessage.isNotEmpty ||
@@ -174,6 +185,11 @@ class PropertyLike {
       hostsGuests: _bool(row['hostsGuests']),
       playsInstrument: _bool(row['playsInstrument']),
       urgency: _str(row['urgency']),
+      dossierDocTypes: row['dossierDocTypes'] is List
+          ? [for (final t in row['dossierDocTypes'] as List) t.toString()]
+          : null,
+      dossierDataFirst: _bool(row['dossierDataFirst']),
+      dossierReference: _bool(row['dossierReference']),
     );
   }
 }
@@ -243,6 +259,9 @@ class PropertyLikesRepository {
     bool? hostsGuests,
     bool? playsInstrument,
     String? urgency,
+    List<String>? dossierDocTypes,
+    bool? dossierDataFirst,
+    bool? dossierReference,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     try {
@@ -284,6 +303,9 @@ class PropertyLikesRepository {
           hostsGuests: hostsGuests,
           playsInstrument: playsInstrument,
           urgency: urgency,
+          dossierDocTypes: dossierDocTypes,
+          dossierDataFirst: dossierDataFirst,
+          dossierReference: dossierReference,
         ),
       );
     } catch (e) {
@@ -332,6 +354,9 @@ class PropertyLikesRepository {
     bool? hostsGuests,
     bool? playsInstrument,
     String? urgency,
+    List<String>? dossierDocTypes,
+    bool? dossierDataFirst,
+    bool? dossierReference,
   }) {
     final note = introMessage.trim();
     final clampedNote = note.length > introMessageMaxLength
@@ -381,6 +406,10 @@ class PropertyLikesRepository {
       if (hostsGuests != null) 'hostsGuests': hostsGuests,
       if (playsInstrument != null) 'playsInstrument': playsInstrument,
       if (urgency != null && urgency.trim().isNotEmpty) 'urgency': urgency.trim(),
+      if (dossierDocTypes != null && dossierDocTypes.isNotEmpty)
+        'dossierDocTypes': dossierDocTypes,
+      if (dossierDataFirst != null) 'dossierDataFirst': dossierDataFirst,
+      if (dossierReference != null) 'dossierReference': dossierReference,
       'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
     };
   }

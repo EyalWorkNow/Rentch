@@ -11864,6 +11864,103 @@ class AppLocalizationsAr extends AppLocalizations {
       'البحث عن الوظائف غير متصل بعد — مطلوب مفتاح TheirStack (THEIRSTACK_API_KEY)';
 
   @override
+  String get dossierTitle => 'ملف المستأجر';
+
+  @override
+  String get dossierSubtitle => 'بطاقة مصداقيتك — بيانات ومستندات تتحدث عنك';
+
+  @override
+  String dossierCompleteness(int percent) {
+    return 'الملف مكتمل بنسبة $percent%';
+  }
+
+  @override
+  String get dossierSectionEmployment => 'العمل والدخل';
+
+  @override
+  String get dossierEmployerHint => 'جهة العمل الحالية';
+
+  @override
+  String get dossierIncomeHint => 'الدخل الشهري الإجمالي (₪)';
+
+  @override
+  String get dossierGuarantorToggle => 'لديّ كفلاء متاحون';
+
+  @override
+  String get dossierSectionDocs => 'مستندات داعمة';
+
+  @override
+  String get dossierDocsHint =>
+      'المستند المرفق يحوّل التصريح إلى حقيقة. تبقى المستندات في ملفك وتُرسل فقط عندما تختار المشاركة.';
+
+  @override
+  String get dossierDocPaySlip => 'قسيمة راتب';
+
+  @override
+  String get dossierDocEmployment => 'إثبات عمل';
+
+  @override
+  String get dossierDocBank => 'كشف حساب بنكي';
+
+  @override
+  String get dossierDocCredit => 'تقرير ائتماني';
+
+  @override
+  String get dossierDocLandlordRef => 'رسالة توصية من مؤجّر';
+
+  @override
+  String get dossierDocGuarantor => 'تعهد كفيل';
+
+  @override
+  String get dossierDocAttached => 'مرفق';
+
+  @override
+  String get dossierDocAdd => 'إرفاق';
+
+  @override
+  String get dossierSectionReference => 'توصية المؤجّر السابق';
+
+  @override
+  String get dossierRefName => 'اسم الموصي';
+
+  @override
+  String get dossierRefPhone => 'هاتف (اختياري)';
+
+  @override
+  String get dossierRefText => 'ماذا سيقول عنك مؤجّرك السابق؟';
+
+  @override
+  String get dossierDataFirstTitle => 'البيانات قبل الاسم';
+
+  @override
+  String get dossierDataFirstBody =>
+      'يرى أصحاب الشقق بياناتك أولاً — الدخل والمهنة والمستندات — قبل اسمك وصورتك. تكافؤ فرص حقيقي.';
+
+  @override
+  String get dossierSaved => 'تم حفظ الملف';
+
+  @override
+  String get dossierSaveButton => 'حفظ الملف';
+
+  @override
+  String get dossierUploadFailed => 'فشل رفع المستند — حاول مجدداً';
+
+  @override
+  String get dossierEntryHint =>
+      'ابنِ بطاقة مصداقية تتحدث عنك أمام أصحاب الشقق';
+
+  @override
+  String leadDossierBadge(int count) {
+    return 'ملف المستأجر · $count مستندات';
+  }
+
+  @override
+  String get leadDossierDataFirst => 'البيانات قبل الاسم';
+
+  @override
+  String get leadDossierReference => 'يتضمن توصية مؤجّر';
+
+  @override
   String get nearbyJobsCardEmpty =>
       'لم يتم العثور على وظائف مناسبة في المنطقة — جرّب وظيفة أو صياغة أخرى';
 

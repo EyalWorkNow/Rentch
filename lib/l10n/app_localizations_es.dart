@@ -12104,6 +12104,105 @@ class AppLocalizationsEs extends AppLocalizations {
       'La búsqueda de empleo aún no está conectada — se requiere una clave de TheirStack (THEIRSTACK_API_KEY)';
 
   @override
+  String get dossierTitle => 'Expediente del inquilino';
+
+  @override
+  String get dossierSubtitle =>
+      'Tu tarjeta de credibilidad — datos y documentos que hablan por ti';
+
+  @override
+  String dossierCompleteness(int percent) {
+    return 'Expediente completo al $percent%';
+  }
+
+  @override
+  String get dossierSectionEmployment => 'Empleo e ingresos';
+
+  @override
+  String get dossierEmployerHint => 'Empleador actual';
+
+  @override
+  String get dossierIncomeHint => 'Ingreso mensual bruto (₪)';
+
+  @override
+  String get dossierGuarantorToggle => 'Tengo avalistas disponibles';
+
+  @override
+  String get dossierSectionDocs => 'Documentos de respaldo';
+
+  @override
+  String get dossierDocsHint =>
+      'Un documento adjunto convierte una declaración en un hecho. Los documentos quedan en tu expediente y solo se envían cuando decides compartirlos.';
+
+  @override
+  String get dossierDocPaySlip => 'Nómina';
+
+  @override
+  String get dossierDocEmployment => 'Carta de empleo';
+
+  @override
+  String get dossierDocBank => 'Extracto bancario';
+
+  @override
+  String get dossierDocCredit => 'Informe crediticio';
+
+  @override
+  String get dossierDocLandlordRef => 'Carta de recomendación del casero';
+
+  @override
+  String get dossierDocGuarantor => 'Compromiso de avalista';
+
+  @override
+  String get dossierDocAttached => 'Adjunto';
+
+  @override
+  String get dossierDocAdd => 'Adjuntar';
+
+  @override
+  String get dossierSectionReference => 'Referencia del casero anterior';
+
+  @override
+  String get dossierRefName => 'Nombre de la referencia';
+
+  @override
+  String get dossierRefPhone => 'Teléfono (opcional)';
+
+  @override
+  String get dossierRefText => '¿Qué diría de ti tu casero anterior?';
+
+  @override
+  String get dossierDataFirstTitle => 'Datos antes que nombre';
+
+  @override
+  String get dossierDataFirstBody =>
+      'Los caseros ven primero tus datos — ingresos, profesión y documentos — antes que tu nombre y foto. Igualdad de oportunidades real.';
+
+  @override
+  String get dossierSaved => 'Expediente guardado';
+
+  @override
+  String get dossierSaveButton => 'Guardar expediente';
+
+  @override
+  String get dossierUploadFailed =>
+      'Error al subir el documento — inténtalo de nuevo';
+
+  @override
+  String get dossierEntryHint =>
+      'Crea una tarjeta de credibilidad que hable por ti ante los caseros';
+
+  @override
+  String leadDossierBadge(int count) {
+    return 'Expediente · $count documentos';
+  }
+
+  @override
+  String get leadDossierDataFirst => 'Datos antes que nombre';
+
+  @override
+  String get leadDossierReference => 'Incluye referencia del casero';
+
+  @override
   String get nearbyJobsCardEmpty =>
       'No se encontraron vacantes en la zona — prueba otro puesto u otra redacción';
 

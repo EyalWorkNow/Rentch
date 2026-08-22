@@ -16,6 +16,7 @@ import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
+import 'package:dating_app/presentation/features/user/dossier/renter_dossier_screen.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -1842,6 +1843,19 @@ class _LandlordProfileScreen extends StatelessWidget {
                   builder: (_) => EditProfileScreen(profile: profile)),
             ),
           ),
+          if (!provider.isLandlord && !provider.isBroker) ...[
+            const _SettingsDivider(),
+            _ProfileMenuItem(
+              icon: IconsaxPlusLinear.shield_tick,
+              label: l10n.dossierTitle,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  settings: const RouteSettings(name: 'RenterDossierScreen'),
+                  builder: (_) => const RenterDossierScreen(),
+                ),
+              ),
+            ),
+          ],
           if (provider.isLandlord) ...[
             const _SettingsDivider(),
             _ProfileMenuItem(

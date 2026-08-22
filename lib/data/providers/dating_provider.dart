@@ -34,6 +34,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/renter_dossier.dart';
 import 'package:dating_app/data/models/subscription.dart';
 import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/data/models/user_signals.dart';
@@ -2977,6 +2978,16 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── תיק שוכר (renter dossier) ────────────────────────────────────────────
+  RenterDossier _renterDossier = const RenterDossier();
+  RenterDossier get renterDossier => _renterDossier;
+
+  Future<void> updateRenterDossier(RenterDossier dossier) async {
+    _renterDossier = dossier;
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
     // Engine relevance folds in the profile (budget/rooms/persona), so a profile
@@ -3994,6 +4005,13 @@ class DatingProvider extends ChangeNotifier {
       hasGuarantor: tp?.hasGuarantor,
       leaseMonths: tp?.leaseMonths,
       incomeProofReady: tp?.incomeProofReady,
+      // תיק שוכר: which document kinds back the numbers above, plus the
+      // data-first presentation preference. URLs stay private — the landlord
+      // sees WHAT is substantiated and requests files in chat.
+      dossierDocTypes:
+          _renterDossier.docs.isEmpty ? null : _renterDossier.docTypeKeys,
+      dossierDataFirst: _renterDossier.dataFirstMode ? true : null,
+      dossierReference: _renterDossier.hasReference ? true : null,
       religiousLifestyle: tp?.religiousLifestyle,
       shabbatObservant: tp?.shabbatObservant,
       keepsKosher: tp?.keepsKosher,
@@ -6297,6 +6315,8 @@ class DatingProvider extends ChangeNotifier {
     _tenantProfile = tenantJson == null
         ? _rentalDataService.createDefaultTenantProfile()
         : TenantProfile.fromJson(Map<String, dynamic>.from(tenantJson));
+    _renterDossier = RenterDossier.fromJson(
+        storedState['renterDossier'] as Map<dynamic, dynamic>?);
 
     _filters = SearchFilters.fromJson(
       Map<String, dynamic>.from(storedState['filters'] as Map? ?? const {}),
@@ -6784,6 +6804,7 @@ class DatingProvider extends ChangeNotifier {
     return {
       'schema': 'rental_match_v2',
       'tenantProfile': _tenantProfile?.toJson(),
+      'renterDossier': _renterDossier.toJson(),
       'learner': _learner.toJson(), // per-user FTRL model (z/n/updates)
       'cohortBelief': _cohortBelief.toJson(), // evolving soft cohort membership
       'tenantConsent': _tenantConsent.toJson(), // versioned data-use consent

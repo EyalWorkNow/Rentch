@@ -20765,6 +20765,186 @@ abstract class AppLocalizations {
   /// **'חיפוש המשרות עדיין לא מחובר — נדרש מפתח TheirStack בהגדרות הבנייה (THEIRSTACK_API_KEY)'**
   String get nearbyJobsCardNoKey;
 
+  /// No description provided for @dossierTitle.
+  ///
+  /// In he, this message translates to:
+  /// **'תיק שוכר'**
+  String get dossierTitle;
+
+  /// No description provided for @dossierSubtitle.
+  ///
+  /// In he, this message translates to:
+  /// **'כרטיס האמינות שלך — נתונים ומסמכים שמדברים בשבילך'**
+  String get dossierSubtitle;
+
+  /// No description provided for @dossierCompleteness.
+  ///
+  /// In he, this message translates to:
+  /// **'התיק שלם ב-{percent}%'**
+  String dossierCompleteness(int percent);
+
+  /// No description provided for @dossierSectionEmployment.
+  ///
+  /// In he, this message translates to:
+  /// **'תעסוקה והכנסה'**
+  String get dossierSectionEmployment;
+
+  /// No description provided for @dossierEmployerHint.
+  ///
+  /// In he, this message translates to:
+  /// **'מקום עבודה נוכחי'**
+  String get dossierEmployerHint;
+
+  /// No description provided for @dossierIncomeHint.
+  ///
+  /// In he, this message translates to:
+  /// **'הכנסה חודשית ברוטו (₪)'**
+  String get dossierIncomeHint;
+
+  /// No description provided for @dossierGuarantorToggle.
+  ///
+  /// In he, this message translates to:
+  /// **'יש לי ערבים זמינים'**
+  String get dossierGuarantorToggle;
+
+  /// No description provided for @dossierSectionDocs.
+  ///
+  /// In he, this message translates to:
+  /// **'מסמכים מגבים'**
+  String get dossierSectionDocs;
+
+  /// No description provided for @dossierDocsHint.
+  ///
+  /// In he, this message translates to:
+  /// **'מסמך מצורף הופך הצהרה לעובדה. המסמכים נשמרים בתיק ונשלחים רק כשתבחרו לשתף.'**
+  String get dossierDocsHint;
+
+  /// No description provided for @dossierDocPaySlip.
+  ///
+  /// In he, this message translates to:
+  /// **'תלוש שכר'**
+  String get dossierDocPaySlip;
+
+  /// No description provided for @dossierDocEmployment.
+  ///
+  /// In he, this message translates to:
+  /// **'אישור העסקה'**
+  String get dossierDocEmployment;
+
+  /// No description provided for @dossierDocBank.
+  ///
+  /// In he, this message translates to:
+  /// **'תדפיס בנק'**
+  String get dossierDocBank;
+
+  /// No description provided for @dossierDocCredit.
+  ///
+  /// In he, this message translates to:
+  /// **'דוח נתוני אשראי'**
+  String get dossierDocCredit;
+
+  /// No description provided for @dossierDocLandlordRef.
+  ///
+  /// In he, this message translates to:
+  /// **'מכתב המלצה ממשכיר'**
+  String get dossierDocLandlordRef;
+
+  /// No description provided for @dossierDocGuarantor.
+  ///
+  /// In he, this message translates to:
+  /// **'התחייבות ערב'**
+  String get dossierDocGuarantor;
+
+  /// No description provided for @dossierDocAttached.
+  ///
+  /// In he, this message translates to:
+  /// **'מצורף'**
+  String get dossierDocAttached;
+
+  /// No description provided for @dossierDocAdd.
+  ///
+  /// In he, this message translates to:
+  /// **'צרף'**
+  String get dossierDocAdd;
+
+  /// No description provided for @dossierSectionReference.
+  ///
+  /// In he, this message translates to:
+  /// **'המלצת משכיר קודם'**
+  String get dossierSectionReference;
+
+  /// No description provided for @dossierRefName.
+  ///
+  /// In he, this message translates to:
+  /// **'שם הממליץ'**
+  String get dossierRefName;
+
+  /// No description provided for @dossierRefPhone.
+  ///
+  /// In he, this message translates to:
+  /// **'טלפון (אופציונלי)'**
+  String get dossierRefPhone;
+
+  /// No description provided for @dossierRefText.
+  ///
+  /// In he, this message translates to:
+  /// **'מה יגיד עליך המשכיר הקודם?'**
+  String get dossierRefText;
+
+  /// No description provided for @dossierDataFirstTitle.
+  ///
+  /// In he, this message translates to:
+  /// **'נתונים לפני שם'**
+  String get dossierDataFirstTitle;
+
+  /// No description provided for @dossierDataFirstBody.
+  ///
+  /// In he, this message translates to:
+  /// **'בעלי דירות יראו קודם את הנתונים שלך — הכנסה, תחום עיסוק ומסמכים — לפני השם והתמונה. שוויון הזדמנויות אמיתי.'**
+  String get dossierDataFirstBody;
+
+  /// No description provided for @dossierSaved.
+  ///
+  /// In he, this message translates to:
+  /// **'התיק נשמר'**
+  String get dossierSaved;
+
+  /// No description provided for @dossierSaveButton.
+  ///
+  /// In he, this message translates to:
+  /// **'שמירת התיק'**
+  String get dossierSaveButton;
+
+  /// No description provided for @dossierUploadFailed.
+  ///
+  /// In he, this message translates to:
+  /// **'העלאת המסמך נכשלה — נסו שוב'**
+  String get dossierUploadFailed;
+
+  /// No description provided for @dossierEntryHint.
+  ///
+  /// In he, this message translates to:
+  /// **'בנו כרטיס אמינות שמדבר בשבילכם מול בעלי דירות'**
+  String get dossierEntryHint;
+
+  /// No description provided for @leadDossierBadge.
+  ///
+  /// In he, this message translates to:
+  /// **'תיק שוכר · {count} מסמכים'**
+  String leadDossierBadge(int count);
+
+  /// No description provided for @leadDossierDataFirst.
+  ///
+  /// In he, this message translates to:
+  /// **'נתונים לפני שם'**
+  String get leadDossierDataFirst;
+
+  /// No description provided for @leadDossierReference.
+  ///
+  /// In he, this message translates to:
+  /// **'כולל המלצת משכיר'**
+  String get leadDossierReference;
+
   /// No description provided for @nearbyJobsCardEmpty.
   ///
   /// In he, this message translates to:

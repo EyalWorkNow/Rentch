@@ -12140,6 +12140,104 @@ class AppLocalizationsFr extends AppLocalizations {
       'La recherche d\'emploi n\'est pas encore connectée — une clé TheirStack (THEIRSTACK_API_KEY) est requise';
 
   @override
+  String get dossierTitle => 'Dossier locataire';
+
+  @override
+  String get dossierSubtitle =>
+      'Votre carte de crédibilité — des données et documents qui parlent pour vous';
+
+  @override
+  String dossierCompleteness(int percent) {
+    return 'Dossier complet à $percent%';
+  }
+
+  @override
+  String get dossierSectionEmployment => 'Emploi et revenus';
+
+  @override
+  String get dossierEmployerHint => 'Employeur actuel';
+
+  @override
+  String get dossierIncomeHint => 'Revenu mensuel brut (₪)';
+
+  @override
+  String get dossierGuarantorToggle => 'J\'ai des garants disponibles';
+
+  @override
+  String get dossierSectionDocs => 'Documents justificatifs';
+
+  @override
+  String get dossierDocsHint =>
+      'Un document joint transforme une déclaration en fait. Les documents restent dans votre dossier et ne sont envoyés que lorsque vous choisissez de les partager.';
+
+  @override
+  String get dossierDocPaySlip => 'Fiche de paie';
+
+  @override
+  String get dossierDocEmployment => 'Attestation d\'emploi';
+
+  @override
+  String get dossierDocBank => 'Relevé bancaire';
+
+  @override
+  String get dossierDocCredit => 'Rapport de crédit';
+
+  @override
+  String get dossierDocLandlordRef => 'Lettre de recommandation du bailleur';
+
+  @override
+  String get dossierDocGuarantor => 'Engagement de garant';
+
+  @override
+  String get dossierDocAttached => 'Joint';
+
+  @override
+  String get dossierDocAdd => 'Joindre';
+
+  @override
+  String get dossierSectionReference => 'Référence du bailleur précédent';
+
+  @override
+  String get dossierRefName => 'Nom du référent';
+
+  @override
+  String get dossierRefPhone => 'Téléphone (facultatif)';
+
+  @override
+  String get dossierRefText => 'Que dirait votre bailleur précédent de vous ?';
+
+  @override
+  String get dossierDataFirstTitle => 'Les données avant le nom';
+
+  @override
+  String get dossierDataFirstBody =>
+      'Les bailleurs voient d\'abord vos données — revenus, profession et documents — avant votre nom et votre photo. Une vraie égalité des chances.';
+
+  @override
+  String get dossierSaved => 'Dossier enregistré';
+
+  @override
+  String get dossierSaveButton => 'Enregistrer le dossier';
+
+  @override
+  String get dossierUploadFailed => 'Échec de l\'envoi du document — réessayez';
+
+  @override
+  String get dossierEntryHint =>
+      'Créez une carte de crédibilité qui parle pour vous auprès des bailleurs';
+
+  @override
+  String leadDossierBadge(int count) {
+    return 'Dossier · $count documents';
+  }
+
+  @override
+  String get leadDossierDataFirst => 'Les données avant le nom';
+
+  @override
+  String get leadDossierReference => 'Comprend une référence du bailleur';
+
+  @override
   String get nearbyJobsCardEmpty =>
       'Aucun poste trouvé dans le secteur — essayez un autre métier ou une autre formulation';
 

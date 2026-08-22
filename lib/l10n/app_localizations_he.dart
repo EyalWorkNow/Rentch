@@ -11740,6 +11740,104 @@ class AppLocalizationsHe extends AppLocalizations {
       'חיפוש המשרות עדיין לא מחובר — נדרש מפתח TheirStack בהגדרות הבנייה (THEIRSTACK_API_KEY)';
 
   @override
+  String get dossierTitle => 'תיק שוכר';
+
+  @override
+  String get dossierSubtitle =>
+      'כרטיס האמינות שלך — נתונים ומסמכים שמדברים בשבילך';
+
+  @override
+  String dossierCompleteness(int percent) {
+    return 'התיק שלם ב-$percent%';
+  }
+
+  @override
+  String get dossierSectionEmployment => 'תעסוקה והכנסה';
+
+  @override
+  String get dossierEmployerHint => 'מקום עבודה נוכחי';
+
+  @override
+  String get dossierIncomeHint => 'הכנסה חודשית ברוטו (₪)';
+
+  @override
+  String get dossierGuarantorToggle => 'יש לי ערבים זמינים';
+
+  @override
+  String get dossierSectionDocs => 'מסמכים מגבים';
+
+  @override
+  String get dossierDocsHint =>
+      'מסמך מצורף הופך הצהרה לעובדה. המסמכים נשמרים בתיק ונשלחים רק כשתבחרו לשתף.';
+
+  @override
+  String get dossierDocPaySlip => 'תלוש שכר';
+
+  @override
+  String get dossierDocEmployment => 'אישור העסקה';
+
+  @override
+  String get dossierDocBank => 'תדפיס בנק';
+
+  @override
+  String get dossierDocCredit => 'דוח נתוני אשראי';
+
+  @override
+  String get dossierDocLandlordRef => 'מכתב המלצה ממשכיר';
+
+  @override
+  String get dossierDocGuarantor => 'התחייבות ערב';
+
+  @override
+  String get dossierDocAttached => 'מצורף';
+
+  @override
+  String get dossierDocAdd => 'צרף';
+
+  @override
+  String get dossierSectionReference => 'המלצת משכיר קודם';
+
+  @override
+  String get dossierRefName => 'שם הממליץ';
+
+  @override
+  String get dossierRefPhone => 'טלפון (אופציונלי)';
+
+  @override
+  String get dossierRefText => 'מה יגיד עליך המשכיר הקודם?';
+
+  @override
+  String get dossierDataFirstTitle => 'נתונים לפני שם';
+
+  @override
+  String get dossierDataFirstBody =>
+      'בעלי דירות יראו קודם את הנתונים שלך — הכנסה, תחום עיסוק ומסמכים — לפני השם והתמונה. שוויון הזדמנויות אמיתי.';
+
+  @override
+  String get dossierSaved => 'התיק נשמר';
+
+  @override
+  String get dossierSaveButton => 'שמירת התיק';
+
+  @override
+  String get dossierUploadFailed => 'העלאת המסמך נכשלה — נסו שוב';
+
+  @override
+  String get dossierEntryHint =>
+      'בנו כרטיס אמינות שמדבר בשבילכם מול בעלי דירות';
+
+  @override
+  String leadDossierBadge(int count) {
+    return 'תיק שוכר · $count מסמכים';
+  }
+
+  @override
+  String get leadDossierDataFirst => 'נתונים לפני שם';
+
+  @override
+  String get leadDossierReference => 'כולל המלצת משכיר';
+
+  @override
   String get nearbyJobsCardEmpty =>
       'לא נמצאו משרות מתאימות באיזור — נסו תפקיד או ניסוח אחר';
 

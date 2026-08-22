@@ -616,6 +616,11 @@ class _LeadCard extends StatefulWidget {
   // with an explicit verified flag shows the shield chip.
   bool get displayVerified => _hasLiker && (liker!.verified ?? false);
 
+  // ── תיק שוכר signals carried on the like ──────────────────────────────────
+  bool get dossierDataFirst => liker?.dossierDataFirst ?? false;
+  int get dossierDocCount => liker?.dossierDocTypes?.length ?? 0;
+  bool get dossierHasReference => liker?.dossierReference ?? false;
+
   /// The candidate's interest intent (from their urgency token), or null.
   String? get displayUrgency => _hasLiker ? liker!.urgency : tenant.urgency;
 
@@ -708,6 +713,16 @@ class _LeadCardState extends State<_LeadCard> {
     if (occupation != null) {
       facts.add(_Fact(IconsaxPlusLinear.briefcase, l10n.exploreScreen6b84e37c, occupation));
     }
+    // תיק שוכר: what this candidate can SUBSTANTIATE — the strongest trust
+    // signal on the card, surfaced right after occupation.
+    if (widget.dossierDocCount > 0) {
+      facts.add(_Fact(IconsaxPlusLinear.shield_tick, l10n.dossierTitle,
+          l10n.leadDossierBadge(widget.dossierDocCount)));
+    }
+    if (widget.dossierHasReference) {
+      facts.add(_Fact(IconsaxPlusLinear.like_1, l10n.dossierSectionReference,
+          l10n.leadDossierReference));
+    }
     final household = widget.displayHousehold(context);
     final children = widget.displayNumChildren;
     if (household != null || (children != null && children > 0)) {
@@ -738,13 +753,22 @@ class _LeadCardState extends State<_LeadCard> {
     final isAccepting = widget.hOffset > 10;
     final isRejecting = widget.hOffset < -10;
     final facts = _buildFacts();
-    final photos = widget.displayPhotos;
+    // Data-first candidates hide their photo along with the name.
+    final photos =
+        widget.dossierDataFirst ? const <String>[] : widget.displayPhotos;
     final hasMultiple = photos.length > 1;
     final safePhotoIndex = _safePhotoIndex(_photoIndex);
     final currentPhoto = photos.isNotEmpty ? photos[safePhotoIndex] : '';
     final age = widget.displayAge;
-    final nameLine =
-        age != null ? '${widget.displayName}, $age' : widget.displayName;
+    // "נתונים לפני שם": the candidate asked to be judged by their data first —
+    // headline their occupation instead of name/photo until the owner engages
+    // (opens the detail / chat). Counters name-based filtering.
+    final dataFirst = widget.dossierDataFirst;
+    final anonHeadline =
+        widget.displayOccupation(context) ?? l10n.leadDossierDataFirst;
+    final nameLine = dataFirst
+        ? anonHeadline
+        : (age != null ? '${widget.displayName}, $age' : widget.displayName);
     final fitReason = _leadFitReasonLabel(widget.fitReason, l10n);
 
     final dragFactor = (widget.hOffset.abs() / 100.0).clamp(0.0, 1.0);

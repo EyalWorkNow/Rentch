@@ -11964,6 +11964,105 @@ class AppLocalizationsEn extends AppLocalizations {
       'Job search isn\'t connected yet — a TheirStack key (THEIRSTACK_API_KEY) is required in the build settings';
 
   @override
+  String get dossierTitle => 'Renter dossier';
+
+  @override
+  String get dossierSubtitle =>
+      'Your credibility card — data and documents that speak for you';
+
+  @override
+  String dossierCompleteness(int percent) {
+    return 'Dossier $percent% complete';
+  }
+
+  @override
+  String get dossierSectionEmployment => 'Employment & income';
+
+  @override
+  String get dossierEmployerHint => 'Current employer';
+
+  @override
+  String get dossierIncomeHint => 'Gross monthly income (₪)';
+
+  @override
+  String get dossierGuarantorToggle => 'I have guarantors available';
+
+  @override
+  String get dossierSectionDocs => 'Supporting documents';
+
+  @override
+  String get dossierDocsHint =>
+      'An attached document turns a claim into a fact. Documents stay in your dossier and are only sent when you choose to share.';
+
+  @override
+  String get dossierDocPaySlip => 'Pay slip';
+
+  @override
+  String get dossierDocEmployment => 'Employment letter';
+
+  @override
+  String get dossierDocBank => 'Bank statement';
+
+  @override
+  String get dossierDocCredit => 'Credit report';
+
+  @override
+  String get dossierDocLandlordRef => 'Landlord reference letter';
+
+  @override
+  String get dossierDocGuarantor => 'Guarantor commitment';
+
+  @override
+  String get dossierDocAttached => 'Attached';
+
+  @override
+  String get dossierDocAdd => 'Attach';
+
+  @override
+  String get dossierSectionReference => 'Previous landlord reference';
+
+  @override
+  String get dossierRefName => 'Referrer name';
+
+  @override
+  String get dossierRefPhone => 'Phone (optional)';
+
+  @override
+  String get dossierRefText =>
+      'What would your previous landlord say about you?';
+
+  @override
+  String get dossierDataFirstTitle => 'Data before name';
+
+  @override
+  String get dossierDataFirstBody =>
+      'Landlords see your data first — income, occupation and documents — before your name and photo. Real equal opportunity.';
+
+  @override
+  String get dossierSaved => 'Dossier saved';
+
+  @override
+  String get dossierSaveButton => 'Save dossier';
+
+  @override
+  String get dossierUploadFailed => 'Document upload failed — try again';
+
+  @override
+  String get dossierEntryHint =>
+      'Build a credibility card that speaks for you with landlords';
+
+  @override
+  String leadDossierBadge(int count) {
+    return 'Renter dossier · $count documents';
+  }
+
+  @override
+  String get leadDossierDataFirst => 'Data before name';
+
+  @override
+  String get leadDossierReference => 'Includes landlord reference';
+
+  @override
   String get nearbyJobsCardEmpty =>
       'No matching openings found in the area — try a different role or wording';
 
