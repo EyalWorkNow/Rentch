@@ -11962,6 +11962,25 @@ class AppLocalizationsAr extends AppLocalizations {
       'ملفك فارغ — أرفق مستندات في ملف المستأجر أولاً';
 
   @override
+  String get dossierVerifyIncomeButton => 'التحقق من الدخل مقابل قسيمة الراتب';
+
+  @override
+  String get dossierIncomeVerifiedBadge => 'الدخل موثّق مقابل قسيمة الراتب ✓';
+
+  @override
+  String get dossierIncomeMismatch =>
+      'قسيمة الراتب لا تطابق الدخل المصرّح — حدّث الدخل أو أرفق قسيمة حديثة';
+
+  @override
+  String get dossierVerifyNeeds => 'للتحقق: أرفق قسيمة راتب وأدخل الدخل الشهري';
+
+  @override
+  String get dossierVerifyFailed => 'فشل التحقق — تحقق من الاتصال وحاول مجدداً';
+
+  @override
+  String get leadIncomeVerified => 'موثّق ✓';
+
+  @override
   String get dossierUploadFailed => 'فشل رفع المستند — حاول مجدداً';
 
   @override

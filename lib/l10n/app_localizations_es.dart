@@ -12203,6 +12203,28 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tu expediente está vacío — adjunta documentos primero';
 
   @override
+  String get dossierVerifyIncomeButton => 'Verificar ingresos con la nómina';
+
+  @override
+  String get dossierIncomeVerifiedBadge =>
+      'Ingresos verificados con la nómina ✓';
+
+  @override
+  String get dossierIncomeMismatch =>
+      'La nómina no coincide con los ingresos declarados — actualiza los ingresos o adjunta una nómina reciente';
+
+  @override
+  String get dossierVerifyNeeds =>
+      'Para verificar: adjunta una nómina e introduce un ingreso mensual';
+
+  @override
+  String get dossierVerifyFailed =>
+      'La verificación falló — comprueba la conexión e inténtalo de nuevo';
+
+  @override
+  String get leadIncomeVerified => 'Verificado ✓';
+
+  @override
   String get dossierUploadFailed =>
       'Error al subir el documento — inténtalo de nuevo';
 

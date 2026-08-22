@@ -12239,6 +12239,29 @@ class AppLocalizationsFr extends AppLocalizations {
       'Votre dossier est vide — joignez d\'abord des documents';
 
   @override
+  String get dossierVerifyIncomeButton =>
+      'Vérifier les revenus avec la fiche de paie';
+
+  @override
+  String get dossierIncomeVerifiedBadge =>
+      'Revenus vérifiés avec la fiche de paie ✓';
+
+  @override
+  String get dossierIncomeMismatch =>
+      'La fiche de paie ne correspond pas aux revenus déclarés — mettez à jour les revenus ou joignez une fiche récente';
+
+  @override
+  String get dossierVerifyNeeds =>
+      'Pour vérifier : joignez une fiche de paie et saisissez un revenu mensuel';
+
+  @override
+  String get dossierVerifyFailed =>
+      'La vérification a échoué — vérifiez la connexion et réessayez';
+
+  @override
+  String get leadIncomeVerified => 'Vérifié ✓';
+
+  @override
   String get dossierUploadFailed => 'Échec de l\'envoi du document — réessayez';
 
   @override

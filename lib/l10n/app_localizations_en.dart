@@ -12064,6 +12064,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your dossier is empty — attach documents in the renter dossier first';
 
   @override
+  String get dossierVerifyIncomeButton => 'Verify income against pay slip';
+
+  @override
+  String get dossierIncomeVerifiedBadge => 'Income verified against pay slip ✓';
+
+  @override
+  String get dossierIncomeMismatch =>
+      'The pay slip didn\'t match the declared income — update the income or attach a recent slip';
+
+  @override
+  String get dossierVerifyNeeds =>
+      'To verify: attach a pay slip and enter a monthly income';
+
+  @override
+  String get dossierVerifyFailed =>
+      'Verification failed — check your connection and try again';
+
+  @override
+  String get leadIncomeVerified => 'Verified ✓';
+
+  @override
   String get dossierUploadFailed => 'Document upload failed — try again';
 
   @override

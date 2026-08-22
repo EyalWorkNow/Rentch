@@ -49,6 +49,54 @@ class DossierDoc {
   }
 }
 
+/// The SERVER's verdict from OCR-reading the uploaded pay slip against the
+/// declared income (POST /dossier/verify-income). Stored on the dossier so the
+/// "הכנסה מאומתת" badge survives restarts; only ever minted by the backend.
+class IncomeVerification {
+  const IncomeVerification({
+    required this.verified,
+    required this.verifiedAt,
+    this.grossMonthly,
+    this.netMonthly,
+    this.employerName = '',
+    this.period = '',
+    this.confidence = 0,
+  });
+
+  final bool verified;
+  final DateTime verifiedAt;
+  final int? grossMonthly;
+  final int? netMonthly;
+  final String employerName;
+  final String period; // YYYY-MM as printed on the slip
+  final double confidence;
+
+  Map<String, dynamic> toJson() => {
+        'verified': verified,
+        'verifiedAt': verifiedAt.toUtc().toIso8601String(),
+        if (grossMonthly != null) 'grossMonthly': grossMonthly,
+        if (netMonthly != null) 'netMonthly': netMonthly,
+        if (employerName.isNotEmpty) 'employerName': employerName,
+        if (period.isNotEmpty) 'period': period,
+        'confidence': confidence,
+      };
+
+  static IncomeVerification? fromJson(Map<dynamic, dynamic>? json) {
+    if (json == null) return null;
+    final at = DateTime.tryParse(json['verifiedAt']?.toString() ?? '');
+    if (at == null) return null;
+    return IncomeVerification(
+      verified: json['verified'] == true,
+      verifiedAt: at,
+      grossMonthly: (json['grossMonthly'] as num?)?.round(),
+      netMonthly: (json['netMonthly'] as num?)?.round(),
+      employerName: json['employerName']?.toString() ?? '',
+      period: json['period']?.toString() ?? '',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 /// "תיק שוכר" — the renter's trust dossier. Everything a landlord needs to say
 /// "this person is safe" WITHOUT the crude filters the market uses today
 /// (name, accent, age, family status). Documents live on S3; this object holds
@@ -66,6 +114,7 @@ class RenterDossier {
     this.referencePhone = '',
     this.referenceText = '',
     this.dataFirstMode = false,
+    this.incomeVerification,
   });
 
   final List<DossierDoc> docs;
@@ -86,6 +135,14 @@ class RenterDossier {
   /// name/photo revealed only after the landlord engages — countering
   /// name/accent-based filtering.
   final bool dataFirstMode;
+
+  /// Server-issued pay-slip OCR verdict, null until a verification ran.
+  final IncomeVerification? incomeVerification;
+
+  /// The income badge is honest only while the verified slip is still the
+  /// attached one — replacing/removing the pay slip voids the verdict.
+  bool get incomeVerified =>
+      incomeVerification?.verified == true && hasDoc(DossierDocType.paySlip);
 
   bool hasDoc(DossierDocType type) => docs.any((d) => d.type == type);
 
@@ -142,6 +199,8 @@ class RenterDossier {
     String? referencePhone,
     String? referenceText,
     bool? dataFirstMode,
+    IncomeVerification? incomeVerification,
+    bool clearIncomeVerification = false,
   }) =>
       RenterDossier(
         docs: docs ?? this.docs,
@@ -151,14 +210,20 @@ class RenterDossier {
         referencePhone: referencePhone ?? this.referencePhone,
         referenceText: referenceText ?? this.referenceText,
         dataFirstMode: dataFirstMode ?? this.dataFirstMode,
+        incomeVerification: clearIncomeVerification
+            ? null
+            : (incomeVerification ?? this.incomeVerification),
       );
 
+  // Replacing or removing the pay slip VOIDS a prior income verification —
+  // the verdict belongs to the exact slip it was issued against.
   RenterDossier withDoc(DossierDoc doc) => copyWith(
         docs: [
           for (final d in docs)
             if (d.type != doc.type) d,
           doc,
         ],
+        clearIncomeVerification: doc.type == DossierDocType.paySlip,
       );
 
   RenterDossier withoutDoc(DossierDocType type) => copyWith(
@@ -166,6 +231,7 @@ class RenterDossier {
           for (final d in docs)
             if (d.type != type) d,
         ],
+        clearIncomeVerification: type == DossierDocType.paySlip,
       );
 
   Map<String, dynamic> toJson() => {
@@ -179,6 +245,8 @@ class RenterDossier {
         if (referenceText.trim().isNotEmpty)
           'referenceText': referenceText.trim(),
         'dataFirstMode': dataFirstMode,
+        if (incomeVerification != null)
+          'incomeVerification': incomeVerification!.toJson(),
       };
 
   static RenterDossier fromJson(Map<dynamic, dynamic>? json) {
@@ -200,6 +268,10 @@ class RenterDossier {
       referencePhone: json['referencePhone']?.toString() ?? '',
       referenceText: json['referenceText']?.toString() ?? '',
       dataFirstMode: json['dataFirstMode'] == true,
+      incomeVerification: json['incomeVerification'] is Map
+          ? IncomeVerification.fromJson(
+              json['incomeVerification'] as Map<dynamic, dynamic>)
+          : null,
     );
   }
 }

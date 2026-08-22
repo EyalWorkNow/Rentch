@@ -2988,6 +2988,32 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Real income verification: the BACKEND OCR-reads the uploaded pay slip
+  /// (POST /dossier/verify-income) and issues the verdict — the client only
+  /// stores it. Returns the verification (verified or not), or null when the
+  /// call itself failed (offline / server error) so the UI can distinguish
+  /// "didn't match" from "couldn't check".
+  Future<IncomeVerification?> verifyDossierIncome() async {
+    final slip = _renterDossier.docOf(DossierDocType.paySlip);
+    final declared = _tenantProfile?.monthlyIncome ?? 0;
+    if (slip == null || declared <= 0) return null;
+    try {
+      final res = await AwsApiClient.instance.post('/dossier/verify-income', {
+        'imageUrl': slip.url,
+        'declaredIncome': declared,
+      });
+      final v = IncomeVerification.fromJson(res);
+      if (v == null) return null;
+      _renterDossier = _renterDossier.copyWith(incomeVerification: v);
+      await _persist();
+      notifyListeners();
+      return v;
+    } catch (e) {
+      if (kDebugMode) debugPrint('verifyDossierIncome: $e');
+      return null;
+    }
+  }
+
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
     // Engine relevance folds in the profile (budget/rooms/persona), so a profile
@@ -4012,6 +4038,7 @@ class DatingProvider extends ChangeNotifier {
           _renterDossier.docs.isEmpty ? null : _renterDossier.docTypeKeys,
       dossierDataFirst: _renterDossier.dataFirstMode ? true : null,
       dossierReference: _renterDossier.hasReference ? true : null,
+      dossierIncomeVerified: _renterDossier.incomeVerified ? true : null,
       religiousLifestyle: tp?.religiousLifestyle,
       shabbatObservant: tp?.shabbatObservant,
       keepsKosher: tp?.keepsKosher,

@@ -32,6 +32,7 @@ class _RenterDossierScreenState extends State<RenterDossierScreen> {
   late final TextEditingController _refText;
 
   DossierDocType? _uploading; // the tile currently mid-upload (spinner)
+  bool _verifyingIncome = false;
 
   DatingProvider get _provider => context.read<DatingProvider>();
   RenterDossier get _dossier => _provider.renterDossier;
@@ -111,6 +112,27 @@ class _RenterDossierScreenState extends State<RenterDossierScreen> {
         SnackBar(content: Text(l10n.dossierUploadFailed)),
       );
     }
+  }
+
+  Future<void> _verifyIncome() async {
+    final l10n = AppLocalizations.of(context);
+    // Fold any just-typed income into the profile first, so the server checks
+    // against what the user actually sees on screen.
+    final typed = int.tryParse(_income.text.trim());
+    final tp = _provider.tenantProfile;
+    if (tp != null && typed != null && typed > 0 && typed != tp.monthlyIncome) {
+      await _provider.updateTenantProfile(tp.copyWith(monthlyIncome: typed));
+    }
+    setState(() => _verifyingIncome = true);
+    final v = await _provider.verifyDossierIncome();
+    if (!mounted) return;
+    setState(() => _verifyingIncome = false);
+    if (v == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.dossierVerifyFailed)),
+      );
+    }
+    // Verified / mismatch states render from the stored verdict (see build).
   }
 
   Future<void> _viewDoc(DossierDoc doc) async {
@@ -245,6 +267,10 @@ class _RenterDossierScreenState extends State<RenterDossierScreen> {
                 _docTile(l10n, dossier, t),
               ],
             ]),
+            const SizedBox(height: 10),
+
+            // ── real income verification (server OCR on the pay slip) ──────
+            _incomeVerificationCard(l10n, provider, dossier),
             const SizedBox(height: 14),
 
             // ── previous landlord reference ────────────────────────────────
@@ -301,6 +327,85 @@ class _RenterDossierScreenState extends State<RenterDossierScreen> {
         ),
       ),
     );
+  }
+
+  /// The "אימות הכנסה" block under the documents: real verification — the
+  /// backend OCR-reads the attached pay slip and compares it to the declared
+  /// income; only ITS verdict lights the badge. Renders one of four states:
+  /// prerequisites missing / ready to verify / verified / mismatch.
+  Widget _incomeVerificationCard(
+      AppLocalizations l10n, DatingProvider provider, RenterDossier dossier) {
+    final hasSlip = dossier.hasDoc(DossierDocType.paySlip);
+    final declared = provider.tenantProfile?.monthlyIncome ?? 0;
+    final typed = int.tryParse(_income.text.trim()) ?? 0;
+    final hasIncome = declared > 0 || typed > 0;
+    final v = dossier.incomeVerification;
+
+    if (dossier.incomeVerified && v != null) {
+      return _card(children: [
+        Row(children: [
+          Icon(IconsaxPlusLinear.verify, size: 20, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.dossierIncomeVerifiedBadge,
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primaryDark)),
+                  if (v.grossMonthly != null)
+                    Text(
+                        '₪${v.grossMonthly}'
+                        '${v.period.isEmpty ? '' : ' · ${v.period}'}'
+                        '${v.employerName.isEmpty ? '' : ' · ${v.employerName}'}',
+                        style: const TextStyle(
+                            fontSize: 12.5, color: AppColors.textSecondary)),
+                ]),
+          ),
+        ]),
+      ]);
+    }
+
+    final mismatch = v != null && !v.verified && hasSlip;
+    return _card(children: [
+      if (mismatch)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            v.grossMonthly != null
+                ? '${l10n.dossierIncomeMismatch} (₪${v.grossMonthly})'
+                : l10n.dossierIncomeMismatch,
+            style: const TextStyle(
+                fontSize: 12.5, height: 1.4, color: AppColors.textSecondary),
+          ),
+        ),
+      if (!hasSlip || !hasIncome)
+        Text(l10n.dossierVerifyNeeds,
+            style: const TextStyle(
+                fontSize: 12.5, color: AppColors.textSecondary))
+      else
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: _verifyingIncome ? null : _verifyIncome,
+          icon: _verifyingIncome
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(IconsaxPlusLinear.scan, size: 17),
+          label: Text(l10n.dossierVerifyIncomeButton,
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w800)),
+        ),
+    ]);
   }
 
   Widget _docTile(AppLocalizations l10n, RenterDossier dossier, DossierDocType t) {

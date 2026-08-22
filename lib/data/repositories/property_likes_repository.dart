@@ -43,6 +43,7 @@ class PropertyLike {
     this.dossierDocTypes,
     this.dossierDataFirst,
     this.dossierReference,
+    this.dossierIncomeVerified,
   });
 
   final String propertyId;
@@ -110,6 +111,10 @@ class PropertyLike {
   final List<String>? dossierDocTypes;
   final bool? dossierDataFirst;
   final bool? dossierReference;
+
+  /// Server-verified: the pay slip was OCR-read and matched the declared
+  /// income. Only the backend can set this on the tenant's dossier.
+  final bool? dossierIncomeVerified;
 
   bool get hasIntro =>
       introMessage.isNotEmpty ||
@@ -190,6 +195,7 @@ class PropertyLike {
           : null,
       dossierDataFirst: _bool(row['dossierDataFirst']),
       dossierReference: _bool(row['dossierReference']),
+      dossierIncomeVerified: _bool(row['dossierIncomeVerified']),
     );
   }
 }
@@ -262,6 +268,7 @@ class PropertyLikesRepository {
     List<String>? dossierDocTypes,
     bool? dossierDataFirst,
     bool? dossierReference,
+    bool? dossierIncomeVerified,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     try {
@@ -306,6 +313,7 @@ class PropertyLikesRepository {
           dossierDocTypes: dossierDocTypes,
           dossierDataFirst: dossierDataFirst,
           dossierReference: dossierReference,
+          dossierIncomeVerified: dossierIncomeVerified,
         ),
       );
     } catch (e) {
@@ -357,6 +365,7 @@ class PropertyLikesRepository {
     List<String>? dossierDocTypes,
     bool? dossierDataFirst,
     bool? dossierReference,
+    bool? dossierIncomeVerified,
   }) {
     final note = introMessage.trim();
     final clampedNote = note.length > introMessageMaxLength
@@ -410,6 +419,8 @@ class PropertyLikesRepository {
         'dossierDocTypes': dossierDocTypes,
       if (dossierDataFirst != null) 'dossierDataFirst': dossierDataFirst,
       if (dossierReference != null) 'dossierReference': dossierReference,
+      if (dossierIncomeVerified != null)
+        'dossierIncomeVerified': dossierIncomeVerified,
       'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
     };
   }

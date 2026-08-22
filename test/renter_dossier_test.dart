@@ -70,6 +70,28 @@ void main() {
     expect(full.completeness(profile), closeTo(1.0, 0.001));
   });
 
+  test('income verification: badge honest, voided when the slip changes', () {
+    final v = IncomeVerification(
+        verified: true, verifiedAt: DateTime.utc(2026, 8, 23), grossMonthly: 12100);
+    final d = const RenterDossier().withDoc(doc).copyWith(incomeVerification: v);
+    expect(d.incomeVerified, isTrue);
+    // Round-trips through json.
+    expect(RenterDossier.fromJson(d.toJson()).incomeVerified, isTrue);
+    // Removing the slip voids the badge even though the verdict object rode
+    // along — and replacing the slip clears the verdict entirely.
+    expect(d.withoutDoc(DossierDocType.paySlip).incomeVerified, isFalse);
+    final replaced = d.withDoc(DossierDoc(
+        type: DossierDocType.paySlip,
+        url: 'https://s3/other.jpg',
+        uploadedAt: DateTime.utc(2026, 8, 3)));
+    expect(replaced.incomeVerification, isNull);
+    // A negative verdict never lights the badge.
+    final failed = d.copyWith(
+        incomeVerification: IncomeVerification(
+            verified: false, verifiedAt: DateTime.utc(2026, 8, 23)));
+    expect(failed.incomeVerified, isFalse);
+  });
+
   test('lead payload carries doc-type keys and flags — never URLs', () {
     final body = PropertyLikesRepository.buildAddLikeBody(
       propertyId: 'p1',

@@ -620,6 +620,7 @@ class _LeadCard extends StatefulWidget {
   bool get dossierDataFirst => liker?.dossierDataFirst ?? false;
   int get dossierDocCount => liker?.dossierDocTypes?.length ?? 0;
   bool get dossierHasReference => liker?.dossierReference ?? false;
+  bool get dossierIncomeVerified => liker?.dossierIncomeVerified ?? false;
 
   /// The candidate's interest intent (from their urgency token), or null.
   String? get displayUrgency => _hasLiker ? liker!.urgency : tenant.urgency;
@@ -747,7 +748,13 @@ class _LeadCardState extends State<_LeadCard> {
     }
     final income = widget.displayIncome;
     if (income != null) {
-      facts.add(_Fact(IconsaxPlusLinear.money_recive, l10n.exploreScreen07bf27d4, _fmt(income)));
+      facts.add(_Fact(
+          IconsaxPlusLinear.money_recive,
+          l10n.exploreScreen07bf27d4,
+          // Server-verified against the OCR-read pay slip → say so inline.
+          widget.dossierIncomeVerified
+              ? '${_fmt(income)} · ${l10n.leadIncomeVerified}'
+              : _fmt(income)));
     }
     final lifestyle = <String>[
       if (widget.displayHasCar == true) l10n.exploreScreen7f1643b2,

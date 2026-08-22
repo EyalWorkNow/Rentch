@@ -11838,6 +11838,26 @@ class AppLocalizationsHe extends AppLocalizations {
       'התיק עדיין ריק — צרפו מסמכים בתיק השוכר קודם';
 
   @override
+  String get dossierVerifyIncomeButton => 'אימות הכנסה מול התלוש';
+
+  @override
+  String get dossierIncomeVerifiedBadge => 'הכנסה מאומתת מול תלוש השכר ✓';
+
+  @override
+  String get dossierIncomeMismatch =>
+      'התלוש שנקרא לא תואם את ההכנסה שהוצהרה — עדכנו את ההכנסה או צרפו תלוש עדכני';
+
+  @override
+  String get dossierVerifyNeeds =>
+      'כדי לאמת: צרפו תלוש שכר והזינו הכנסה חודשית';
+
+  @override
+  String get dossierVerifyFailed => 'האימות לא הצליח — בדקו את החיבור ונסו שוב';
+
+  @override
+  String get leadIncomeVerified => 'מאומת ✓';
+
+  @override
   String get dossierUploadFailed => 'העלאת המסמך נכשלה — נסו שוב';
 
   @override

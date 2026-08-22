@@ -20945,6 +20945,42 @@ abstract class AppLocalizations {
   /// **'התיק עדיין ריק — צרפו מסמכים בתיק השוכר קודם'**
   String get dossierShareEmpty;
 
+  /// No description provided for @dossierVerifyIncomeButton.
+  ///
+  /// In he, this message translates to:
+  /// **'אימות הכנסה מול התלוש'**
+  String get dossierVerifyIncomeButton;
+
+  /// No description provided for @dossierIncomeVerifiedBadge.
+  ///
+  /// In he, this message translates to:
+  /// **'הכנסה מאומתת מול תלוש השכר ✓'**
+  String get dossierIncomeVerifiedBadge;
+
+  /// No description provided for @dossierIncomeMismatch.
+  ///
+  /// In he, this message translates to:
+  /// **'התלוש שנקרא לא תואם את ההכנסה שהוצהרה — עדכנו את ההכנסה או צרפו תלוש עדכני'**
+  String get dossierIncomeMismatch;
+
+  /// No description provided for @dossierVerifyNeeds.
+  ///
+  /// In he, this message translates to:
+  /// **'כדי לאמת: צרפו תלוש שכר והזינו הכנסה חודשית'**
+  String get dossierVerifyNeeds;
+
+  /// No description provided for @dossierVerifyFailed.
+  ///
+  /// In he, this message translates to:
+  /// **'האימות לא הצליח — בדקו את החיבור ונסו שוב'**
+  String get dossierVerifyFailed;
+
+  /// No description provided for @leadIncomeVerified.
+  ///
+  /// In he, this message translates to:
+  /// **'מאומת ✓'**
+  String get leadIncomeVerified;
+
   /// No description provided for @dossierUploadFailed.
   ///
   /// In he, this message translates to:

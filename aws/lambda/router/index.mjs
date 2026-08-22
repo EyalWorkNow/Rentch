@@ -1614,6 +1614,15 @@ export const handler = async (event) => {
       return await handleAssistant(event);
     }
 
+    // ── תיק שוכר: real income verification (vision OCR on the pay slip) ─────
+    // POST /dossier/verify-income { imageUrl, declaredIncome } → the model
+    // reads the Hebrew תלוש שכר and the SERVER decides the verdict, so the
+    // client can never mint a "verified" badge itself.
+    if (segments[0] === 'dossier' && segments[1] === 'verify-income'
+        && method === 'POST') {
+      return await handleDossierVerifyIncome(event);
+    }
+
     // ── Admin company broadcast ─────────────────────────────────────────────
     // Both routes are gated to the notif-admin user (see callerIsNotifAdmin).
     if (segments[0] === 'admin' && segments[1] === 'broadcast'
@@ -7181,6 +7190,110 @@ async function openaiToolLoop(systemText, messages, uid = null) {
 // OpenAI chat-completion for אתי's warm reply. Plain text, NO tools. Returns the
 // reply string, or null on any failure (unfunded/over-quota/network) so the caller
 // can fall back to Gemini. Isolated from the shared Gemini quota by design.
+// ── תיק שוכר: pay-slip income verification ──────────────────────────────────
+// Vision OCR over the renter's uploaded תלוש שכר. Hebrew pay slips defeat
+// on-device OCR (ML Kit has no Hebrew script), so the multimodal chat model
+// reads the slip and the SERVER issues the verdict: verified only when the
+// image is a real pay slip AND its gross figure is within tolerance of the
+// renter's declared income. The client stores the verdict; it cannot mint one.
+const DOSSIER_INCOME_TOLERANCE = 0.15; // ±15% (bonuses/deductions vary monthly)
+
+function isOwnMediaUrl(url) {
+  // Only OCR images the app itself uploaded (our S3/CloudFront) — never an
+  // arbitrary URL the client points us at.
+  try {
+    const h = new URL(url).hostname;
+    return h.endsWith('.amazonaws.com') || h.endsWith('.cloudfront.net');
+  } catch { return false; }
+}
+
+async function handleDossierVerifyIncome(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!OPENAI_API_KEY) {
+    return json(503, { message: 'Income verification not configured.' });
+  }
+  const body = (() => {
+    try { return event.body ? JSON.parse(event.body) : {}; } catch { return {}; }
+  })();
+  const imageUrl = String(body.imageUrl || '');
+  const declared = Number(body.declaredIncome || 0);
+  if (!isOwnMediaUrl(imageUrl)) {
+    return json(400, { message: 'imageUrl must be an app-uploaded document.' });
+  }
+  if (!(declared > 0)) {
+    return json(400, { message: 'declaredIncome required.' });
+  }
+
+  const sys = [
+    'You read Israeli pay slips (תלוש שכר) in Hebrew. Extract the figures',
+    'EXACTLY as printed — never guess or infer a missing number. Respond with',
+    'ONLY a JSON object, no prose, with keys:',
+    '  is_payslip     boolean — is this actually a pay slip?',
+    '  gross_monthly  number|null — שכר ברוטו / סה"כ תשלומים for the month',
+    '  net_monthly    number|null — נטו לתשלום',
+    '  employer_name  string|null — the employer as printed',
+    '  period         string|null — the salary month as YYYY-MM',
+    '  confidence     number 0..1 — how legible/complete the slip is',
+  ].join('\n');
+
+  let extracted = null;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_CHAT_MODEL,
+        messages: [
+          { role: 'system', content: sys },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Read this pay slip and return the JSON.' },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+        max_completion_tokens: 300,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) {
+      console.warn('dossier ocr', res.status);
+      return json(502, { message: 'Verification model unavailable.' });
+    }
+    const data = await res.json();
+    extracted = JSON.parse(data?.choices?.[0]?.message?.content || '{}');
+  } catch (e) {
+    console.warn('dossier ocr', e.message);
+    return json(502, { message: 'Verification failed.' });
+  }
+
+  const gross = Number(extracted?.gross_monthly || 0);
+  const net = Number(extracted?.net_monthly || 0);
+  const isPayslip = extracted?.is_payslip === true;
+  const confidence = Number(extracted?.confidence || 0);
+  // Declared income is gross by the profile's definition; accept a net match
+  // too (people often quote their net) at the same tolerance.
+  const within = (a, b) => a > 0 && Math.abs(a - b) / b <= DOSSIER_INCOME_TOLERANCE;
+  const verified =
+    isPayslip && confidence >= 0.5 && (within(gross, declared) || within(net, declared));
+
+  return json(200, {
+    verified,
+    isPayslip,
+    grossMonthly: gross > 0 ? Math.round(gross) : null,
+    netMonthly: net > 0 ? Math.round(net) : null,
+    employerName: extracted?.employer_name || null,
+    period: extracted?.period || null,
+    confidence,
+    verifiedAt: new Date().toISOString(),
+  });
+}
+
 async function openaiChat(systemText, messages) {
   if (!OPENAI_API_KEY) return null;
   const chat = messages
