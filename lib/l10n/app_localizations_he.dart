@@ -11876,6 +11876,22 @@ class AppLocalizationsHe extends AppLocalizations {
   String get leadNameHidden => 'מועמד/ת · נתונים לפני שם';
 
   @override
+  String get chatMsgCopy => 'העתקת ההודעה';
+
+  @override
+  String get chatMsgCopied => 'ההודעה הועתקה';
+
+  @override
+  String get chatMsgEdit => 'עריכת ההודעה';
+
+  @override
+  String get chatMsgEditHint => 'ההודעה תוחלף והתשובות שאחריה יחושבו מחדש';
+
+  @override
+  String get chatMsgEditingBanner =>
+      'עריכת הודעה — שליחה תחליף אותה ותחשב מחדש';
+
+  @override
   String get leadNameRevealHint => 'השם והתמונה ייחשפו לאחר אישור המועמדות';
 
   @override

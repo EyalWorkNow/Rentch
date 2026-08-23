@@ -21011,6 +21011,36 @@ abstract class AppLocalizations {
   /// **'מועמד/ת · נתונים לפני שם'**
   String get leadNameHidden;
 
+  /// No description provided for @chatMsgCopy.
+  ///
+  /// In he, this message translates to:
+  /// **'העתקת ההודעה'**
+  String get chatMsgCopy;
+
+  /// No description provided for @chatMsgCopied.
+  ///
+  /// In he, this message translates to:
+  /// **'ההודעה הועתקה'**
+  String get chatMsgCopied;
+
+  /// No description provided for @chatMsgEdit.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכת ההודעה'**
+  String get chatMsgEdit;
+
+  /// No description provided for @chatMsgEditHint.
+  ///
+  /// In he, this message translates to:
+  /// **'ההודעה תוחלף והתשובות שאחריה יחושבו מחדש'**
+  String get chatMsgEditHint;
+
+  /// No description provided for @chatMsgEditingBanner.
+  ///
+  /// In he, this message translates to:
+  /// **'עריכת הודעה — שליחה תחליף אותה ותחשב מחדש'**
+  String get chatMsgEditingBanner;
+
   /// No description provided for @leadNameRevealHint.
   ///
   /// In he, this message translates to:

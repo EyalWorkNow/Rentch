@@ -11999,6 +11999,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get leadNameHidden => 'مرشّح · البيانات قبل الاسم';
 
   @override
+  String get chatMsgCopy => 'نسخ الرسالة';
+
+  @override
+  String get chatMsgCopied => 'تم نسخ الرسالة';
+
+  @override
+  String get chatMsgEdit => 'تعديل الرسالة';
+
+  @override
+  String get chatMsgEditHint =>
+      'سيتم استبدال الرسالة وإعادة حساب الإجابات التالية';
+
+  @override
+  String get chatMsgEditingBanner =>
+      'تعديل رسالة — الإرسال يستبدلها ويعيد الحساب';
+
+  @override
   String get leadNameRevealHint => 'يُكشف الاسم والصورة بعد موافقتك على الطلب';
 
   @override

@@ -12280,6 +12280,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get leadNameHidden => 'Candidat · les données avant le nom';
 
   @override
+  String get chatMsgCopy => 'Copier le message';
+
+  @override
+  String get chatMsgCopied => 'Message copié';
+
+  @override
+  String get chatMsgEdit => 'Modifier le message';
+
+  @override
+  String get chatMsgEditHint =>
+      'Le message sera remplacé et les réponses suivantes recalculées';
+
+  @override
+  String get chatMsgEditingBanner =>
+      'Modification — l\'envoi remplace le message et recalcule';
+
+  @override
   String get leadNameRevealHint =>
       'Le nom et la photo sont révélés une fois la candidature approuvée';
 

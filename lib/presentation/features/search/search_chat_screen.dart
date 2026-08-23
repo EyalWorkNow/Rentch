@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
@@ -82,6 +84,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   final _repo = PropertySearchRepository();
   final _history = SearchHistoryRepository();
   final _input = TextEditingController();
+
+  // The user message currently being edited (long-press → עריכה). Sending
+  // while set REPLACES that message: it and every later message are removed
+  // and the corrected text runs through the normal send pipeline, so the
+  // answers after it are recomputed.
+  _ChatMsg? _editingMsg;
   final _scroll = ScrollController();
 
   final List<_ChatMsg> _messages = [];
@@ -1293,6 +1301,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
     final l10n = AppLocalizations.of(context)!;
     final provider = context.read<DatingProvider>();
+
+    // Editing an earlier message: drop it and everything after, then run the
+    // corrected text through the normal pipeline so the answers regenerate.
+    // (The accumulated query state stays — the send's own merge lets the
+    // corrected numbers/criteria override the old ones.)
+    final editing = _editingMsg;
+    if (editing != null) {
+      final idx = _messages.indexOf(editing);
+      if (idx >= 0) _messages.removeRange(idx, _messages.length);
+      _editingMsg = null;
+    }
 
     setState(() {
       _messages.add(_ChatMsg(role: 'user', text: text));
@@ -2551,6 +2570,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final topInset = MediaQuery.of(context).padding.top;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Directionality(
       textDirection: Directionality.of(context),
@@ -2571,7 +2591,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                     12,
                     topInset + 145,
                     12,
-                    90,
+                    95 + bottomInset,
                   ),
                   itemCount: _messages.length + (_busy ? 1 : 0),
                   itemBuilder: (_, i) {
@@ -2583,7 +2603,31 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 ),
               ),
             ),
-            // Layer 2: Floating Header Controls Overlay
+            // Layer 2: Subtle Top Gradient Overlay (fades content into page background color at top)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: topInset + 150,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.cloud,
+                        AppColors.cloud.withValues(alpha: 0.85),
+                        AppColors.cloud.withValues(alpha: 0.4),
+                        AppColors.cloud.withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.4, 0.75, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Layer 3: Floating Header Controls Overlay
             Positioned(
               top: 0,
               left: 0,
@@ -2608,7 +2652,31 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 ),
               ),
             ),
-            // Layer 3: Bottom Input Bar Overlay
+            // Layer 4: Subtle Bottom Gradient Overlay (fades content into page background color at bottom)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: bottomInset + 90,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        AppColors.cloud,
+                        AppColors.cloud.withValues(alpha: 0.85),
+                        AppColors.cloud.withValues(alpha: 0.4),
+                        AppColors.cloud.withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.4, 0.75, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Layer 5: Bottom Input Bar Overlay
             Positioned(
               bottom: 0,
               left: 0,
@@ -2630,7 +2698,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (m.text.isNotEmpty)
-            Container(
+            GestureDetector(
+              onLongPress: () => _showMsgActions(m),
+              child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
               padding: const EdgeInsets.all(14),
               constraints: BoxConstraints(
@@ -2659,6 +2729,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                           : AppColors.textPrimary,
                       fontSize: 15,
                       height: 1.45)),
+              ),
             ),
           if (m.scored.isNotEmpty) _resultList(m),
           if (m.whatIfs.isNotEmpty) _whatIfRow(m.whatIfs),
@@ -2830,13 +2901,105 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
+  // Long-press actions on a chat bubble: copy (any message), edit (own only).
+  Future<void> _showMsgActions(_ChatMsg m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final isUser = m.role == 'user';
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+                color: AppColors.borderLight,
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 6),
+          ListTile(
+            leading: Icon(IconsaxPlusLinear.copy, color: AppColors.primary),
+            title: Text(l10n.chatMsgCopy,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            onTap: () async {
+              Navigator.pop(ctx);
+              await Clipboard.setData(ClipboardData(text: m.text));
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  duration: const Duration(milliseconds: 1500),
+                  content: Text(l10n.chatMsgCopied)));
+            },
+          ),
+          if (isUser)
+            ListTile(
+              leading: Icon(IconsaxPlusLinear.edit_2, color: AppColors.primary),
+              title: Text(l10n.chatMsgEdit,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(l10n.chatMsgEditHint,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _editingMsg = m;
+                  _input.text = m.text;
+                  _input.selection = TextSelection.collapsed(
+                      offset: _input.text.length);
+                });
+              },
+            ),
+          const SizedBox(height: 6),
+        ]),
+      ),
+    );
+  }
+
   Widget _inputBar() {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       top: false,
       // Floating, rounded, detached ≥13px from every edge.
       child: Padding(
         padding: const EdgeInsets.fromLTRB(13, 6, 13, 13),
-        child: Container(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // Editing banner — makes the replace-and-regenerate behavior visible
+          // and cancelable before sending.
+          if (_editingMsg != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(children: [
+                Icon(IconsaxPlusLinear.edit_2,
+                    size: 15, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(l10n.chatMsgEditingBanner,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryDark)),
+                ),
+                InkWell(
+                  onTap: () => setState(() {
+                    _editingMsg = null;
+                    _input.clear();
+                  }),
+                  child: const Icon(Icons.close_rounded,
+                      size: 17, color: AppColors.textSecondary),
+                ),
+              ]),
+            ),
+          Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
@@ -2908,6 +3071,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             ],
           ),
         ),
+        ]),
       ),
     );
   }
