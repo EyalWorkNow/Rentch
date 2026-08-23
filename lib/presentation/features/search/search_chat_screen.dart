@@ -2698,13 +2698,70 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (m.text.isNotEmpty)
-            GestureDetector(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // RTL row: first child renders rightmost. User bubble hugs the
+                // right edge with its action icons on the inner (left) side;
+                // the assistant bubble hugs the left with icons on ITS inner
+                // (right) side — so icons always sit beside the bubble.
+                if (isUser) _bubbleBody(m, isUser) else _msgIcons(m, isUser),
+                if (isUser) _msgIcons(m, isUser) else _bubbleBody(m, isUser),
+              ],
+            ),
+          if (m.scored.isNotEmpty) _resultList(m),
+          if (m.whatIfs.isNotEmpty) _whatIfRow(m.whatIfs),
+          if (m.chips.isNotEmpty) _chipsRow(m.chips),
+          if (m.isConsent) _consentButtons(),
+          if (m.locationRequest) _locationButtons(),
+        ],
+      ),
+    );
+  }
+
+  /// The tiny action icons beside a bubble: edit (own messages) + copy.
+  Widget _msgIcons(_ChatMsg m, bool isUser) {
+    Widget btn(IconData icon, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Icon(icon, size: 15, color: AppColors.textSecondary),
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (isUser)
+          btn(IconsaxPlusLinear.edit_2, () {
+            setState(() {
+              _editingMsg = m;
+              _input.text = m.text;
+              _input.selection =
+                  TextSelection.collapsed(offset: _input.text.length);
+            });
+          }),
+        btn(IconsaxPlusLinear.copy, () async {
+          await Clipboard.setData(ClipboardData(text: m.text));
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              duration: const Duration(milliseconds: 1500),
+              content: Text(AppLocalizations.of(context)!.chatMsgCopied)));
+        }),
+      ]),
+    );
+  }
+
+  Widget _bubbleBody(_ChatMsg m, bool isUser) {
+    return Flexible(
+      child: GestureDetector(
               onLongPress: () => _showMsgActions(m),
               child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
               padding: const EdgeInsets.all(14),
               constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.82),
+                  maxWidth: MediaQuery.of(context).size.width * 0.74),
               decoration: BoxDecoration(
                 color: isUser ? AppColors.primary : Colors.white,
                 borderRadius: BorderRadius.only(
@@ -2731,13 +2788,6 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       height: 1.45)),
               ),
             ),
-          if (m.scored.isNotEmpty) _resultList(m),
-          if (m.whatIfs.isNotEmpty) _whatIfRow(m.whatIfs),
-          if (m.chips.isNotEmpty) _chipsRow(m.chips),
-          if (m.isConsent) _consentButtons(),
-          if (m.locationRequest) _locationButtons(),
-        ],
-      ),
     );
   }
 
