@@ -464,30 +464,6 @@ class ProfileScreen extends StatelessWidget {
                                       : AppColors.slate400,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                key: const Key('profile_edit_button'),
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        EditProfileScreen(profile: profile),
-                                  ),
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: AppColors.slate200),
-                                  ),
-                                  child: const RentlyIcon(
-                                    IconsaxPlusLinear.edit_2,
-                                    size: 14,
-                                    color: AppColors.slate900,
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -497,6 +473,51 @@ class ProfileScreen extends StatelessWidget {
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.slate500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          InkWell(
+                            key: const Key('profile_edit_button'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditProfileScreen(profile: profile),
+                              ),
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(color: AppColors.primary, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.12),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  RentlyIcon(
+                                    IconsaxPlusLinear.edit_2,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'עריכת פרופיל',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -1907,6 +1928,17 @@ class _LandlordProfileScreen extends StatelessWidget {
                   builder: (_) => _SettingsSubPage(
                     title: (l10n) => l10n.profileScreen47cfdefb,
                     items: [
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.user_edit,
+                        title: (l10n) => 'עריכת פרטי משתמש',
+                        subtitle: (l10n) => 'עדכון שם, גיל, תמונה והעדפות פרופיל',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            settings: const RouteSettings(name: 'EditProfileScreen'),
+                            builder: (_) => EditProfileScreen(profile: profile),
+                          ),
+                        ),
+                      ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.notification,
                         title: (l10n) => l10n.profileScreen48918f07,
@@ -3820,36 +3852,43 @@ class _PreferenceTile extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(width: 16),
-            Flexible(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.slate900,
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate900,
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Flexible(
+              flex: 4,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: isEmpty
                       ? AppColors.primary.withValues(alpha: 0.08)
                       : AppColors.slate100,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: isEmpty ? AppColors.primary : AppColors.slate600,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isEmpty ? AppColors.primary : AppColors.slate600,
+                    ),
                   ),
                 ),
               ),

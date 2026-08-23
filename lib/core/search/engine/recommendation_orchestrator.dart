@@ -196,6 +196,11 @@ class Explainer {
     'family': 'אזור משפחתי',
     'health': 'נגישות בריאות',
     'coast': 'קרבה לים',
+    'park': 'קרבה לפארק',
+    'religious_area': 'קהילה דתית',
+    'school_young': 'גנים ויסודי בקרבת מקום',
+    'school_teen': 'חטיבה ותיכון בקרבת מקום',
+    'nightlife': 'חיי לילה ובילוי',
     'yield': 'תשואה להשקעה',
     'university': 'קרבה לאוניברסיטה',
     'young_area': 'אזור צעיר ותוסס',
@@ -1058,7 +1063,9 @@ class RecommendationEngine {
         if (maxP != null && maxP > 0 && p.price > maxP) return false;
         if (nearSeaStated) {
           final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
-          if (km == null || km > 5.0) return false;
+          // Same 4km cutoff as the primary near-sea gate — the backfill used
+          // 5.0, quietly admitting flats the gate had just excluded.
+          if (km == null || km > SearchIntent.notFarFromSeaKm) return false;
         }
         return true;
       }).toList();
@@ -1280,9 +1287,12 @@ class RecommendationEngine {
     return ScorecardDimension(
       key: kCommuteDimensionKey,
       label: 'מרחק מהעבודה',
-      // Importance is owned by the preference model; this axis is informational,
-      // so it carries no model weight (it never re-ranks, only explains).
-      weightPct: 0.0,
+      // The tenant SAVED a work address — that's a stated priority, and both
+      // ranking surfaces now genuinely reorder by it (the ×1.30 boost in
+      // recommend() and the bounded boost in relevance()). Displaying 0%
+      // importance next to a re-ranking factor was dishonest; show the real
+      // effective share the commute boost carries.
+      weightPct: 0.12,
       contributionPct: score,
       stat: est.plainHebrewLabel,
       source: GovSources.labelFor(kCommuteDimensionKey),
@@ -1684,6 +1694,10 @@ class RecommendationEngine {
     required SearchQuery query,
     TenantProfile? profile,
     List<RentalProperty>? marketSource,
+    // The per-user FTRL model. Without it every deck rank built a COLD learner
+    // (confidence 0 → learner component weight 0), so months of swipe training
+    // never influenced the surface that generated the training data.
+    OnlineLogisticLearner? learner,
   }) {
     if (candidates.isEmpty) return const {};
     // Baseline over the transaction-consistent slice of the market source (never
@@ -1698,7 +1712,7 @@ class RecommendationEngine {
     final market =
         MarketContext.analyzeCached(seg.length >= 8 ? seg : candidates);
     final model = PreferenceModelBuilder.build(
-        query: query, profile: profile, market: market);
+        query: query, profile: profile, market: market, learner: learner);
     final ranked = RankingEngine.rank(
       [for (final p in candidates) _engineerCached(p, market)],
       model,
@@ -1707,7 +1721,23 @@ class RecommendationEngine {
     // as "how well this satisfies what you asked for" on a percentage-like band,
     // which is what a caller wants to display AND what keeps a caller's own ±
     // deltas (calibrated against that band) meaningful.
-    return {for (final c in ranked) c.property.id: _statedMatch(c, model)};
+    final out = {for (final c in ranked) c.property.id: _statedMatch(c, model)};
+    // COMMUTE on the DECK: the tenant's saved work location used to reorder
+    // only the chat surface — the main feed ignored it entirely. A bounded
+    // additive proximity boost (≤ +0.12 for a flat AT the workplace, ~0 by
+    // ~18 km) keeps the 0..1 fit band intact while genuinely reordering.
+    final workLat = profile?.workLat, workLon = profile?.workLon;
+    if (workLat != null && workLon != null &&
+        workLat.abs() > 0.1 && workLon.abs() > 0.1) {
+      for (final c in ranked) {
+        final km = _km(c.property.lat, c.property.lon, workLat, workLon);
+        if (!km.isFinite) continue;
+        final prox = math.exp(-km / 6.0);
+        final id = c.property.id;
+        out[id] = ((out[id] ?? 0) + 0.12 * prox).clamp(0.0, 1.0);
+      }
+    }
+    return out;
   }
 
   /// Adapter: run the pipeline and return results as the legacy [ScoredProperty]

@@ -148,6 +148,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       // fields below carry the intent; only a parsed neighbourhood (which IS in
       // searchableText) is kept as a keyword.
       query: q.neighborhood ?? '',
+      // The FULL sentence rides separately as a scoring-only signal — it wakes
+      // the soft ranking dimensions (quiet/safety/park/…) on the deck without
+      // touching the hard substring filter above.
+      nlQuery: q.rawText,
       city: q.city,
       minBudget: q.minPrice,
       maxBudget: q.maxPrice,

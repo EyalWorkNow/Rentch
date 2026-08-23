@@ -41,8 +41,11 @@ void main() {
     expect(q.weights['near_sea'], closeTo(1.0, 0.01)); // 2.0 → max
     expect(q.weights['central'], closeTo(1.0, 0.01)); // 1.8 → super-linear ≈1.0
     expect(q.weights['transit'], closeTo(0.2, 0.01)); // 1.2 → linear 0.2
-    // size: −1.0 (undesired) → not weighted (deprioritised, not a veto).
-    expect(q.weights.containsKey('size'), false);
+    // size: −1.0 ("willing to sacrifice size") → a small EXPLICIT
+    // de-prioritisation (~0.03) that REPLACES the default weight. It used to
+    // be dropped entirely, making "sacrifice X for Y" indistinguishable from
+    // never mentioning X.
+    expect(q.weights['size'], closeTo(0.03, 0.01));
     // near_sea is a spatial intent → the near-sea gate will fire.
     expect(q.intents.contains('near_sea'), true);
   });

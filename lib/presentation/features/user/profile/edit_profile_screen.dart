@@ -136,6 +136,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _bioCtrl;
   late final TextEditingController _incomeCtrl;
   late final TextEditingController _workAddressCtrl;
+  late final TextEditingController _ageCtrl;
   late int _budget;
   late double _rooms;
   late String _moveIn;
@@ -184,6 +185,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _incomeCtrl = TextEditingController(
       text: p.monthlyIncome == null ? '' : p.monthlyIncome.toString(),
     );
+    _ageCtrl = TextEditingController(
+      text: p.age == null ? '' : p.age.toString(),
+    );
     // We persist only the geocoded coords (not the typed string), so on reopen
     // the field starts empty but the stored coords remain unless re-edited.
     _workAddressCtrl = TextEditingController();
@@ -229,6 +233,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _bioCtrl.dispose();
     _incomeCtrl.dispose();
     _workAddressCtrl.dispose();
+    _ageCtrl.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -1615,7 +1620,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Age — stepper; backs minAge/maxAge on the gate.
+                          // Age — free manual text input; backs minAge/maxAge on the gate.
                           Row(
                             children: [
                               Expanded(
@@ -1630,14 +1635,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              _AgeStepper(
-                                value: _age,
-                                min: 18,
-                                max: 99,
-                                onChanged: (v) {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _age = v);
-                                },
+                              SizedBox(
+                                width: 100,
+                                height: 42,
+                                child: TextField(
+                                  controller: _ageCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(2),
+                                  ],
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'למשל: 25',
+                                    hintStyle: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textSecondary.withValues(alpha: 0.6),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    filled: true,
+                                    fillColor: AppColors.cloud,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: AppColors.borderLight),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: AppColors.borderLight),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    final parsed = int.tryParse(val.trim());
+                                    setState(() {
+                                      _age = parsed;
+                                    });
+                                  },
+                                ),
                               ),
                             ],
                           ),

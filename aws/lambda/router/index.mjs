@@ -1603,10 +1603,14 @@ export const handler = async (event) => {
       if (segments[1] === 'realtime' && segments[2] === 'session') {
         return await createRealtimeSession(event);
       }
-      // POST /assistant/extract → the ONLY model call in the cost-optimised
-      // listing flow: pull structured property fields out of a free-text
-      // description + report which required fields are still missing.
-      if (segments[1] === 'extract') return await handleAssistantExtract(event);
+      // POST /assistant/extract-fields → the ONLY model call in the cost-
+      // optimised listing flow: pull structured property fields out of a
+      // free-text description + report which required fields are still
+      // missing. (Was registered as 'extract' — a DEAD duplicate of the Etti
+      // route above, unreachable and a live trap for the landlord flow.)
+      if (segments[1] === 'extract-fields') {
+        return await handleAssistantExtract(event);
+      }
       // POST /assistant/explain → data-grounded explainer: takes the engine's
       // Scorecards + persona and writes a warm "how I chose" + per-property
       // "why this one, by the numbers", grounded strictly in the supplied figures.
@@ -6605,6 +6609,15 @@ async function handleMatchLeads(event) {
       budgetMax: Number(tp.budgetMax) || 0,
       price: Number(property.price) || 0,
       tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys,
+      // תיק שוכר + urgency — carried on the LIKE row itself.
+      dossier: {
+        incomeVerified: like.dossierIncomeVerified === true,
+        docCount: Array.isArray(like.dossierDocTypes)
+          ? like.dossierDocTypes.length : 0,
+        reference: like.dossierReference === true,
+        guarantor: like.hasGuarantor === true,
+        urgency: typeof like.urgency === 'string' ? like.urgency : '',
+      },
     });
 
     leads.push({
@@ -6637,10 +6650,22 @@ const MATCH_W = {
   conflictPenalty: 28,     // per unmet deal-breaker on the standalone fit
 };
 
-function scoreLandlordToTenant({ budgetMax, price, tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys }) {
+function scoreLandlordToTenant({ budgetMax, price, tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys, dossier }) {
   let fit = 60;
   const reasons = [];
   const conflicts = [];
+
+  // תיק שוכר: substantiated trust genuinely sorts a candidate up — these were
+  // display-only chips while ranking ignored them. Bounded (+13 max) so real
+  // budget/requirement fit still dominates. Urgency is a small tiebreaker.
+  if (dossier) {
+    if (dossier.incomeVerified) { fit += 7; reasons.push('הכנסה מאומתת מול תלוש'); }
+    if (dossier.docCount > 0) fit += Math.min(3, dossier.docCount);
+    if (dossier.reference) { fit += 2; reasons.push('המלצת משכיר קודם'); }
+    if (dossier.guarantor) fit += 1;
+    if (dossier.urgency === 'now') fit += 3;
+    else if (dossier.urgency === 'soon') fit += 1;
+  }
 
   if (budgetMax > 0 && price > 0) {
     const ratio = budgetMax / price;
@@ -7469,9 +7494,21 @@ async function geminiTranscribe(bytes, mime) {
 
 async function handleEttiExtract(event) {
   let query = '';
-  try { query = (JSON.parse(event.body || '{}').query || '').toString(); } catch {}
+  let context = '';
+  try {
+    const body = JSON.parse(event.body || '{}');
+    query = (body.query || '').toString();
+    // Prior user turns (client-truncated). The extractor was fully stateless —
+    // on turn 3 it reasoned about "משהו יותר גדול" with zero knowledge of the
+    // family/budget/city from turns 1-2, so persona + weights were re-derived
+    // from a fragment. Context lets the model reason over the conversation.
+    context = (body.context || '').toString().slice(0, 1200);
+  } catch {}
   if (!query.trim()) return json(400, { error: 'missing query' });
-  const plan = await openaiExtractJson(ETTI_EXTRACT_PROMPT, query);
+  const userMsg = context.trim()
+    ? `הקשר מהשיחה עד כה (בקשות קודמות של המשתמש):\n${context}\n\nההודעה הנוכחית:\n${query}`
+    : query;
+  const plan = await openaiExtractJson(ETTI_EXTRACT_PROMPT, userMsg);
   return json(200, plan || { hard_constraints: {}, soft_weights: {}, inferred_persona: '' });
 }
 
@@ -7646,14 +7683,40 @@ async function createRealtimeSession(event) {
       type: 'object',
       properties: {
         city: { type: 'string', description: 'City or area (Hebrew)' },
+        neighborhood: { type: 'string', description: 'Neighborhood (Hebrew), if named' },
         minRooms: { type: 'number' },
         maxRooms: { type: 'number' },
+        rooms: { type: 'number', description: 'Exact desired rooms when stated' },
+        minPrice: { type: 'number' },
         maxPrice: { type: 'number', description: 'Max monthly rent in ILS' },
+        transactionType: {
+          type: 'string',
+          description: "'rent' (default) or 'sale'",
+        },
         amenities: {
           type: 'array',
           items: { type: 'string' },
           description: 'e.g. elevator, parking, balcony, mamad',
         },
+        features: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'REQUIRED features (hard) — feat_* keys or plain names',
+        },
+        intents: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Lifestyle/spatial intents: near_sea, quiet, central, nightlife, safety, transit, green, accessible, religious_area, good_schools, wfh, student, investment',
+        },
+        weights: {
+          type: 'object',
+          additionalProperties: { type: 'number' },
+          description:
+            'Importance per factor, -1..2 (1 neutral): budget, value, size, transit, safety, schools, family, near_sea, quiet, nightlife, central, luxury, view, spacious…',
+        },
+        notes: { type: 'string', description: 'Free-text nuance worth keeping' },
+        query: { type: 'string', description: 'The user request, verbatim Hebrew' },
         lifestyle: {
           type: 'string',
           description:

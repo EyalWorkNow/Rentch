@@ -719,6 +719,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             final r = await _handleRealtimeSearch(args);
             return (count: r.results.length, summary: r.summary);
           },
+          // Feed each spoken user turn into the SAME conversation state text
+          // messages use — it used to be painted on the live screen and
+          // dropped, so cohort signals, lifestyle rules and cross-turn
+          // constraint memory never saw voice input.
+          onUserUtterance: (utterance) {
+            if (!mounted) return;
+            setState(() => _messages.add(_ChatMsg(role: 'user', text: utterance)));
+            final provider = context.read<DatingProvider>();
+            provider.observeCohortSignals(_cohortSignals());
+          },
         ),
       ));
       _scrollToEnd();
@@ -1133,19 +1143,50 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // Calls the Etti extraction engine and folds its plan into _query. The
   // deterministic _query is passed as the fallback so explicit numbers survive.
+  // The persona Etti inferred on the LAST extract ("young couple, first
+  // apartment, prioritises commute…"). Used to be parsed and thrown away —
+  // now it grounds the "how I chose" explanation alongside the profile tags.
+  String _ettiPersona = '';
+
   Future<void> _ettiEnrich(String text) async {
     try {
-      final resp = await AwsApiClient.instance
-          .post('/assistant/extract', {'query': text}).timeout(
+      // Prior user turns (newest last, current excluded) so the extractor
+      // reasons over the CONVERSATION instead of a single fragment.
+      final priorTurns = [
+        for (final m in _messages)
+          if (m.role == 'user' && m.text.trim().isNotEmpty && m.text != text)
+            m.text.trim(),
+      ];
+      final context = priorTurns.length > 4
+          ? priorTurns.sublist(priorTurns.length - 4).join('\n')
+          : priorTurns.join('\n');
+      final resp = await AwsApiClient.instance.post('/assistant/extract', {
+        'query': text,
+        if (context.isNotEmpty) 'context': context,
+      }).timeout(
         const Duration(seconds: 4),
       );
       final plan = EttiPlan.fromJson(resp);
+      if (plan.persona.trim().isNotEmpty) _ettiPersona = plan.persona.trim();
       // The server enrich ADDS soft signals (persona weights/intents/features)
       // and fills gaps — but the deterministic on-device parse stays AUTHORITATIVE
       // for the explicit hard constraints the user actually typed. Re-overlaying
       // _query keeps its city/budget/rooms from being overwritten by a fuzzy Gemini
       // re-extraction of a single turn (which was silently degrading correct asks).
-      if (!plan.isEmpty) _query = _merge(plan.toQuery(fallback: _query), _query);
+      if (!plan.isEmpty) {
+        final enriched = plan.toQuery(fallback: _query);
+        final merged = _merge(enriched, _query);
+        // _merge puts the PRE-enrich on-device weights last ("b wins"), which
+        // clobbered Etti's amplified importances for every factor SmartSearch
+        // had already touched — her whole soft-weight layer was dead for the
+        // factors that matter most. Re-apply her weights as a per-key MAX so
+        // both signals survive and the stronger one decides.
+        _query = merged.copyWith(weights: {
+          ...merged.weights,
+          for (final e in enriched.weights.entries)
+            if (e.value > (merged.weights[e.key] ?? 0)) e.key: e.value,
+        });
+      }
     } catch (_) {
       // graceful — the on-device SmartSearch query already stands
     }
@@ -1517,11 +1558,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Persona labels driving the ranking + sent to the explainer.
   List<String> _personaLabels(DatingProvider provider) {
     final p = provider.tenantProfile;
-    if (p == null) return const [];
-    return [...p.importantDetails, ...p.dealBreakers]
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    return [
+      // Etti's own inferred persona leads — it's the reasoning that actually
+      // drove this ranking, and the explainer never saw it before.
+      if (_ettiPersona.isNotEmpty) _ettiPersona,
+      ...?(p == null ? null : [...p.importantDetails, ...p.dealBreakers]),
+    ].map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
   }
 
   // Calls the (frozen) RecommendationExplainer over the engine's scorecards and

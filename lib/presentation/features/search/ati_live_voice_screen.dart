@@ -25,8 +25,16 @@ class AtiLiveVoiceScreen extends StatefulWidget {
     super.key,
     required this.onSearch,
     required this.onConnectFailed,
+    this.onUserUtterance,
     this.criteria = const [],
   });
+
+  /// Fired once per completed user turn with the final transcript. The live
+  /// path used to paint the transcript on screen and DROP it — so the chat's
+  /// conversation state, cohort signals and lifestyle rules never saw what the
+  /// user said by voice. The host wires this back into the same pipeline text
+  /// messages flow through.
+  final void Function(String utterance)? onUserUtterance;
 
   /// Runs the real on-device search for a search_listings tool-call; returns how
   /// many listings matched + a short spoken summary for אתי.
@@ -73,6 +81,8 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
         }
       }
       ..onTurnComplete = () {
+        final utterance = _userText.trim();
+        if (utterance.isNotEmpty) widget.onUserUtterance?.call(utterance);
         if (mounted) setState(() => _userText = '');
       }
       ..onSearchListings = (args) async {

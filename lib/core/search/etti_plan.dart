@@ -49,6 +49,15 @@ class EttiPlan {
   /// important" (raw ≥ ~1.7) becomes decisive rather than averaging out against
   /// value/budget. `size:-1.0` (undesired) → 0 (deprioritised, never a veto).
   static double _importance(double rawWeight) {
+    // BELOW neutral is a real signal, not noise: the model's own worked
+    // example emits `size:-1.0` ("willing to sacrifice size"). The old clamp
+    // dropped every raw < 1.0, so "מוכן לוותר על X" never reached the ranker.
+    // raw ∈ [-1, 1) → a small explicit de-prioritisation (0.03..0.12) that
+    // REPLACES the default weight instead of leaving it untouched.
+    if (rawWeight < 1.0) {
+      final t = ((rawWeight + 1.0) / 2.0).clamp(0.0, 1.0); // -1→0, 1→1
+      return 0.03 + t * 0.09;
+    }
     final base = (rawWeight - 1.0).clamp(0.0, 1.0).toDouble();
     if (base <= 0.5) return base; // neutral..moderate stays linear
     return (0.5 + (base - 0.5) * 1.8).clamp(0.0, 1.0); // strong signals amplified
@@ -108,6 +117,17 @@ class EttiPlan {
       'rent' => TransactionTypeFilter.rent,
       _ => fb.transactionType,
     };
+    // The prompt doesn't enumerate a closed key set, so the model routinely
+    // emits keys that ARE representable in SearchQuery but used to be silently
+    // dropped — neighborhood and property_type being the costly ones.
+    final neighborhood = s(hardConstraints['neighborhood'] ??
+            hardConstraints['area'] ??
+            hardConstraints['שכונה']) ??
+        fb.neighborhood;
+    final propertyType = s(hardConstraints['property_type'] ??
+            hardConstraints['propertyType'] ??
+            hardConstraints['type']) ??
+        fb.propertyType;
 
     // ── 2. deal-breaker features (required amenity + aggressive weight) ────────
     final features = <String>{...fb.amenities};
@@ -125,8 +145,16 @@ class EttiPlan {
       }
     }
     dealBreaker('mamad', 'feat_mamad', 'safety', hardCanonical: 'mamad');
+    dealBreaker('ממ"ד', 'feat_mamad', 'safety', hardCanonical: 'mamad');
     dealBreaker('parking', 'feat_parking', 'amenities', hardCanonical: 'parking');
     dealBreaker('elevator', 'feat_elevator', 'accessible', hardCanonical: 'elevator');
+    // Common hard asks the model emits that used to vanish (canonical keys
+    // verified against the feature catalog in rental_models.dart).
+    dealBreaker('balcony', 'feat_balcony', 'amenities', hardCanonical: 'balcony');
+    dealBreaker('storage', 'feat_storage', 'amenities', hardCanonical: 'storage');
+    dealBreaker('air_conditioning', 'feat_ac', 'amenities',
+        hardCanonical: 'airConditioning');
+    dealBreaker('garden', 'feat_garden', 'amenities', hardCanonical: 'garden');
     // pets is a HARD gate (petsAllowed veto) — weight is nearly cosmetic, but it
     // must NOT be 'accessible' or a pet owner sees a bogus "נגישות פחות חזק" concern.
     dealBreaker('pets', 'feat_pets', 'amenities', hardCanonical: 'petsAllowed');
@@ -154,6 +182,8 @@ class EttiPlan {
 
     return SearchQuery(
       city: city,
+      neighborhood: neighborhood,
+      propertyType: propertyType,
       minPrice: minPrice,
       maxPrice: maxPrice,
       minRooms: minRooms,
@@ -164,6 +194,7 @@ class EttiPlan {
       weights: weights,
       intents: intents,
       rawText: fb.rawText,
+      preferredNearbyDims: fb.preferredNearbyDims,
     );
   }
 }

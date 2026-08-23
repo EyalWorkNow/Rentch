@@ -59,9 +59,12 @@ String? nearbyKindToDimension(NearbyKind k) {
       return 'convenience';
     case NearbyKind.parks:
     case NearbyKind.dogParks:
+      return 'park';
+    // A gym/pool preference is about daily errands & facilities, not green
+    // space — mapping them to 'park' skewed the boost toward gardens.
     case NearbyKind.gyms:
     case NearbyKind.pools:
-      return 'park';
+      return 'convenience';
     case NearbyKind.synagogues:
     case NearbyKind.worship:
       return 'religious_area';
@@ -70,14 +73,21 @@ String? nearbyKindToDimension(NearbyKind k) {
     case NearbyKind.rail:
       return 'transit';
     case NearbyKind.nightlife:
-    case NearbyKind.dining:
       return 'nightlife';
+    // Restaurants ≠ bars: a family wanting dining nearby was boosting the
+    // bar-density dimension. Convenience (daily amenities) is the honest fit.
+    case NearbyKind.dining:
+      return 'convenience';
+    // Museums/theatres are an urban-vibrancy preference, not campus proximity.
     case NearbyKind.culture:
-      return 'university';
+      return 'young_area';
     case NearbyKind.coworking:
       return 'employment';
+    // Was 'quiet' — a dimension that DOESN'T EXIST (the canonical key is
+    // 'low_noise'), so picking the air-quality chip was a silent no-op that
+    // also polluted statedDimensions with a phantom key.
     case NearbyKind.airQuality:
-      return 'quiet'; // clean-air proximity ≈ environmental-quality preference
+      return 'low_noise';
     case NearbyKind.vets:
     case NearbyKind.parking:
       return null; // display-only (no ranking dimension yet)

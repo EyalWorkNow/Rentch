@@ -23,6 +23,7 @@ import 'package:dating_app/core/search/nearby_relevance.dart'
     show nearbyKindToDimension;
 import 'package:dating_app/core/services/tenant_consent_service.dart';
 import 'package:dating_app/data/models/tenant_data_consent.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
@@ -1583,6 +1584,7 @@ class DatingProvider extends ChangeNotifier {
             query: _queryFromFilters(_effectiveScoringFilters(filters)),
             profile: _tenantProfile,
             marketSource: _allProperties,
+            learner: _learner, // swipe-trained FTRL finally ranks the deck
           )
         : const <String, double>{};
     final scoreCache = filters.sortBy == SearchSortOption.bestMatch
@@ -2068,11 +2070,18 @@ class DatingProvider extends ChangeNotifier {
         : (tenant?.moveInWindow ?? '');
     final timingFit = _leadTimingFit(window, property); // [0, 1] or null
 
-    // Trust: for a real liker the one cross-device signal we carry is their
-    // verification flag; demo leads reuse the profile's computed trust score.
+    // Trust: what the candidate can SUBSTANTIATE. The dossier signals ride the
+    // like row, so a tenant with an OCR-verified income, documents, a landlord
+    // reference and a guarantor now genuinely SORTS above one with nothing —
+    // they used to be display-only chips while trust was a binary flag.
     final double trustFit;
     if (liker != null) {
-      trustFit = (liker.verified ?? false) ? 1.0 : 0.5;
+      var t = (liker.verified ?? false) ? 0.50 : 0.30;
+      if (liker.dossierIncomeVerified == true) t += 0.28;
+      if (liker.dossierDocTypes?.isNotEmpty ?? false) t += 0.10;
+      if (liker.dossierReference == true) t += 0.08;
+      if (liker.hasGuarantor == true) t += 0.04;
+      trustFit = t.clamp(0.0, 1.0);
     } else {
       trustFit = GamificationService.computeTrustScore(tenant!, const []) / 100.0;
     }
@@ -2081,6 +2090,14 @@ class DatingProvider extends ChangeNotifier {
     // Only let timing move the score when we actually have a property entry
     // date to compare against — otherwise skip it honestly (no invented fit).
     if (timingFit != null) score += timingFit * _leadTimingWeight;
+    // Urgency is a small honest tiebreaker: "מחפש עכשיו" beats "רק מסתכל"
+    // between otherwise-equal candidates, never dominating real fit.
+    switch (liker?.urgency) {
+      case 'now':
+        score += 4;
+      case 'soon':
+        score += 2;
+    }
     return score.clamp(0, 100).toDouble();
   }
 
@@ -5303,12 +5320,31 @@ class DatingProvider extends ChangeNotifier {
       photoCount: p.media.length,
     );
 
-    final outcome = _matchEngine.evaluate(
+    var outcome = _matchEngine.evaluate(
       tenant: tenant,
       landlord: landlord,
       property: property,
       propertyFitScore: matchScore(p),
     );
+    // HEADLINE ALIGNMENT: this card renders right next to the deck badge, and
+    // the two used to be computed by different engines — the same property
+    // could show 84% on the card and a lower "why this match" number, which
+    // reads as a bug and erodes trust in both. Keep the two-sided internals
+    // (fit scores, reasons, dealbreaker exclusions) exactly as evaluated, but
+    // make the HEADLINE score the same number the badge shows — unless a
+    // dealbreaker excluded the match, where the honest low score must stand.
+    final deckScore = displayMatchScore(p);
+    if (deckScore != null && !outcome.excluded && deckScore != outcome.score) {
+      outcome = MatchOutcome(
+        score: deckScore,
+        tier: MatchTierX.fromScore(deckScore),
+        propertyFitScore: outcome.propertyFitScore,
+        tenantFitScore: outcome.tenantFitScore,
+        reasons: outcome.reasons,
+        dealBreakerConflicts: outcome.dealBreakerConflicts,
+        excluded: outcome.excluded,
+      );
+    }
     if (_matchOutcomeCache.length > 400) _matchOutcomeCache.clear();
     _matchOutcomeCache[cacheKey] = outcome;
     return outcome;
@@ -5420,10 +5456,32 @@ class DatingProvider extends ChangeNotifier {
   /// is ranked by the SAME RecommendationEngine relevance as the search surface.
   /// Only real, user-set constraints are mapped (an unset budget/rooms stays null
   /// so the engine uses its priors, not a synthetic ceiling).
+  /// Intents derived from the tenant's PROFILE, not from typed text. These
+  /// dimensions (accessibility, religious_area, schools, transit, wfh…) always
+  /// existed in the engine but only fired on free-text regexes — a tenant who
+  /// ticked "צריך נגישות" in their profile got nothing. The bridge makes the
+  /// profile itself wake the matching dimensions on every surface.
+  Set<String> _profileIntents() {
+    final tp = _tenantProfile;
+    if (tp == null) return const {};
+    return {
+      if (tp.accessibilityNeed == true) SearchIntent.accessible,
+      if (tp.shabbatObservant == true ||
+          (tp.religiousLifestyle ?? '').trim().isNotEmpty)
+        SearchIntent.religiousArea,
+      if ((tp.numChildren ?? 0) > 0) SearchIntent.goodSchools,
+      if (tp.hasCar == false) SearchIntent.transit,
+      if (tp.wfh == true) SearchIntent.wfh,
+    };
+  }
+
   SearchQuery _queryFromFilters(SearchFilters f) {
     final type = f.transactionType;
     final hasMaxBudget =
         f.maxBudget > 0 && f.maxBudget < _defaultMaxBudgetFor(type);
+    // Prefer the full NL sentence (scoring-only field); fall back to the
+    // keyword filter (a parsed neighbourhood) when no sentence was typed.
+    final raw = f.nlQuery.trim().isNotEmpty ? f.nlQuery.trim() : f.query.trim();
     return SearchQuery(
       city: f.city.trim().isEmpty ? null : f.city.trim(),
       minPrice: f.minBudget > 0 ? f.minBudget : null,
@@ -5434,6 +5492,13 @@ class DatingProvider extends ChangeNotifier {
       requiredFeatures: f.requiredFeatures,
       transactionType: type,
       propertyType: f.propertyTypes.isNotEmpty ? f.propertyTypes.first : null,
+      // The deck used to build this query with NO rawText and NO intents, so
+      // every "off by default" dimension (coast/park/religious/schools/quiet/
+      // nightlife/…) stayed at weight 0 on the MAIN surface — typing "שקט
+      // ובטוח ליד רכבת" reordered nothing. Threading the text + its intents
+      // (plus the profile-derived ones) lights those 19 dimensions here too.
+      rawText: raw,
+      intents: {...SearchIntent.fromText(raw), ..._profileIntents()},
       // Boost the ranking dimensions for the nearby-place categories the seeker
       // marked important (vets/parking map to null → display-only, skipped).
       preferredNearbyDims:
@@ -5463,6 +5528,7 @@ class DatingProvider extends ChangeNotifier {
       query: _queryFromFilters(filters),
       profile: _tenantProfile,
       marketSource: _allProperties,
+      learner: _learner,
     );
     final v = rel[p.id] ?? 0.5;
     if (_inlineRelevanceMemo.length > 600) _inlineRelevanceMemo.clear();

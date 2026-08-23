@@ -2076,9 +2076,17 @@ class SearchFilters {
     this.transactionType = TransactionTypeFilter.any,
     this.strictMaxBudget = false,
     this.preferredNearby = const <NearbyKind>{},
+    this.nlQuery = '',
   });
 
   final String query;
+
+  /// The full natural-language sentence the seeker typed ("שקט ובטוח ליד
+  /// רכבת…"), kept SEPARATE from [query]: `query` is a HARD substring filter
+  /// on searchableText (a full sentence there empties the deck), while this
+  /// field is scoring-only — it feeds SearchQuery.rawText/intents so the soft
+  /// ranking dimensions fire on the deck too.
+  final String nlQuery;
   final int minBudget;
   final int maxBudget;
   final double minRooms;
@@ -2284,6 +2292,7 @@ class SearchFilters {
     TransactionTypeFilter? transactionType,
     bool? strictMaxBudget,
     Set<NearbyKind>? preferredNearby,
+    String? nlQuery,
   }) {
     return SearchFilters(
       query: query ?? this.query,
@@ -2320,6 +2329,7 @@ class SearchFilters {
       transactionType: transactionType ?? this.transactionType,
       strictMaxBudget: strictMaxBudget ?? this.strictMaxBudget,
       preferredNearby: preferredNearby ?? this.preferredNearby,
+      nlQuery: nlQuery ?? this.nlQuery,
     );
   }
 
@@ -2402,6 +2412,7 @@ class SearchFilters {
         for (final v in (json['preferredNearby'] as List<dynamic>? ?? const []))
           ...NearbyKind.values.where((k) => k.name == v), // skips unknown names
       },
+      nlQuery: json['nlQuery'] as String? ?? '',
     );
   }
 
@@ -2440,6 +2451,7 @@ class SearchFilters {
       'city': city,
       'transactionType': transactionType.name,
       'preferredNearby': preferredNearby.map((k) => k.name).toList(),
+      'nlQuery': nlQuery,
     };
   }
 }

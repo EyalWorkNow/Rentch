@@ -265,7 +265,9 @@ class AssistantService {
     final client = _http;
     try {
       final request =
-          await client.openUrl('POST', _resolve('/assistant/extract')).timeout(_timeout);
+          // extract-fields, NOT extract: /assistant/extract is Etti's intent
+          // route — this listing-fields extractor was colliding with it.
+          await client.openUrl('POST', _resolve('/assistant/extract-fields')).timeout(_timeout);
       request.headers.contentType = ContentType.json;
       final apiKey = AppConfig.awsApiKey.trim();
       if (apiKey.isNotEmpty) request.headers.add('x-api-key', apiKey);

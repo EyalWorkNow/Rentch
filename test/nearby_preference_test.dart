@@ -13,16 +13,20 @@ void main() {
       expect(nearbyKindToDimension(NearbyKind.hospitals), 'health');
       expect(nearbyKindToDimension(NearbyKind.supermarkets), 'convenience');
       expect(nearbyKindToDimension(NearbyKind.parks), 'park');
-      expect(nearbyKindToDimension(NearbyKind.gyms), 'park');
-      expect(nearbyKindToDimension(NearbyKind.pools), 'park');
+      // Gyms/pools are daily-facility preferences, not green space.
+      expect(nearbyKindToDimension(NearbyKind.gyms), 'convenience');
+      expect(nearbyKindToDimension(NearbyKind.pools), 'convenience');
       expect(nearbyKindToDimension(NearbyKind.synagogues), 'religious_area');
       expect(nearbyKindToDimension(NearbyKind.worship), 'religious_area');
       expect(nearbyKindToDimension(NearbyKind.transit), 'transit');
       expect(nearbyKindToDimension(NearbyKind.bikeShare), 'transit');
       expect(nearbyKindToDimension(NearbyKind.nightlife), 'nightlife');
-      expect(nearbyKindToDimension(NearbyKind.dining), 'nightlife');
-      expect(nearbyKindToDimension(NearbyKind.culture), 'university');
+      // Restaurants ≠ bars; museums ≠ campuses — semantic mismaps fixed.
+      expect(nearbyKindToDimension(NearbyKind.dining), 'convenience');
+      expect(nearbyKindToDimension(NearbyKind.culture), 'young_area');
       expect(nearbyKindToDimension(NearbyKind.coworking), 'employment');
+      // 'quiet' was NOT a real dimension — the air-quality chip was a no-op.
+      expect(nearbyKindToDimension(NearbyKind.airQuality), 'low_noise');
     });
 
     test('display-only categories have no ranking dimension', () {

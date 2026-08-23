@@ -43,15 +43,22 @@ class Commute {
   // Road distance ≈ this × straight-line in a typical Israeli urban grid.
   static const double _roadFactor = 1.3;
 
-  // Effective door-to-door urban driving speed (km/h) including stops/lights.
-  static const double _driveSpeedKmh = 25.0;
+  // GRADED effective door-to-door driving speed (km/h). The old flat 25 km/h
+  // read מודיעין→ת"א as ~29 min when reality is 55-80: short hops are all
+  // lights and parking, long hops mix congested arterials (איילון/כביש 1)
+  // with faster stretches — but never freeway speed door-to-door.
+  static double _driveSpeedKmh(double roadKm) {
+    if (roadKm <= 8) return 18.0; // inner-city: lights, parking, one-ways
+    if (roadKm <= 25) return 26.0; // metro-area: arterials at rush bias
+    return 38.0; // intercity mix, still congestion-biased
+  }
 
   // Effective transit speed (km/h) — slower vehicle speed; the fixed wait is
-  // added separately below.
-  static const double _transitSpeedKmh = 18.0;
+  // added separately below. Longer hops ride rail and average faster.
+  static double _transitSpeedKmh(double roadKm) => roadKm <= 12 ? 15.0 : 24.0;
 
   // Typical fixed overhead for transit (walk to stop + wait), in minutes.
-  static const double _transitOverheadMin = 8.0;
+  static const double _transitOverheadMin = 10.0;
 
   /// Coarse, deterministic commute estimate from a property to a work location.
   ///
@@ -68,9 +75,9 @@ class Commute {
     final straightKm = _haversineKm(propLat, propLon, workLat, workLon);
     final roadKm = straightKm * _roadFactor;
 
-    final driveMin = (roadKm / _driveSpeedKmh * 60).round();
+    final driveMin = (roadKm / _driveSpeedKmh(roadKm) * 60).round();
     final transitMin =
-        (_transitOverheadMin + roadKm / _transitSpeedKmh * 60).round();
+        (_transitOverheadMin + roadKm / _transitSpeedKmh(roadKm) * 60).round();
 
     return CommuteEstimate(
       straightLineKm: straightKm,

@@ -747,12 +747,24 @@ class PreferenceModelBuilder {
     'near_sea': 'coast', 'sea': 'coast', 'beach': 'coast', 'coast': 'coast',
     'yield': 'yield', 'investment': 'yield',
     'university': 'university', 'campus': 'university',
-    'nightlife': 'young_area', 'young_area': 'young_area', 'vibrant': 'young_area',
-    'quiet': 'senior_area', 'senior_area': 'senior_area', 'calm': 'senior_area',
+    // nightlife has its OWN bar-density dimension — it used to alias to
+    // young_area, double-counting an LLM nightlife weight onto two dims.
+    'nightlife': 'nightlife', 'young_area': 'young_area', 'vibrant': 'young_area',
+    'quiet': 'low_noise', 'senior_area': 'senior_area', 'calm': 'senior_area',
     'luxury': 'luxury', 'premium': 'luxury',
     'view': 'view',
     'spacious': 'spaciousness', 'spaciousness': 'spaciousness',
     'accessible': 'accessibility', 'accessibility': 'accessibility',
+    // Previously unreachable dims — an LLM weight on any of these vanished.
+    'park': 'park', 'green': 'park', 'nature': 'park',
+    'religious': 'religious_area', 'religious_area': 'religious_area',
+    'school_young': 'school_young', 'kindergarten': 'school_young',
+    'school_teen': 'school_teen', 'high_school': 'school_teen',
+    'low_noise': 'low_noise', 'noise': 'low_noise',
+    'convenience': 'convenience', 'shopping': 'convenience',
+    'future_value': 'future_value', 'growth': 'future_value',
+    'employment': 'employment', 'near_work': 'employment', 'jobs': 'employment',
+    'low_floor': 'low_floor',
   };
 
   /// The importance the assistant assigned to [dim] (0 if it didn't mention it) —
@@ -1332,17 +1344,32 @@ class PreferenceModelBuilder {
     // then does only the math the model asked for. Budget/location keep a small
     // floor so price/place are never entirely ignored.
     if (query.weights.isNotEmpty) {
-      stated.clear();
+      // The model decides what matters — but only for dims it can EXPRESS.
+      // The old behaviour zeroed EVERY dim the model didn't name, which wiped
+      // intent-derived weights for dims with no factor alias (a "קרוב לים +
+      // שכונה דתית" search went coast/religious-blind the moment the LLM
+      // returned weights). Now: LLM value wins where given; an intent-stated
+      // dim the model was silent on KEEPS its sharpened weight; everything
+      // else drops to 0 as before.
+      final intentStated = Set<String>.from(stated);
       for (final dim in kScoringDimensions) {
         final llmImp = llmWeightForDim(dim, query.weights); // what the model set
-        var imp = llmImp;
-        if (dim == 'budget') imp = math.max(imp, 0.35);
-        if (dim == 'location') imp = math.max(imp, 0.20);
-        weights[dim] = BayesianWeight(imp, 0.02); // confident: the model decided
-        // Only "stated" when the model ACTUALLY weighted it — the budget/location
-        // FLOOR must not mark budget as stated (else a no-budget search shows a
-        // phantom "over budget" concern against the default median budget).
-        if (llmImp > 0) stated.add(dim);
+        if (llmImp > 0) {
+          var imp = llmImp;
+          if (dim == 'budget') imp = math.max(imp, 0.35);
+          if (dim == 'location') imp = math.max(imp, 0.20);
+          weights[dim] = BayesianWeight(imp, 0.02); // the model decided
+          stated.add(dim);
+        } else if (!intentStated.contains(dim)) {
+          var imp = 0.0;
+          if (dim == 'budget') imp = 0.35;
+          if (dim == 'location') imp = 0.20;
+          weights[dim] = BayesianWeight(imp, 0.02);
+          // Floors are not "stated" — a no-budget search must not grow a
+          // phantom "over budget" concern against the default median budget.
+          stated.remove(dim);
+        }
+        // else: intent-stated, model silent → keep the sharpened weight.
       }
     }
 

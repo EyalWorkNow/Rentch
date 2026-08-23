@@ -47,8 +47,45 @@ class ScorecardStats {
     _addSchools(out, property, gov);
     _addFamily(out, property, gov);
     _addHealth(out, property, gov);
+    _addNoise(out, property, gov);
+    _addFutureInfra(out, property, gov);
 
     return out;
+  }
+
+  // ── low_noise: proximity to a MAJOR road / rail line — a top real-world
+  //    regret driver that was scored but never SHOWN to the seeker (the layer
+  //    lived only in the broker screens). Omit when the dataset has no answer. ──
+  static void _addNoise(
+    Map<String, String> out,
+    RentalProperty p,
+    GovData gov,
+  ) {
+    if (!gov.loaded) return;
+    final noise = gov.roadNoiseScore(p.lat, p.lon); // 1 on-cell, 0.5 ring, 0 clear
+    if (noise == null) return;
+    out['low_noise'] = noise >= 1.0
+        ? 'סמוך לציר תנועה ראשי / מסילה (רעש צפוי)'
+        : noise > 0
+            ? 'ציר תנועה ראשי בקרבת מקום'
+            : 'ללא ציר תנועה ראשי סמוך (שקט יחסית)';
+  }
+
+  // ── future_value: a PLANNED metro/light-rail station or urban renewal near
+  //    the property — the strongest thing you can tell a buyer, previously
+  //    locked behind the broker's area-intel screen. Bonus-only: no plans → no
+  //    line (never a scare). ─────────────────────────────────────────────────
+  static void _addFutureInfra(
+    Map<String, String> out,
+    RentalProperty p,
+    GovData gov,
+  ) {
+    if (!gov.loaded) return;
+    final score = gov.futureValueScore(p.lat, p.lon); // [0,1], 0 = nothing near
+    if (score < 0.35) return; // only surface a genuinely-near plan
+    out['future_value'] = score >= 0.7
+        ? 'תחנת מטרו/רק"ל מתוכננת או התחדשות עירונית בסמיכות ממש'
+        : 'תשתית מתוכננת (מטרו/רק"ל/התחדשות) באזור';
   }
 
   // ── value: ₪/m² of the unit vs the locality's gov ₪/m² median, plus the
