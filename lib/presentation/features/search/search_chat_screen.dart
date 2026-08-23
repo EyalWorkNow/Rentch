@@ -2720,18 +2720,33 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
-  /// The tiny action icons beside a bubble: edit (own messages) + copy.
+  /// The action icons beside a bubble: edit (own messages) + copy.
+  /// DESIGN RULE: primary-blue icon on a WHITE circle — never blue on a
+  /// tinted/light-blue ground.
   Widget _msgIcons(_ChatMsg m, bool isUser) {
     Widget btn(IconData icon, VoidCallback onTap) => GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Icon(icon, size: 15, color: AppColors.textSecondary),
+          child: Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.symmetric(vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.borderLight),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Icon(icon, size: 14, color: AppColors.primary),
           ),
         );
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (isUser)
           btn(IconsaxPlusLinear.edit_2, () {
@@ -3021,10 +3036,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           if (_editingMsg != null)
             Container(
               margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              // Blue on WHITE (design rule) — the tinted primaryLight ground
+              // made this read as blue-on-light-blue.
               decoration: BoxDecoration(
-                color: AppColors.primaryLight,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
+                border:
+                    Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.navy.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3)),
+                ],
               ),
               child: Row(children: [
                 Icon(IconsaxPlusLinear.edit_2,
@@ -3037,7 +3062,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primaryDark)),
+                          color: AppColors.primary)),
                 ),
                 InkWell(
                   onTap: () => setState(() {
