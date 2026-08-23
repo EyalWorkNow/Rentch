@@ -7371,6 +7371,10 @@ const ETTI_EXTRACT_PROMPT = [
   '4. Specific community/religious needs (synagogue, Shabbat, Olim communities,',
   '   Haredi cities, mamad in the South) ⇒ turn location & specific amenities into',
   '   STRICT HARD CONSTRAINTS that override general preferences.',
+  '5. "לא רחוק מ-X" / "קרוב ל-X" where X is a NAMED place (a specific hospital,',
+  '   university, college or train station — e.g. איכילוב, שיבא, הטכניון,',
+  '   אוניברסיטת תל אביב) ⇒ hard_constraints.near_place = the place name EXACTLY',
+  '   as the user said it (Hebrew). A generic "ליד הים/פארק" is NOT near_place.',
   '',
   'OUTPUT strictly valid JSON ONLY (no prose), with:',
   '- "hard_constraints": absolute deal-breakers, e.g. {"city":"תל אביב-יפו","mamad":true,"max_price":6000}',
@@ -7714,6 +7718,11 @@ async function createRealtimeSession(event) {
           additionalProperties: { type: 'number' },
           description:
             'Importance per factor, -1..2 (1 neutral): budget, value, size, transit, safety, schools, family, near_sea, quiet, nightlife, central, luxury, view, spacious…',
+        },
+        near_place: {
+          type: 'string',
+          description:
+            'A NAMED place the user wants to live near (specific hospital/university/train station, Hebrew, e.g. איכילוב, הטכניון)',
         },
         notes: { type: 'string', description: 'Free-text nuance worth keeping' },
         query: { type: 'string', description: 'The user request, verbatim Hebrew' },

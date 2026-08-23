@@ -2,6 +2,7 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/search/anchor_resolver.dart';
 import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
@@ -847,6 +848,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         rawText: rawText,
         intents: intents,
         weights: llmWeights,
+        // Voice: "לא רחוק מ-X" via the structured near_place param, with the
+        // free-text fallback resolving from rawText.
+        anchor: AnchorResolver.resolveNamed(
+                (args['near_place'] ?? args['nearPlace'] ?? '').toString()) ??
+            AnchorResolver.resolve(rawText),
       ),
     );
     final life = (args['lifestyle'] as String?)?.toLowerCase() ?? '';
@@ -1948,6 +1954,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         intents: {...a.intents, ...b.intents},
         weights: {...a.weights, ...b.weights}, // latest turn's importances win
         requiredFeatures: {...a.requiredFeatures, ...b.requiredFeatures},
+        // Latest "לא רחוק מ-X" anchor wins; an earlier one carries over until
+        // replaced (a city switch drops it via _prefsOnly, which omits it).
+        anchor: b.anchor ?? a.anchor,
+        preferredNearbyDims: {...a.preferredNearbyDims, ...b.preferredNearbyDims},
       );
 
   // Canonical city name for equality — strips the "- יפו" / parenthetical suffix

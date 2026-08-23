@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/advanced_matcher.dart';
+import 'package:dating_app/core/search/anchor_resolver.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/search_intent.dart';
@@ -157,6 +158,7 @@ class SearchQuery {
     this.areaDir,
     this.areaDirExclude = false,
     Set<String>? preferredNearbyDims,
+    this.anchor,
   })  : amenities = amenities ?? <String>{},
         intents = intents ?? <String>{},
         weights = weights ?? const <String, double>{},
@@ -172,6 +174,10 @@ class SearchQuery {
   final double? maxRooms;
   final String? propertyType; // normalised, matched against RentalProperty.propertyType
   final Set<String> amenities; // PropertyFeatureSet keys, e.g. feat_pets
+
+  /// "לא רחוק מ-X": a resolved NAMED place (hospital / university / rail
+  /// station) the results must be near. Gates + boosts + a scorecard axis.
+  final NearAnchor? anchor;
   final bool nearTrain;
   final bool cheapPreference; // user asked for "the cheapest"
 
@@ -242,6 +248,8 @@ class SearchQuery {
     List<String>? excludeAreas,
     String? areaDir,
     bool? areaDirExclude,
+    Set<String>? preferredNearbyDims,
+    NearAnchor? anchor,
   }) =>
       SearchQuery(
         city: city ?? this.city,
@@ -262,6 +270,10 @@ class SearchQuery {
         excludeAreas: excludeAreas ?? this.excludeAreas,
         areaDir: areaDir ?? this.areaDir,
         areaDirExclude: areaDirExclude ?? this.areaDirExclude,
+        // preferredNearbyDims used to be DROPPED by copyWith — every what-if
+        // mutation silently erased the seeker's nearby-category boosts.
+        preferredNearbyDims: preferredNearbyDims ?? this.preferredNearbyDims,
+        anchor: anchor ?? this.anchor,
       );
 
   bool get isEmpty =>
@@ -862,6 +874,9 @@ class SmartSearch {
         // so flag the engine to widen the city gate. See _isAreaSearch.
         if (_isAreaSearch(text, city)) SearchIntent.cityArea,
       },
+      // "לא רחוק מאיכילוב" / "קרוב לטכניון" / "ליד תחנת רכבת השלום" — a NAMED
+      // place anchor that gates + boosts + explains the results.
+      anchor: AnchorResolver.resolve(text),
     );
   }
 

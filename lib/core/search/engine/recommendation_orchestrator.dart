@@ -21,6 +21,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/finance/commute.dart';
 import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/search/anchor_resolver.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
@@ -741,6 +742,21 @@ class RecommendationEngine {
       if (nearSea.isNotEmpty) candidates = nearSea;
     }
 
+    // NAMED-ANCHOR gate ("לא רחוק מאיכילוב"): identity, same as near-sea —
+    // within the anchor's radius when anything qualifies; one honest ×1.5
+    // widening for sparse areas; never silently relaxed beyond that (an
+    // anchored search with zero in-range flats should SAY so, not wander).
+    final anchor = query.anchor;
+    if (anchor != null) {
+      List<RentalProperty> within(double r) => [
+            for (final p in candidates)
+              if (_km(p.lat, p.lon, anchor.lat, anchor.lon) <= r) p
+          ];
+      var near = within(anchor.radiusKm);
+      if (near.isEmpty) near = within(anchor.radiusKm * 1.5);
+      if (near.isNotEmpty) candidates = near;
+    }
+
     // Backfill pool captured HERE — after the IDENTITY gates (city, must-have
     // features, near-sea) but before the SOFT ones (budget, rooms). So topping the
     // list up to ~10 relaxes only budget/rooms (a "slightly over budget" or
@@ -907,6 +923,20 @@ class RecommendationEngine {
         c.score *= 1.0 + 0.30 * prox;
       }
       ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
+    // ANCHOR re-rank: the gate above kept everything in range; this orders the
+    // survivors nearest-to-the-anchor first (scaled to the anchor's own radius
+    // so a 2km rail anchor is as discriminating as a 4km hospital one).
+    if (query.anchor != null) {
+      final a = query.anchor!;
+      final scale = (a.radiusKm / 2.5).clamp(0.8, 2.0);
+      for (final c in ranked) {
+        final km = _km(c.property.lat, c.property.lon, a.lat, a.lon);
+        if (!km.isFinite) continue;
+        c.score *= 1.0 + 0.25 * math.exp(-km / scale);
+      }
+      ranked.sort((a2, b2) => b2.score.compareTo(a2.score));
     }
 
     // CHEAPEST re-rank: an explicit "הכי זול" is a request for the lowest PRICE,
@@ -1135,6 +1165,7 @@ class RecommendationEngine {
             highlights: highlights,
             workLat: workLat,
             workLon: workLon,
+            anchor: query.anchor,
           );
           return Recommendation(
             property: c.property,
@@ -1175,6 +1206,7 @@ class RecommendationEngine {
     required List<String> highlights,
     double? workLat,
     double? workLon,
+    NearAnchor? anchor,
   }) {
     final stats = ScorecardStats.statLabels(c.property, market);
     final weightSum = model.weightSum;
@@ -1216,6 +1248,11 @@ class RecommendationEngine {
     // the property has usable coordinates. Off by default → fully back-compat.
     final commuteDim = _commuteDimension(c.property, workLat, workLon);
     if (commuteDim != null) dimensions.add(commuteDim);
+
+    // "לא רחוק מ-X": the anchored distance the seeker asked about, leading the
+    // card with the REAL km to the named place.
+    final anchorDim = _anchorDimension(c.property, anchor);
+    if (anchorDim != null) dimensions.add(anchorDim);
 
     // True monthly cost (rent + arnona + vaad) — a listing can fit on rent yet
     // blow the budget once municipal tax + maintenance are added.
@@ -1366,6 +1403,30 @@ class RecommendationEngine {
   /// Informational "קרבה לים" axis from the real coastline geo-index. Shown only
   /// when the property is within ~8 km of the sea; weight 0 (explains, doesn't
   /// re-rank). Null inland.
+  /// "לא רחוק מ-X" axis: real distance from the NAMED anchor the seeker asked
+  /// for. Weighted (it genuinely re-ranks via the anchor boost) and stat-rich:
+  /// "כ-1.2 ק"מ מאיכילוב".
+  static ScorecardDimension? _anchorDimension(
+      RentalProperty property, NearAnchor? anchor) {
+    if (anchor == null) return null;
+    final km = _km(property.lat, property.lon, anchor.lat, anchor.lon);
+    if (!km.isFinite) return null;
+    final score =
+        (1.0 - km / (anchor.radiusKm * 1.5)).clamp(0.0, 1.0).toDouble();
+    final kmLabel = km < 1
+        ? '${(km * 1000).round()} מ\''
+        : '${km.toStringAsFixed(1)} ק"מ';
+    return ScorecardDimension(
+      key: 'anchor',
+      label: 'מרחק מ${anchor.name}',
+      weightPct: 0.18,
+      contributionPct: score,
+      stat: 'כ-$kmLabel מ${anchor.name}',
+      source: null,
+      positive: km <= anchor.radiusKm * 0.6,
+    );
+  }
+
   static ScorecardDimension? _coastDimension(
       RentalProperty property, UserPreferenceModel model, double weightSum) {
     final km = IsraelGeoIndex.coastKm(property.lat, property.lon);
@@ -1735,6 +1796,24 @@ class RecommendationEngine {
         final prox = math.exp(-km / 6.0);
         final id = c.property.id;
         out[id] = ((out[id] ?? 0) + 0.12 * prox).clamp(0.0, 1.0);
+      }
+    }
+    // "לא רחוק מ-X" on the DECK: in-range flats get a proximity boost, and
+    // beyond-range ones sink hard (soft demotion, not exclusion — the deck's
+    // own filters decide visibility; here we make far ones rank last).
+    final anchor = query.anchor;
+    if (anchor != null) {
+      final scale = (anchor.radiusKm / 2.5).clamp(0.8, 2.0);
+      for (final c in ranked) {
+        final km = _km(c.property.lat, c.property.lon, anchor.lat, anchor.lon);
+        if (!km.isFinite) continue;
+        final id = c.property.id;
+        if (km <= anchor.radiusKm * 1.5) {
+          out[id] = ((out[id] ?? 0) + 0.15 * math.exp(-km / scale))
+              .clamp(0.0, 1.0);
+        } else {
+          out[id] = (out[id] ?? 0) * 0.55;
+        }
       }
     }
     return out;

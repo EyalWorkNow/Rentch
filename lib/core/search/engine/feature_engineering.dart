@@ -278,6 +278,22 @@ class IsraelGeoIndex {
   static double? nearestUniversityKm(double lat, double lon) =>
       _nearest(lat, lon, _universities);
 
+  /// Rail station lookup BY NAME for the "לא רחוק מ-X" anchor resolver:
+  /// returns (name, lat, lon) of the first of the 244 bundled stations whose
+  /// name contains / is contained by [q]. Null when unloaded or no match.
+  static (String, double, double)? railStationNamed(String q) {
+    final list = _poiLayers['rail'];
+    final needle = q.trim();
+    if (list == null || needle.length < 3) return null;
+    for (final p in list) {
+      if (p.name.isEmpty) continue;
+      if (p.name.contains(needle) || needle.contains(p.name)) {
+        return (p.name, p.lat, p.lon);
+      }
+    }
+    return null;
+  }
+
   /// Distance to the Mediterranean coastline (km), approximated by nearest
   /// coastal reference point.
   static double? coastKm(double lat, double lon) =>

@@ -1,3 +1,4 @@
+import 'package:dating_app/core/search/anchor_resolver.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/rental_models.dart' show TransactionTypeFilter;
@@ -128,6 +129,15 @@ class EttiPlan {
             hardConstraints['propertyType'] ??
             hardConstraints['type']) ??
         fb.propertyType;
+    // "לא רחוק מ-X" as a structured constraint (the on-device parse already
+    // resolves it from rawText — this catches the model's explicit key too).
+    final nearPlace = s(hardConstraints['near_place'] ??
+        hardConstraints['nearPlace'] ??
+        hardConstraints['near']);
+    final anchor = (nearPlace != null
+            ? AnchorResolver.resolveNamed(nearPlace)
+            : null) ??
+        fb.anchor;
 
     // ── 2. deal-breaker features (required amenity + aggressive weight) ────────
     final features = <String>{...fb.amenities};
@@ -195,6 +205,7 @@ class EttiPlan {
       intents: intents,
       rawText: fb.rawText,
       preferredNearbyDims: fb.preferredNearbyDims,
+      anchor: anchor,
     );
   }
 }

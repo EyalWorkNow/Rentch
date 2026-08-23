@@ -23,6 +23,7 @@ import 'package:dating_app/core/search/nearby_relevance.dart'
     show nearbyKindToDimension;
 import 'package:dating_app/core/services/tenant_consent_service.dart';
 import 'package:dating_app/data/models/tenant_data_consent.dart';
+import 'package:dating_app/core/search/anchor_resolver.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
@@ -5499,6 +5500,8 @@ class DatingProvider extends ChangeNotifier {
       // (plus the profile-derived ones) lights those 19 dimensions here too.
       rawText: raw,
       intents: {...SearchIntent.fromText(raw), ..._profileIntents()},
+      // "לא רחוק מאיכילוב" typed into the deck search anchors the deck too.
+      anchor: AnchorResolver.resolve(raw),
       // Boost the ranking dimensions for the nearby-place categories the seeker
       // marked important (vets/parking map to null → display-only, skipped).
       preferredNearbyDims:
