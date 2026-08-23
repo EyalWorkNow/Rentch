@@ -355,23 +355,37 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   Widget _removableChip(IconData icon, String label, VoidCallback onRemove) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(9, 6, 6, 6),
+      padding: const EdgeInsets.fromLTRB(9, 5, 6, 5),
       decoration: BoxDecoration(
-          color: AppColors.primaryLight2,
-          borderRadius: BorderRadius.circular(99)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 14, color: AppColors.primaryDark),
+        Icon(icon, size: 14, color: AppColors.primary),
         const SizedBox(width: 4),
         Text(label,
+            // not const: AppColors.primary is a runtime theming color.
             style: TextStyle(
-                color: AppColors.primaryDark,
+                color: AppColors.primary,
                 fontSize: 12,
-                fontWeight: FontWeight.w700)),
+                fontWeight: FontWeight.w800)),
         const SizedBox(width: 4),
         GestureDetector(
-            onTap: onRemove,
-            child:
-                Icon(IconsaxPlusLinear.close_circle, size: 15, color: AppColors.primaryDark)),
+          onTap: onRemove,
+          child: Icon(IconsaxPlusLinear.close_circle,
+              size: 15, color: AppColors.primary),
+        ),
       ]),
     );
   }
@@ -2431,117 +2445,178 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // ── UI ────────────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Directionality(
-      textDirection: Directionality.of(context),
-      child: Scaffold(
-        backgroundColor: AppColors.cloud,
-        appBar: AppBar(
-          backgroundColor: AppColors.background,
-          elevation: 0.5,
-          titleSpacing: 0,
-          title: Row(children: [
-            const SizedBox(width: 12),
+  Widget _floatingHeader(BuildContext context, AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.30),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              tooltip: l10n.searchChatScreen82c40bcf,
+              icon: Icon(IconsaxPlusLinear.refresh_2,
+                  color: AppColors.textSecondary, size: 20),
+              onPressed: _resetConversation,
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              tooltip: l10n.searchChatScreenE13c91de,
+              icon: Icon(IconsaxPlusLinear.clock,
+                  color: AppColors.textSecondary, size: 19),
+              onPressed: _showSearchHistory,
+            ),
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _botName(context),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.searchChatScreenFaae8713,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: AppColors.success,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
             Container(
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.primary, width: 2),
                 boxShadow: [
                   BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4))
+                    color: AppColors.primary.withValues(alpha: 0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
                 ],
               ),
               clipBehavior: Clip.antiAlias,
               child: Image.asset('assets/images/eti.jpg', fit: BoxFit.cover),
             ),
-            const SizedBox(width: 10),
-            // Expanded so the header has a bounded width — otherwise the long
-            // subtitle overflows the AppBar (the "broken header").
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_botName(context),
-                      style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
-                  Row(children: [
-                    Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                            color: AppColors.success, shape: BoxShape.circle)),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(l10n.searchChatScreenFaae8713,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 11)),
-                    ),
-                  ]),
-                ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final topInset = MediaQuery.of(context).padding.top;
+
+    return Directionality(
+      textDirection: Directionality.of(context),
+      child: Scaffold(
+        backgroundColor: AppColors.cloud,
+        body: Stack(
+          children: [
+            // Layer 1: Scrollable content extending underneath the floating header controls
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusScope.of(context).unfocus(),
+                child: ListView.builder(
+                  controller: _scroll,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    topInset + 145,
+                    12,
+                    90,
+                  ),
+                  itemCount: _messages.length + (_busy ? 1 : 0),
+                  itemBuilder: (_, i) {
+                    if (i >= _messages.length) return _Typing();
+                    final isLast = i == _messages.length - 1;
+                    final bubble = _bubble(_messages[i]);
+                    return isLast ? _FadeSlideIn(child: bubble) : bubble;
+                  },
+                ),
               ),
             ),
-          ]),
-          actions: [
-            IconButton(
-              tooltip: l10n.searchChatScreenE13c91de,
-              icon: Icon(IconsaxPlusLinear.clock,
-                  color: AppColors.textSecondary, size: 22),
-              onPressed: _showSearchHistory,
+            // Layer 2: Floating Header Controls Overlay
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _floatingHeader(context, l10n),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+                      child: Center(
+                        child: SpeedModeSlider(
+                          immediate: _immediateMode,
+                          onChanged: _setImmediateMode,
+                        ),
+                      ),
+                    ),
+                    _criteriaBar(),
+                  ],
+                ),
+              ),
             ),
-            IconButton(
-              tooltip: l10n.searchChatScreen82c40bcf,
-              icon: Icon(IconsaxPlusLinear.refresh_2,
-                  color: AppColors.textSecondary, size: 24),
-              onPressed: _resetConversation,
+            // Layer 3: Bottom Input Bar Overlay
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _inputBar(),
             ),
           ],
         ),
-        body: Column(children: [
-          // Speed slider — fast (on-device) ↔ personalization (background AI).
-          // Styled identically to the discover pill selector, centred.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-            child: Center(
-              child: SpeedModeSlider(
-                immediate: _immediateMode,
-                onChanged: _setImmediateMode,
-              ),
-            ),
-          ),
-          _criteriaBar(),
-          Expanded(
-            // Tap anywhere on the conversation to dismiss the keyboard.
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: ListView.builder(
-                controller: _scroll,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-                itemCount: _messages.length + (_busy ? 1 : 0),
-                itemBuilder: (_, i) {
-                  if (i >= _messages.length) return _Typing();
-                  final isLast = i == _messages.length - 1;
-                  final bubble = _bubble(_messages[i]);
-                  return isLast ? _FadeSlideIn(child: bubble) : bubble;
-                },
-              ),
-            ),
-          ),
-          _inputBar(),
-        ]),
       ),
     );
   }
