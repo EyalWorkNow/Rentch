@@ -335,12 +335,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
     return Container(
       width: double.infinity,
-      color: AppColors.background,
-      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+      color: Colors.transparent,
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          Text(l10n.searchChatScreen3fd04a29,
+          const Text('סינון:',
               style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,

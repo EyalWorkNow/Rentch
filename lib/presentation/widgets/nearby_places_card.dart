@@ -117,6 +117,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         ..clear()
         ..addAll(out);
       _selected = _selected.clamp(0, out.isEmpty ? 0 : out.length - 1);
+      // The section list just changed (initial load / "ראה עוד מקומות") — a
+      // page index carried over from a longer section would show an EMPTY
+      // grid (skip beyond the new list's end).
+      _currentPage = 0;
       _loaded = true;
     });
   }
@@ -304,7 +308,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final sel = _selected.clamp(0, _sections.length - 1);
     final total = _sections.length;
     final limit = widget.maxChips;
-    final showAll = _showAllChips || total <= limit;
+    // Keep the chip strip expanded while a beyond-the-fold chip is selected —
+    // collapsing used to hide the selected chip entirely (grid shows section
+    // 7, chips show 0-2 with nothing highlighted).
+    final showAll = _showAllChips || total <= limit || sel >= limit;
     final count = showAll ? total : limit;
     final viewAll = total > limit ? _viewAllButton(!showAll, total - limit) : null;
     final l10n = AppLocalizations.of(context)!;
@@ -348,13 +355,20 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         // cell carries the category icon + name + distance, with prev/next
         // paging below.
         if (_sections.isNotEmpty) ...[
-          GridView.count(
-            crossAxisCount: 3,
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 0.88,
+            // FIXED cell height, not childAspectRatio: a ratio-derived height
+            // shrinks with the host width, and inside the chat bubble (much
+            // narrower than the property page) the cells dropped below their
+            // content height → "BOTTOM OVERFLOWED BY N PIXELS" stripes on
+            // every cell of אתי's מקומות-בקרבת-הדירה preview.
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              mainAxisExtent: 82,
+            ),
             children: [
               for (final pl
                   in _sections[sel].$2.skip(_currentPage * 9).take(9))
@@ -481,15 +495,22 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
   /// One cell of the 3×3 place grid: category icon in a tinted circle, the
   /// place name (up to 2 lines), and the distance — tap opens a Google search.
   Widget _gridPlaceCard(NearbyPlace p, IconData icon) {
+    final subText = p.stage.isNotEmpty
+        ? p.stage
+        : (p.sector.isNotEmpty ? p.sector : '');
+
     return InkWell(
       onTap: () => _confirmOpenGoogle(p.name),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderLight),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.22),
+            width: 1.0,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.02),
@@ -499,48 +520,51 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.cloud,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.borderLight),
+            Text(
+              p.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
               ),
-              child: Icon(icon, size: 11, color: AppColors.primary),
             ),
-            const SizedBox(height: 2),
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  p.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+            if (subText.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary.withValues(alpha: 0.7),
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
+            ],
+            const SizedBox(height: 4),
             Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.location_on_rounded, size: 9, color: AppColors.primary),
-                const SizedBox(width: 2),
                 Text(
                   _distLabel(p.km),
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary,
                   ),
+                ),
+                const SizedBox(width: 3),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 13,
+                  color: AppColors.primary,
                 ),
               ],
             ),

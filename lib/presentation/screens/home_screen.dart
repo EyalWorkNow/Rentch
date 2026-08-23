@@ -328,7 +328,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: isSelected
-                                      ? AppColors.primary
+                                      ? (isEtti
+                                          ? const Color(0xFF0F172A)
+                                          : AppColors.primary)
                                       : AppColors.ink,
                                   boxShadow: isSelected
                                       ? [
